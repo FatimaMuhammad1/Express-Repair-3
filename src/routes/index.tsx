@@ -115,10 +115,10 @@ function HomePage() {
               {/* Subtle geometric background block behind the text */}
               <div className="absolute left-[-10%] top-0 h-full w-[45%] origin-bottom-left -skew-x-[12deg] bg-slate-200/60 dark:bg-[#0e1628] transition-colors duration-500" />
               
-              {/* Solid Blue Stripe (The Cut) */}
+              {/* Solid Blue Stripe (The Cut) - Responsive */}
               <div className="absolute -right-[20%] lg:right-0 top-0 h-full w-[110%] lg:w-[46%] origin-bottom-left -skew-x-[12deg] bg-[#0095ff]" />
               
-              {/* Image Container */}
+              {/* Image Container - Responsive */}
               <div className="absolute -right-[20%] lg:right-0 top-0 h-full w-[110%] lg:w-[46%] origin-bottom-left -skew-x-[12deg] overflow-hidden translate-x-[12px] lg:translate-x-[20px]">
                 {/* Unskew the image */}
                 <div className="absolute inset-[-20%] w-[140%] h-[140%] origin-bottom-left skew-x-[12deg] flex items-center justify-center">
@@ -133,20 +133,23 @@ function HomePage() {
                 {/* Clean Transparent Parallel Overlay on the bottom left of the image */}
                 <div className="absolute left-0 bottom-0 h-[80%] w-[40%] bg-gradient-to-t from-[#0095ff]/60 to-transparent mix-blend-multiply" />
               </div>
+
+              {/* Mobile text background overlay for better readability */}
+              <div className="lg:hidden absolute inset-0 bg-gradient-to-r from-white/90 via-white/70 to-transparent dark:from-slate-900/90 dark:via-slate-900/70 dark:to-transparent" />
             </div>
 
             {/* Content Container */}
-            <div className="relative z-10 mx-auto w-full max-w-7xl px-4 md:px-8 py-24 lg:py-0">
-              <div className="max-w-full lg:max-w-[56%] flex flex-col items-start pt-12 md:pt-0">
+            <div className="relative z-10 mx-auto w-full max-w-7xl px-4 md:px-8 py-16 lg:py-0">
+              <div className="max-w-full lg:max-w-[56%] flex flex-col items-start pt-8 md:pt-12 lg:pt-0">
                 {/* Badge */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-green-500/30 bg-green-50 dark:bg-green-500/10 mb-8 shadow-sm"
+                  className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-green-500/30 bg-green-50 dark:bg-green-500/10 mb-6 md:mb-8 shadow-sm"
                 >
-                  <ShieldCheck className="w-4 h-4 text-green-600 dark:text-green-500" />
-                  <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">Trusted by Hundreds of Customers</span>
+                  <ShieldCheck className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-600 dark:text-green-500" />
+                  <span className="text-xs md:text-sm font-semibold text-slate-900 dark:text-slate-200">Trusted by Hundreds of Customers</span>
                 </motion.div>
 
                 {/* Heading */}
@@ -154,7 +157,7 @@ function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
-                  className="font-sans text-4xl md:text-5xl lg:text-[3.5rem] xl:text-[4rem] font-black uppercase leading-[1.05] tracking-tight text-[#0a1830] dark:text-white mb-6"
+                  className="font-sans text-3xl sm:text-4xl md:text-5xl lg:text-[3.5rem] xl:text-[4rem] font-black uppercase leading-[1.1] md:leading-[1.05] tracking-tight text-slate-900 dark:text-white mb-4 md:mb-6"
                 >
                   TRUSTED REPAIRS.
                   <br />
@@ -166,7 +169,7 @@ function HomePage() {
                   initial={{ opacity: 0, scaleX: 0 }}
                   animate={{ opacity: 1, scaleX: 1 }}
                   transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
-                  className="h-1.5 w-20 bg-[#0095ff] mb-8 origin-left rounded-full"
+                  className="h-1 w-16 md:w-20 bg-[#0095ff] mb-6 md:mb-8 origin-left rounded-full"
                 />
 
                 {/* Subtext */}
@@ -174,7 +177,7 @@ function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
-                  className="text-base md:text-lg text-slate-600 dark:text-slate-300 max-w-[32rem] leading-relaxed mb-10 font-medium"
+                  className="text-sm md:text-base lg:text-lg text-slate-800 dark:text-slate-300 max-w-full md:max-w-[32rem] leading-relaxed mb-8 md:mb-10 font-medium"
                 >
                   Expert repairs for phones, tablets, laptops and consoles.
                   <br className="hidden md:block" />
@@ -186,33 +189,33 @@ function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10 w-full max-w-[38rem]"
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-10 w-full max-w-full md:max-w-[38rem]"
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-start gap-2 md:gap-3">
                     <div className="mt-0.5">
-                      <Zap className="w-5 h-5 text-[#0095ff]" />
+                      <Zap className="w-4 h-4 md:w-5 md:h-5 text-[#0095ff]" />
                     </div>
                     <div className="flex flex-col">
-                      <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Fast Turnaround</h3>
-                      <p className="text-[13px] text-slate-500 dark:text-slate-400 font-medium leading-tight">Same-day service<br/>available</p>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-xs md:text-sm mb-1">Fast Turnaround</h3>
+                      <p className="text-[11px] md:text-[13px] text-slate-800 dark:text-slate-400 font-medium leading-tight">Same-day service<br/>available</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3 sm:border-l border-slate-200 dark:border-slate-800 sm:pl-6">
+                  <div className="flex items-start gap-2 md:gap-3 sm:border-l border-slate-200 dark:border-slate-800 sm:pl-4 md:pl-6">
                     <div className="mt-0.5">
-                      <ShieldCheck className="w-5 h-5 text-green-500" />
+                      <ShieldCheck className="w-4 h-4 md:w-5 md:h-5 text-green-500" />
                     </div>
                     <div className="flex flex-col">
-                      <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Warranty Included</h3>
-                      <p className="text-[13px] text-slate-500 dark:text-slate-400 font-medium leading-tight">Up to 12 months<br/>warranty</p>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-xs md:text-sm mb-1">Warranty Included</h3>
+                      <p className="text-[11px] md:text-[13px] text-slate-800 dark:text-slate-400 font-medium leading-tight">Up to 12 months<br/>warranty</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3 sm:border-l border-slate-200 dark:border-slate-800 sm:pl-6">
+                  <div className="flex items-start gap-2 md:gap-3 sm:border-l border-slate-200 dark:border-slate-800 sm:pl-4 md:pl-6">
                     <div className="mt-0.5">
-                      <Tag className="w-5 h-5 text-[#0095ff]" />
+                      <Tag className="w-4 h-4 md:w-5 md:h-5 text-[#0095ff]" />
                     </div>
                     <div className="flex flex-col">
-                      <h3 className="font-bold text-slate-900 dark:text-white text-sm mb-1">Transparent Pricing</h3>
-                      <p className="text-[13px] text-slate-500 dark:text-slate-400 font-medium leading-tight">No hidden fees.<br/>Ever.</p>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-xs md:text-sm mb-1">Transparent Pricing</h3>
+                      <p className="text-[11px] md:text-[13px] text-slate-800 dark:text-slate-400 font-medium leading-tight">No hidden fees.<br/>Ever.</p>
                     </div>
                   </div>
                 </motion.div>
@@ -222,23 +225,23 @@ function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.4, ease: "easeOut" }}
-                  className="flex flex-wrap items-center gap-4 mb-10"
+                  className="flex flex-col sm:flex-wrap sm:flex-row items-center gap-3 md:gap-4 mb-8 md:mb-10 w-full"
                 >
                   <Button
                     asChild
-                    className="rounded-full bg-[#0095ff] text-white hover:bg-[#0078d4] px-8 py-6 text-sm font-bold shadow-[0_4px_20px_rgba(0,149,255,0.3)] transition-all hover:shadow-[0_8px_30px_rgba(0,149,255,0.5)] border-0"
+                    className="rounded-full bg-[#0095ff] text-white hover:bg-[#0078d4] px-6 py-4 md:px-8 md:py-6 text-xs md:text-sm font-bold shadow-[0_4px_20px_rgba(0,149,255,0.3)] transition-all hover:shadow-[0_8px_30px_rgba(0,149,255,0.5)] border-0 w-full sm:w-auto"
                   >
-                    <Link to="/services" className="flex items-center gap-2">
-                      Get a Repair Quote <ArrowRight className="w-4 h-4" />
+                    <Link to="/services" className="flex items-center justify-center gap-2">
+                      Get a Repair Quote <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     </Link>
                   </Button>
                   <Button
                     asChild
                     variant="outline"
-                    className="rounded-full bg-transparent border-2 border-[#0095ff]/20 text-slate-900 dark:text-white hover:bg-[#0095ff]/5 dark:hover:bg-[#0095ff]/10 px-8 py-6 text-sm font-bold transition-all"
+                    className="rounded-full bg-transparent border-2 border-[#0095ff]/20 text-slate-900 dark:text-white hover:bg-[#0095ff]/5 dark:hover:bg-[#0095ff]/10 px-6 py-4 md:px-8 md:py-6 text-xs md:text-sm font-bold transition-all w-full sm:w-auto"
                   >
-                    <a href="tel:+447415278767" className="flex items-center gap-2">
-                      <Phone className="w-4 h-4 text-[#0095ff]" /> Call Us Now
+                    <a href="tel:+447415278767" className="flex items-center justify-center gap-2">
+                      <Phone className="w-3.5 h-3.5 md:w-4 md:h-4 text-[#0095ff]" /> Call Us Now
                     </a>
                   </Button>
                 </motion.div>
@@ -248,22 +251,22 @@ function HomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.6, delay: 0.5, ease: "easeOut" }}
-                  className="flex flex-wrap items-center gap-4 md:gap-5 text-sm font-medium text-slate-600 dark:text-slate-400"
+                  className="flex flex-col sm:flex-wrap sm:flex-row items-start sm:items-center gap-3 md:gap-5 text-xs md:text-sm font-medium text-slate-800 dark:text-slate-400"
                 >
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-0.5">
                       {[1, 2, 3, 4, 5].map((star) => (
-                        <Star key={star} className="w-4 h-4 fill-green-500 text-green-500" />
+                        <Star key={star} className="w-3 h-3 md:w-4 md:h-4 fill-green-500 text-green-500" />
                       ))}
                     </div>
                     <span className="text-slate-900 dark:text-slate-200 font-bold ml-1">4.9/5</span>
-                    <span>from 500+ reviews</span>
+                    <span className="hidden sm:inline">from 500+ reviews</span>
                   </div>
                   
-                  <div className="hidden md:block w-px h-5 bg-slate-300 dark:bg-slate-700" />
+                  <div className="hidden sm:block w-px h-4 md:h-5 bg-slate-300 dark:bg-slate-700" />
                   
                   <div className="flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-[#0095ff]" />
+                    <MapPin className="w-3 h-3 md:w-4 md:h-4 text-[#0095ff]" />
                     <span>Nuneaton, CV11 4HD</span>
                   </div>
                 </motion.div>

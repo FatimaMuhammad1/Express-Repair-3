@@ -337,6 +337,35 @@ function AuthPanel({
     }
   };
 
+  const handleResendVerification = async () => {
+    if (!email) {
+      setError("Please enter your email address first.");
+      return;
+    }
+    setIsLoading(true);
+    setError("");
+    setSuccessMessage("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuccessMessage(data.message);
+        setShowOtp(true);
+        setMode("login");
+      } else {
+        setError(getErrorMessage(data, "Failed to resend verification."));
+      }
+    } catch {
+      setError("Could not reach backend.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900/80 shadow-2xl shadow-slate-200/50 flex flex-col lg:flex-row">
       <div className="w-full lg:w-1/2 p-8 md:p-12">
@@ -552,13 +581,24 @@ function AuthPanel({
                 <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-[#0095ff] focus:ring-[#0095ff]" />
                 Remember me
               </label>
-              <button
-                type="button"
-                onClick={() => setMode("forgot")}
-                className="text-sm font-medium text-[#0095ff] hover:underline"
-              >
-                Forgot password?
-              </button>
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setMode("forgot")}
+                  className="text-sm font-medium text-[#0095ff] hover:underline"
+                >
+                  Forgot password?
+                </button>
+                {error && error.includes("not verified") && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    className="text-sm font-medium text-[#0095ff] hover:underline"
+                  >
+                    Resend verification
+                  </button>
+                )}
+              </div>
             </div>
             <Button
               type="submit"

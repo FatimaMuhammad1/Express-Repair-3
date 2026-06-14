@@ -104,10 +104,40 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(body.password, user.password):
         raise HTTPException(401, "Invalid credentials.")
     if not user.is_verified:
-        raise HTTPException(403, "Email not verified. Please verify your email first.")
+        raise HTTPException(403, "Email not verified. Please verify your email first or request a new verification code.")
 
     token = create_access_token({"sub": str(user.id), "role": user.role})
     return TokenResponse(message="Login successful.", token=token, user=UserOut.model_validate(user))
+
+@router.post("/resend-verification")
+def resend_verification(body: dict, db: Session = Depends(get_db)):
+    """Resend verification email for unverified users"""
+    email = body.get("email", "").strip().lower()
+    if not email:
+        raise HTTPException(400, "Email is required.")
+    
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(404, "User not found.")
+    
+    if user.is_verified:
+        return {"success": True, "message": "Email is already verified."}
+    
+    # Generate and send new OTP
+    code = _store_otp(db, email, "signup_verification")
+    send_verification_otp(email, code)
+    
+    if user.phone:
+        try:
+            send_sms_task.delay(user.phone, f"Your Electronics Repair Shop verification OTP is: {code}")
+        except Exception as e:
+            print(f"[Resend Verification] Failed to send SMS (Redis may not be running): {e}")
+    
+    return {
+        "success": True,
+        "message": "Verification code sent to your email and phone."
+    }
+
 
 @router.post("/google")
 def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):

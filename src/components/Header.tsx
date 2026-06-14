@@ -253,6 +253,12 @@ export function Header() {
                 </Link>
               )}
 
+              {/* Dark/Light mode toggle in mobile */}
+              <div className="flex items-center gap-2 py-2.5 px-3 rounded-md text-sm font-medium text-[#10274b] dark:text-slate-100">
+                <ModeToggle />
+                <span>Theme</span>
+              </div>
+
               <Link
                 to="/profile"
                 onClick={() => setOpen(false)}
