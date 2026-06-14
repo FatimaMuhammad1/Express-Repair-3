@@ -121,7 +121,7 @@ class ServiceOut(BaseModel):
 class BookingCreate(BaseModel):
     customer_name: str
     customer_email: EmailStr
-    customer_phone: str
+    customer_phone: Optional[str] = None
     device_type: str
     device_model: str
     issue_description: str
@@ -142,7 +142,7 @@ class BookingOut(BaseModel):
     id: UUID
     customer_name: str
     customer_email: str
-    customer_phone: str
+    customer_phone: Optional[str] = None
     device_type: str
     device_model: str
     issue_description: str
@@ -158,7 +158,7 @@ class BookingOut(BaseModel):
 
 class RepairCreate(BaseModel):
     customer_name: str
-    customer_phone: str
+    customer_phone: Optional[str] = None
     customer_email: Optional[EmailStr] = None
     notification_preference: Optional[str] = "email" # email or whatsapp
     device_model: str
@@ -182,7 +182,7 @@ class RepairOut(BaseModel):
     id: UUID
     tracking_id: str
     customer_name: str
-    customer_phone: str
+    customer_phone: Optional[str] = None
     device_model: str
     status: str
     status_notes: Optional[str]

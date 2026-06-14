@@ -6,6 +6,18 @@ from fastapi.staticfiles import StaticFiles
 from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products
 import os
 
+# Sentry integration (optional)
+try:
+    import sentry_sdk
+    if os.getenv("SENTRY_DSN"):
+        sentry_sdk.init(
+            dsn=os.getenv("SENTRY_DSN"),
+            traces_sample_rate=1.0,
+            environment=os.getenv("ENV", "production"),
+        )
+except ImportError:
+    pass
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create tables on startup — graceful warning if DB is not yet reachable
@@ -25,10 +37,11 @@ app = FastAPI(
     version="2.0.0",
 )
 
-# CORS — adjust origins for production
+# CORS — read from environment or allow all for development
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

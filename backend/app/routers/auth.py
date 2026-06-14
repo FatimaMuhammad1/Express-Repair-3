@@ -34,12 +34,18 @@ from app.worker import send_sms_task
 
 @router.post("/signup", status_code=201)
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == body.email).first():
+    # Trim whitespace from email
+    email = body.email.strip().lower()
+    
+    # Check if user already exists (case-insensitive)
+    existing_user = db.query(User).filter(User.email == email).first()
+    if existing_user:
+        print(f"[Signup] Email already exists: {email}")
         raise HTTPException(400, "A user with this email already exists.")
 
     user = User(
         name=body.name,
-        email=body.email,
+        email=email,
         password=hash_password(body.password),
         phone=body.phone,
         role="customer",
@@ -49,11 +55,14 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    code = _store_otp(db, body.email, "signup_verification")
-    send_verification_otp(body.email, code)
+    code = _store_otp(db, email, "signup_verification")
+    send_verification_otp(email, code)
     
     if body.phone:
-        send_sms_task.delay(body.phone, f"Your Electronics Repair Shop verification OTP is: {code}")
+        try:
+            send_sms_task.delay(body.phone, f"Your Electronics Repair Shop verification OTP is: {code}")
+        except Exception as e:
+            print(f"[Signup] Failed to send SMS (Redis may not be running): {e}")
 
     return {
         "success": True,
@@ -165,3 +174,28 @@ def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
 @router.get("/me")
 def get_me(current_user: User = Depends(get_current_user)):
     return {"success": True, "user": UserOut.model_validate(current_user)}
+
+
+@router.delete("/me")
+def delete_account(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Delete the current user account and all associated data. This action cannot be undone."""
+    from app.models import Appointment, Repair
+    
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(404, "User not found.")
+    
+    # Delete associated appointments and repairs
+    appointments = db.query(Appointment).filter(Appointment.user_id == user.id).all()
+    for appointment in appointments:
+        # Delete associated repair
+        repair = db.query(Repair).filter(Repair.appointment_id == appointment.id).first()
+        if repair:
+            db.delete(repair)
+        db.delete(appointment)
+    
+    # Delete the user
+    db.delete(user)
+    db.commit()
+    
+    return {"success": True, "message": "Account and all associated data deleted successfully."}

@@ -76,7 +76,7 @@ class CategoryOut(BaseModel):
 class TradeRequestCreate(BaseModel):
     customer_name: str
     customer_email: str
-    customer_phone: str
+    customer_phone: Optional[str] = None
     device_type: str
     device_brand: str
     device_model: str
@@ -88,7 +88,7 @@ class TradeRequestOut(BaseModel):
     id: str
     customer_name: str
     customer_email: str
-    customer_phone: str
+    customer_phone: Optional[str] = None
     device_type: str
     device_brand: str
     device_model: str

@@ -516,7 +516,7 @@ function HomePage() {
 
                 {/* RIGHT: Track Your Repair — premium frosted glass card */}
                 <Reveal delay={0.12}>
-                  <div className="rounded-2xl border border-[#b3d9ff] dark:border-slate-700 bg-gradient-to-br from-[#f0f7ff] via-[#e8f4ff] to-[#f0f7ff] dark:from-slate-950/95 dark:via-slate-900/90 dark:to-slate-950/95 backdrop-blur-xl p-10 md:p-12 flex flex-col gap-8 shadow-[0_16px_48px_-12px_rgba(0,149,255,0.15)] h-full relative overflow-hidden">
+                  <div className="rounded-2xl border border-[#b3d9ff] dark:border-slate-700 bg-gradient-to-br from-[#f0f7ff] via-[#e8f4ff] to-[#f0f7ff] dark:from-slate-950/95 dark:via-slate-900/90 dark:to-slate-950/95 backdrop-blur-xl p-6 sm:p-8 md:p-12 flex flex-col gap-6 sm:gap-8 shadow-[0_16px_48px_-12px_rgba(0,149,255,0.15)] h-full relative overflow-hidden">
                     {/* Decorative blobs */}
                     <div className="absolute -top-20 -right-20 h-40 w-40 rounded-full bg-[#0095ff]/8 dark:bg-[#0095ff]/15 blur-3xl" aria-hidden />
                     <div className="absolute -bottom-16 -left-16 h-32 w-32 rounded-full bg-[#5bbcff]/12 dark:bg-[#5bbcff]/10 blur-3xl" aria-hidden />
@@ -532,84 +532,85 @@ function HomePage() {
                       </p>
                     </div>
 
-                    <div className="relative z-10 flex gap-2">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-300" />
+                    <div className="relative z-10 flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1 min-w-0">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 dark:text-slate-300" />
                         <input
                           type="text"
                           placeholder="Enter your tracking ID (e.g. FIX-89045)"
-                          className="w-full rounded-lg border border-[#b3d9ff] dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm pl-12 pr-4 py-3.5 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 font-medium outline-none focus:border-[#0095ff] focus:ring-2 focus:ring-[#0095ff]/25 transition-all shadow-sm"
+                          className="w-full rounded-lg border border-[#b3d9ff] dark:border-slate-700 bg-white/90 dark:bg-slate-900/80 backdrop-blur-sm pl-10 pr-4 py-3 text-sm text-slate-700 dark:text-slate-100 placeholder:text-slate-500 dark:placeholder:text-slate-400 font-medium outline-none focus:border-[#0095ff] focus:ring-2 focus:ring-[#0095ff]/25 transition-all shadow-sm min-w-0"
                         />
                       </div>
-                      <button className="rounded-lg bg-[#0095ff] hover:bg-[#0080dd] text-white px-7 py-3.5 text-sm font-bold shadow-md hover:shadow-lg transition-all duration-300 uppercase tracking-wide shrink-0">
+                      <button className="w-full sm:w-auto rounded-lg bg-[#0095ff] hover:bg-[#0080dd] text-white px-6 py-3 text-sm font-bold shadow-md hover:shadow-lg transition-all duration-300 uppercase tracking-wide">
                         Track Now
                       </button>
                     </div>
 
                     {/* Progress stepper */}
-                    <div className="relative z-10">
-                      <div className="relative flex items-start justify-between mb-8">
-                        <div className="absolute top-5 left-0 right-0 flex items-center px-6 pointer-events-none">
-                          <div className="flex-1 h-[2px] bg-gradient-to-r from-[#0095ff] to-slate-300" />
-                          <div className="flex-[3] h-[1px] bg-slate-200 dark:bg-slate-700" />
+                    <div className="relative z-10 overflow-hidden py-6">
+                      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 pointer-events-none px-4">
+                        <div className="h-[2px] bg-gradient-to-r from-[#0095ff] to-slate-300" />
+                      </div>
+                      <div className="relative w-full px-4 sm:px-6">
+                        <div className="flex items-center w-full justify-between md:justify-between gap-2 md:gap-0">
+                          {[
+                            {
+                              icon: PackageCheck,
+                              label: "Received",
+                              desc: "Device logged in.",
+                              active: true,
+                            },
+                            {
+                              icon: Search,
+                              label: "Diagnosis",
+                              desc: "Checking the issue.",
+                              active: false,
+                            },
+                            {
+                              icon: Wrench,
+                              label: "Repairing",
+                              desc: "Experts are fixing.",
+                              active: false,
+                            },
+                            {
+                              icon: ShieldCheck,
+                              label: "Testing",
+                              desc: "Quality checks.",
+                              active: false,
+                            },
+                            {
+                              icon: CheckCircle2,
+                              label: "Ready",
+                              desc: "Ready for pickup.",
+                              active: false,
+                            },
+                          ].map((step) => (
+                            <div
+                              key={step.label}
+                              className="relative flex flex-col items-center text-center flex-1 md:w-[18%]"
+                            >
+                              <div
+                                className={`relative flex h-10 w-10 md:h-11 md:w-11 items-center justify-center rounded-full border-2 z-10 shadow-md transition-all ${
+                                  step.active
+                                    ? "border-[#0095ff] bg-white text-[#0095ff] shadow-[0_4px_12px_rgba(0,149,255,0.18)] dark:bg-slate-950/95 dark:text-[#7cc3ff] dark:border-slate-600"
+                                    : "border-slate-300 bg-white text-slate-400 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700"
+                                }`}
+                              >
+                                <step.icon className="h-4 w-4 md:h-5 md:w-5" strokeWidth={1.75} />
+                              </div>
+                              <div
+                                className={`mt-2 text-[10px] md:text-[11px] font-bold uppercase tracking-wide ${
+                                  step.active ? "text-[#0095ff] dark:text-sky-300" : "text-slate-600 dark:text-slate-400"
+                                }`}
+                              >
+                                {step.label}
+                              </div>
+                              <div className="mt-1 text-[9px] md:text-[10px] text-slate-500 dark:text-slate-400 leading-tight hidden sm:block px-1 font-medium">
+                                {step.desc}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        {[
-                          {
-                            icon: PackageCheck,
-                            label: "Received",
-                            desc: "Device logged in.",
-                            active: true,
-                          },
-                          {
-                            icon: Search,
-                            label: "Diagnosis",
-                            desc: "Checking the issue.",
-                            active: false,
-                          },
-                          {
-                            icon: Wrench,
-                            label: "Repairing",
-                            desc: "Experts are fixing.",
-                            active: false,
-                          },
-                          {
-                            icon: ShieldCheck,
-                            label: "Testing",
-                            desc: "Quality checks.",
-                            active: false,
-                          },
-                          {
-                            icon: CheckCircle2,
-                            label: "Ready",
-                            desc: "Ready for pickup.",
-                            active: false,
-                          },
-                        ].map((step) => (
-                          <div
-                            key={step.label}
-                            className="relative flex flex-col items-center text-center w-[18%]"
-                          >
-                            <div
-                              className={`flex h-12 w-12 items-center justify-center rounded-full border-2 z-10 shadow-md transition-all ${
-                                step.active
-                                  ? "border-[#0095ff] bg-white text-[#0095ff] shadow-[0_4px_16px_rgba(0,149,255,0.25)] dark:bg-slate-950/95 dark:text-[#7cc3ff] dark:border-slate-600"
-                                  : "border-slate-300 bg-white text-slate-400 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700"
-                              }`}
-                            >
-                              <step.icon className="h-5 w-5" strokeWidth={1.75} />
-                            </div>
-                            <div
-                              className={`mt-4 text-xs font-bold uppercase tracking-wide ${
-                                step.active ? "text-[#0095ff] dark:text-sky-300" : "text-slate-600 dark:text-slate-400"
-                              }`}
-                            >
-                              {step.label}
-                            </div>
-                            <div className="mt-1.5 text-[10px] text-slate-500 dark:text-slate-400 leading-tight hidden sm:block px-1 font-medium">
-                              {step.desc}
-                            </div>
-                          </div>
-                        ))}
                       </div>
                     </div>
 
@@ -943,7 +944,7 @@ function HomePage() {
         <div className="relative z-10 max-w-7xl mx-auto px-4">
           <Reveal>
             <motion.div
-              className="relative overflow-hidden rounded-[2.5rem] bg-sky-50 dark:bg-slate-900/80 dark:border-slate-700 border border-slate-200/70 p-10 md:p-12 shadow-[0_30px_90px_-30px_rgba(15,23,42,0.12)]"
+              className="relative overflow-hidden rounded-[2.5rem] bg-sky-50 dark:bg-slate-900/80 dark:border-slate-700 border border-slate-200/70 p-6 sm:p-8 md:p-12 shadow-[0_30px_90px_-30px_rgba(15,23,42,0.12)]"
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
@@ -953,7 +954,7 @@ function HomePage() {
               <div className="pointer-events-none absolute -left-10 bottom-14 h-48 w-48 rounded-full bg-[#e0e7ff]/40 dark:bg-[#5b8be1]/10 blur-3xl" />
               <div className="grid gap-14 xl:gap-20 lg:grid-cols-[1.3fr_0.85fr] lg:items-center">
                 <motion.div
-                  className="overflow-hidden rounded-[1.75rem] bg-slate-100 dark:bg-slate-950/95 min-h-[520px] aspect-[4/3]"
+                  className="overflow-hidden rounded-[1.75rem] bg-slate-100 dark:bg-slate-950/95 min-h-[220px] sm:min-h-[360px] md:min-h-[520px] sm:aspect-[4/3]"
                   initial={{ opacity: 0, x: -16, scale: 0.98 }}
                   whileInView={{ opacity: 1, x: 0, scale: 1 }}
                   viewport={{ once: true, margin: "-100px" }}
@@ -962,7 +963,7 @@ function HomePage() {
                   <img
                     src={workshopImage}
                     alt="Repair workshop storefront"
-                    className="w-full h-full object-contain"
+                    className="w-full h-full object-cover"
                     style={{ objectPosition: 'center center' }}
                     loading="lazy"
                   />

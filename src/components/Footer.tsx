@@ -10,7 +10,7 @@ export function Footer() {
       <GradientBackdrop variant="footer" />
       <div className="relative max-w-7xl mx-auto px-4 py-8 grid gap-10 md:grid-cols-2 lg:grid-cols-5">
         <div className="lg:col-span-2 space-y-4">
-          <Logo light />
+          <Logo dark />
           <p className="text-sm text-white/75 max-w-sm">
             Professional same-day repairs for phones, laptops, tablets and electronic devices in
             Nuneaton. Fast service, quality parts, fair prices.
@@ -94,10 +94,14 @@ export function Footer() {
       <div className="border-t border-white/10 mt-4 relative z-10">
         <div className="max-w-7xl mx-auto px-4 py-3 text-xs text-white flex items-center justify-between flex-wrap gap-2">
           <span>© 2026 Express Phone & Laptop Repair. All rights reserved.</span>
-          <span className="flex gap-4">
-            <a href="#" className="hover:text-white"></a>
-            <a href="#" className="hover:text-white"></a>
-          </span>
+          <nav aria-label="Footer legal links" className="flex gap-4">
+            <Link to="/privacy" aria-label="Privacy Policy" className="hover:text-white">
+              Privacy Policy
+            </Link>
+            <Link to="/terms" aria-label="Terms and Conditions" className="hover:text-white">
+              Terms
+            </Link>
+          </nav>
         </div>
       </div>
     </footer>

@@ -18,6 +18,7 @@ import {
   Users,
   Activity,
   TrendingUp,
+  Trash2,
   Clock,
   ChevronDown,
   User,
@@ -100,8 +101,13 @@ function AdminDashboard({
   }, []);
 
   const updateStatus = async (trackingId: string, newStatus: string) => {
+    // Optimistic update - update local state immediately
+    setRepairs(prev => prev.map(r => 
+      r.tracking_id === trackingId ? { ...r, status: newStatus } : r
+    ));
+    
     try {
-      const res = await fetch(
+      await fetch(
         `${API_BASE_URL}/repairs/${trackingId}/status`,
         {
           method: "PUT",
@@ -112,7 +118,26 @@ function AdminDashboard({
           body: JSON.stringify({ status: newStatus, notify_customer: true }),
         },
       );
-      if (res.ok) fetchRepairs();
+    } catch (e) {
+      console.error(e);
+      // Revert on error
+      setRepairs(prev => prev.map(r => 
+        r.tracking_id === trackingId ? { ...r, status: r.status } : r
+      ));
+    }
+  };
+
+  const deleteRepair = async (trackingId: string) => {
+    if (!confirm("Are you sure you want to delete this repair? This action cannot be undone.")) return;
+    
+    try {
+      const res = await fetch(`${API_BASE_URL}/repairs/${trackingId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setRepairs(prev => prev.filter(r => r.tracking_id !== trackingId));
+      }
     } catch (e) {
       console.error(e);
     }
@@ -365,6 +390,9 @@ function AdminDashboard({
                     <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">
                       Date
                     </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-slate-600 w-20">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -428,6 +456,15 @@ function AdminDashboard({
                         </td>
                         <td className="px-6 py-4 text-xs text-slate-500">
                           {new Date(r.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => deleteRepair(r.tracking_id)}
+                            className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 p-2 rounded-lg transition-colors"
+                            title="Delete repair"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </td>
                       </motion.tr>
                     ))

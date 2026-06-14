@@ -67,7 +67,7 @@ class Appointment(Base):
     user_id             = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     customer_name       = Column(String(255), nullable=False)
     customer_email      = Column(String(255), nullable=False)
-    customer_phone      = Column(String(20), nullable=False)
+    customer_phone      = Column(String(20), nullable=True)
     device_type         = Column(String(50), nullable=False)   # smartphone | laptop | tablet | console | other
     device_model        = Column(String(255), nullable=False)
     issue_description   = Column(Text, nullable=False)
@@ -89,7 +89,7 @@ class Repair(Base):
     tracking_id    = Column(String(50), unique=True, nullable=False, index=True)
     appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True)
     customer_name  = Column(String(255), nullable=False)
-    customer_phone = Column(String(20), nullable=False)
+    customer_phone = Column(String(20), nullable=True)
     device_model   = Column(String(255), nullable=False)
     status         = Column(String(50), default="received")   # received | diagnosed | repairing | testing | collection
     status_notes   = Column(Text, nullable=True)
@@ -144,7 +144,7 @@ class TradeRequest(Base):
     user_id         = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     customer_name   = Column(String(255), nullable=False)
     customer_email  = Column(String(255), nullable=False)
-    customer_phone  = Column(String(20), nullable=False)
+    customer_phone  = Column(String(20), nullable=True)
     device_type     = Column(String(50), nullable=False)
     device_brand    = Column(String(100), nullable=False)
     device_model    = Column(String(100), nullable=False)

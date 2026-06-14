@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 
 from app.database import get_db
-from app.models import Appointment, User
+from app.models import Appointment, User, Repair
 from app.schemas import BookingCreate, BookingOut, BookingStatusUpdate
 from app.dependencies import get_current_user, require_roles, optional_user
+from app.utils.helpers import generate_tracking_id
 
 router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
 
@@ -33,9 +34,28 @@ def create_booking(
     db.add(appointment)
     db.commit()
     db.refresh(appointment)
+    
+    # Create a Repair record with tracking ID
+    tracking_id = generate_tracking_id()
+    # Ensure unique tracking_id
+    while db.query(Repair).filter(Repair.tracking_id == tracking_id).first():
+        tracking_id = generate_tracking_id()
+    
+    repair = Repair(
+        appointment_id=appointment.id,
+        tracking_id=tracking_id,
+        customer_name=body.customer_name,
+        customer_phone=body.customer_phone,
+        device_model=body.device_model,
+        status="received",
+    )
+    db.add(repair)
+    db.commit()
+    
     return {
         "success": True,
         "message": "Appointment booked successfully.",
+        "tracking_id": tracking_id,
         "booking": BookingOut.model_validate(appointment),
     }
 

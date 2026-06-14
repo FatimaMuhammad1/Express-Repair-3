@@ -17,3 +17,4 @@ telnyx
 alembic
 stripe
 google-auth
+sentry-sdk>=1.45.0

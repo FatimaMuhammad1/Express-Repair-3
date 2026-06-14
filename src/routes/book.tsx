@@ -34,6 +34,7 @@ export const Route = createFileRoute("/book")({
 
 function BookPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [trackingId, setTrackingId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     customer_name: "",
@@ -112,8 +113,10 @@ function BookPage() {
       });
 
       if (res.ok) {
+        const data = await res.json();
+        setTrackingId(data.tracking_id || "");
         setSubmitted(true);
-        toast.success("Booking received! We'll contact you shortly.");
+        toast.success("Booking received! Your tracking ID is: " + (data.tracking_id || "pending"));
       } else {
         const data = await res.json();
         toast.error(data.message || "Failed to submit booking.");
@@ -141,11 +144,21 @@ function BookPage() {
                     <CheckCircle2 className="w-8 h-8 text-[#059669]" />
                   </div>
                   <h2 className="text-2xl font-bold mb-2 text-slate-950 dark:text-white">Booking Confirmed!</h2>
+                  {trackingId && (
+                    <div className="my-6 p-4 bg-[#f0f9ff] dark:bg-slate-800/50 rounded-lg border border-[#0095ff]/30">
+                      <p className="text-sm text-slate-600 dark:text-slate-400 mb-1">Your Tracking ID:</p>
+                      <p className="text-2xl font-bold text-[#0095ff] dark:text-sky-300 font-mono">{trackingId}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Use this to track your repair progress</p>
+                    </div>
+                  )}
                   <p className="text-slate-600 dark:text-slate-400 mb-6">
                     We'll be in touch shortly on 07415 278767 to confirm your repair slot.
                   </p>
                   <Button
-                    onClick={() => setSubmitted(false)}
+                    onClick={() => {
+                      setSubmitted(false);
+                      setTrackingId("");
+                    }}
                     variant="outline"
                     className="rounded-sm border-[#0095ff] text-[#0095ff] dark:text-sky-300 dark:border-sky-500 hover:bg-[#f0f9ff] dark:hover:bg-slate-800"
                   >
@@ -173,11 +186,10 @@ function BookPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="phone">Phone Number</Label>
+                      <Label htmlFor="phone">Phone Number <span className="text-xs text-slate-500">(optional)</span></Label>
                       <Input
                         id="phone"
                         type="tel"
-                        required
                         value={formData.customer_phone}
                         onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
                         placeholder="+447415278767"

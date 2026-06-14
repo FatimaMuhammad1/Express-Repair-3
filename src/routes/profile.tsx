@@ -742,6 +742,9 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
   const [myRepairs, setMyRepairs] = useState<any[]>([]);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchMyRepairs = async () => {
@@ -785,6 +788,31 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
     }
   };
 
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const token = localStorage.getItem("user_token") || localStorage.getItem("admin_token");
+      const res = await fetch(`http://localhost:8000/api/auth/me`, {
+        method: "DELETE",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        localStorage.removeItem("user_token");
+        localStorage.removeItem("admin_token");
+        localStorage.removeItem("admin_user");
+        window.dispatchEvent(new CustomEvent("auth-change", { detail: { type: "logout" } }));
+        await router.navigate({ to: "/" });
+      } else {
+        alert("Failed to delete account. Please try again.");
+      }
+    } catch (err) {
+      alert("Error deleting account. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
 
 
   const timeline = [
@@ -819,9 +847,47 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
             <p className="text-slate-500 dark:text-slate-400">Manage your devices and track repairs.</p>
           </div>
         </div>
-        <Button onClick={onSignOut} variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-900 gap-2">
-          <LogOut className="h-4 w-4" /> Sign Out
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button onClick={onSignOut} variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-900 gap-2">
+            <LogOut className="h-4 w-4" /> Sign Out
+          </Button>
+          <Button onClick={() => setShowDeleteConfirm(true)} variant="outline" className="border-rose-300 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 bg-white dark:bg-slate-900 gap-2">
+            Delete Account
+          </Button>
+        </div>
+
+        {showDeleteConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="max-w-md w-full rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 p-6 shadow-lg">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="h-12 w-12 rounded-full bg-rose-100 dark:bg-rose-950/40 flex items-center justify-center text-rose-600 dark:text-rose-400">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Delete Account?</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">This action cannot be undone. All your data will be permanently deleted.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <Button 
+                  onClick={() => setShowDeleteConfirm(false)} 
+                  variant="outline"
+                  className="flex-1"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleDeleteAccount} 
+                  disabled={isDeleting}
+                  className="flex-1 bg-rose-600 hover:bg-rose-700 text-white"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </Button>
+              </div>
+            </Card>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-3">

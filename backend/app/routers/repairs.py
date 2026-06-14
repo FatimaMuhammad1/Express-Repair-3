@@ -9,7 +9,7 @@ import io
 from app.database import get_db
 from app.models import Repair, User, Appointment
 from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrackOut
-from app.dependencies import require_roles
+from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
 from app.worker import send_email_task, send_whatsapp_task
 
@@ -34,10 +34,14 @@ def _notify_customer(repair, notification_preference, customer_email, event_type
         msg = f"Hello {repair.customer_name}, your repair ticket for {repair.device_model} status has been updated to '{repair.status}'. Track it here: {tracking_link}"
         subj = f"Repair Status Update - {repair.tracking_id}"
 
-    if notification_preference == "whatsapp" and repair.customer_phone:
-        send_whatsapp_task.delay(repair.customer_phone, msg)
-    elif customer_email:
-        send_email_task.delay(customer_email, subj, msg)
+    # Fire and forget - don't wait for Celery
+    try:
+        if notification_preference == "whatsapp" and repair.customer_phone:
+            send_whatsapp_task.apply_async(args=[repair.customer_phone, msg], ignore_result=True)
+        elif customer_email:
+            send_email_task.apply_async(args=[customer_email, subj, msg], ignore_result=True)
+    except Exception as e:
+        print(f"[Notification] Failed to send notification (Redis/Celery may not be running): {e}")
         
 
 @router.post("/create", status_code=201)
@@ -135,6 +139,50 @@ def update_repair_status(
         "success": True,
         "message": f"Repair status updated to '{body.status}'.",
         "repair": RepairOut.model_validate(repair),
+    }
+
+
+@router.delete("/{tracking_id}")
+def delete_repair(
+    tracking_id: str,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin")),
+):
+    """Delete a repair by tracking ID (admin only)"""
+    repair = db.query(Repair).filter(Repair.tracking_id == tracking_id).first()
+    if not repair:
+        raise HTTPException(404, "Repair not found.")
+    
+    # Delete associated appointment if exists
+    if repair.appointment_id:
+        appointment = db.query(Appointment).filter(Appointment.id == repair.appointment_id).first()
+        if appointment:
+            db.delete(appointment)
+    
+    db.delete(repair)
+    db.commit()
+    
+    return {"success": True, "message": "Repair deleted successfully."}
+
+
+@router.get("/my")
+def my_repairs(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all repairs for the current user"""
+    # Find repairs where the user is associated via appointment
+    repairs = (
+        db.query(Repair)
+        .join(Appointment)
+        .filter(Appointment.user_id == current_user.id)
+        .order_by(Repair.created_at.desc())
+        .all()
+    )
+    return {
+        "success": True,
+        "count": len(repairs),
+        "repairs": [RepairOut.model_validate(r) for r in repairs],
     }
 
 

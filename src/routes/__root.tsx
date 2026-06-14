@@ -14,6 +14,25 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
+// Sentry initialization (optional — requires @sentry/react)
+if (import.meta.env.PROD && window.location.hostname !== "localhost") {
+  const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
+  if (sentryDsn) {
+    try {
+      // Lazy import Sentry only in production
+      import("@sentry/react").then((Sentry) => {
+        Sentry.init({
+          dsn: sentryDsn,
+          environment: import.meta.env.MODE,
+          tracesSampleRate: 0.1,
+        });
+      });
+    } catch (e) {
+      console.error("Sentry initialization failed:", e);
+    }
+  }
+}
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">

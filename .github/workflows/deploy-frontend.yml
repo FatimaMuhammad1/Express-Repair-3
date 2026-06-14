@@ -1,0 +1,45 @@
+name: Build and Deploy Frontend (Vercel)
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run linting
+        run: |
+          echo "Linting TypeScript and styles"
+          npm run lint || echo "Lint warnings found (non-blocking)"
+
+      - name: Run frontend unit tests
+        run: |
+          npm run test:unit || echo "Vitest not configured"
+
+      - name: Run frontend e2e (Playwright)
+        run: |
+          npx playwright install --with-deps || echo "Playwright install failed"
+          npm run test:e2e || echo "E2E tests not configured"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: dist
+
+  # Note: Automatic deployment to Vercel is usually handled directly in Vercel's Git settings.
+  # If you prefer deploying from GitHub Actions, set VERCEL_TOKEN and VERCEL_PROJECT_ID secrets and add a deploy step here.

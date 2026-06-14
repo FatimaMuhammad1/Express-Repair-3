@@ -1,7 +1,10 @@
 """
 Seed the database with:
   - 6 repair services
-  - 1 admin user  (email: admin@repairshop.com / password: AdminPassword123)
+  - 4 categories
+  - 3 sample products
+
+NOTE: Admin user creation removed for security. Use create_admin.py instead.
 
 Run with:
     python seed.py
@@ -11,8 +14,7 @@ import os
 sys.path.append(os.path.dirname(__file__))
 
 from app.database import SessionLocal, engine, Base
-from app.models import User, Service, Category, Product
-from app.utils.helpers import hash_password
+from app.models import Service, Category, Product
 
 # Make sure tables exist
 Base.metadata.create_all(bind=engine)
@@ -61,15 +63,6 @@ SERVICES = [
         "icon_name": "hard-drive",
     },
 ]
-
-ADMIN = {
-    "name": "Head Technician (Admin)",
-    "email": "admin@repairshop.com",
-    "password": "AdminPassword123",
-    "phone": "1234567890",
-    "role": "admin",
-    "is_verified": True,
-}
 
 CATEGORIES = [
     {
@@ -150,23 +143,6 @@ def seed():
             print(f"[Seed] ✓  Inserted {len(SERVICES)} services.")
         else:
             print(f"[Seed] –  Services already seeded ({existing_services} found). Skipping.")
-
-        # ── Admin User ────────────────────────────────────────────────────────
-        existing_admin = db.query(User).filter(User.email == ADMIN["email"]).first()
-        if not existing_admin:
-            admin = User(
-                name=ADMIN["name"],
-                email=ADMIN["email"],
-                password=hash_password(ADMIN["password"]),
-                phone=ADMIN["phone"],
-                role=ADMIN["role"],
-                is_verified=ADMIN["is_verified"],
-            )
-            db.add(admin)
-            db.commit()
-            print(f"[Seed] ✓  Admin user created  →  {ADMIN['email']}  /  {ADMIN['password']}")
-        else:
-            print(f"[Seed] –  Admin user already exists. Skipping.")
 
         # ── Categories ────────────────────────────────────────────────────────
         existing_categories = db.query(Category).count()
