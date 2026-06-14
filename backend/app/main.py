@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
+from fastapi.staticfiles import StaticFiles
 from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products
 import os
 
@@ -16,8 +17,6 @@ try:
         )
 except ImportError:
     pass
-
-IS_VERCEL = os.getenv("VERCEL", "") == "1"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,8 +39,6 @@ app = FastAPI(
 
 # CORS — read from environment or allow all for development
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
-# Strip whitespace and trailing slashes from origins for consistent matching
-allowed_origins = [origin.strip().rstrip("/") for origin in allowed_origins]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -60,12 +57,8 @@ app.include_router(uploads.router)
 app.include_router(payments.router)
 app.include_router(products.router)
 
-# Static files — only mount when not on Vercel (filesystem is read-only on Vercel)
-if not IS_VERCEL:
-    from fastapi.staticfiles import StaticFiles
-    os.makedirs("static/uploads", exist_ok=True)
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
+os.makedirs("static/uploads", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/", tags=["Health"])
 def root():
     return {
