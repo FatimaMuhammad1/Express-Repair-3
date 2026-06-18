@@ -1,20 +1,34 @@
-import { Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
-export default function Privacy() {
+export const Route = createFileRoute("/privacy")({
+  head: () => ({
+    meta: [
+      { title: "Privacy Policy - Express Phone & Laptop Repair" },
+      {
+        name: "description",
+        content: "Privacy Policy for Express Phone & Laptop Repair. Learn how we collect, use, and protect your information.",
+      },
+    ],
+  }),
+  component: Privacy,
+});
+
+function Privacy() {
   return (
-    <main className="max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold mb-2">Privacy Policy</h1>
-      <p className="text-sm text-slate-600 mb-8">Last updated: June 2026</p>
+    <main className="relative min-h-screen bg-[#F5F1ED] dark:bg-slate-950 section-frost dark:section-frost">
+      <div className="relative z-10 mx-auto max-w-4xl px-4 py-12">
+        <h1 className="text-3xl font-bold mb-2 text-foreground">Privacy Policy</h1>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: June 2026</p>
 
-      <section className="space-y-6 text-slate-700">
-        <div>
-          <h2 className="text-xl font-semibold mb-3">1. Introduction</h2>
-          <p>
-            Express Phone & Laptop Repair ("we," "our," or "us") is committed to protecting your privacy.
-            This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you
-            visit our website and use our services.
-          </p>
-        </div>
+        <section className="space-y-6 text-foreground">
+          <div>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">1. Introduction</h2>
+            <p>
+              Express Phone & Laptop Repair ("we," "our," or "us") is committed to protecting your privacy.
+              This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you
+              visit our website and use our services.
+            </p>
+          </div>
 
         <div>
           <h2 className="text-xl font-semibold mb-3">2. Information We Collect</h2>
@@ -93,7 +107,7 @@ export default function Privacy() {
           </p>
         </div>
 
-        <div className="bg-slate-100 p-4 rounded-lg text-sm text-slate-600">
+        <div className="bg-white/90 dark:bg-slate-900/80 border border-border rounded-xl p-6 text-sm text-muted-foreground">
           <p>
             <strong>Note:</strong> This Privacy Policy is effective as of June 2026 and may be updated periodically.
             We will notify you of any material changes via email or through the website.
@@ -102,10 +116,11 @@ export default function Privacy() {
       </section>
 
       <div className="mt-12">
-        <Link to="/" className="inline-flex items-center text-blue-600 hover:underline font-medium">
+        <Link to="/" className="inline-flex items-center text-primary hover:text-primary/80 font-medium">
           ← Back to home
         </Link>
       </div>
+    </div>
     </main>
   );
 }

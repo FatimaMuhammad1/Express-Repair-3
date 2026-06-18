@@ -203,10 +203,9 @@
   );
 
   --gradient-footer-blue: linear-gradient(
-    145deg,
-    #08182e 0%,
+   lab(3.09% 1.69 -10.9),
 
-    #10274b 100%
+   lab(3.09% 1.69 -10.9)
   );
 
   --gradient-soft: linear-gradient(
@@ -239,7 +238,7 @@
 }
 
 .dark {
-  --background: oklch(0.15 0.04 260);
+  --background: lab(3.09% 1.69 -10.9);
 
   --foreground: oklch(0.97 0.01 250);
 

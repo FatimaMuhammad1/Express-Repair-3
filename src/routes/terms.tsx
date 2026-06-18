@@ -1,20 +1,34 @@
-import { Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
-export default function Terms() {
+export const Route = createFileRoute("/terms")({
+  head: () => ({
+    meta: [
+      { title: "Terms & Conditions - Express Phone & Laptop Repair" },
+      {
+        name: "description",
+        content: "Terms & Conditions for Express Phone & Laptop Repair. Read our service terms and conditions.",
+      },
+    ],
+  }),
+  component: Terms,
+});
+
+function Terms() {
   return (
-    <main className="max-w-4xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold mb-2">Terms & Conditions</h1>
-      <p className="text-sm text-slate-600 mb-8">Last updated: June 2026</p>
+    <main className="relative min-h-screen bg-[#F5F1ED] dark:bg-slate-950 section-frost dark:section-frost">
+      <div className="relative z-10 mx-auto max-w-4xl px-4 py-12">
+        <h1 className="text-3xl font-bold mb-2 text-foreground">Terms & Conditions</h1>
+        <p className="text-sm text-muted-foreground mb-8">Last updated: June 2026</p>
 
-      <section className="space-y-6 text-slate-700">
-        <div>
-          <h2 className="text-xl font-semibold mb-3">1. Agreement to Terms</h2>
-          <p>
-            By accessing and using the Express Phone & Laptop Repair website and services, you accept and agree to
-            be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please
-            do not use this service.
-          </p>
-        </div>
+        <section className="space-y-6 text-foreground">
+          <div>
+            <h2 className="text-xl font-semibold mb-3 text-foreground">1. Agreement to Terms</h2>
+            <p>
+              By accessing and using the Express Phone & Laptop Repair website and services, you accept and agree to
+              be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please
+              do not use this service.
+            </p>
+          </div>
 
         <div>
           <h2 className="text-xl font-semibold mb-3">2. Use License</h2>
@@ -116,7 +130,7 @@ export default function Terms() {
           </p>
         </div>
 
-        <div className="bg-slate-100 p-4 rounded-lg text-sm text-slate-600">
+        <div className="bg-white/90 dark:bg-slate-900/80 border border-border rounded-xl p-6 text-sm text-muted-foreground">
           <p>
             <strong>Note:</strong> These Terms & Conditions are effective as of June 2026 and may be updated periodically.
             Please review them regularly for changes.
@@ -125,10 +139,11 @@ export default function Terms() {
       </section>
 
       <div className="mt-12">
-        <Link to="/" className="inline-flex items-center text-blue-600 hover:underline font-medium">
+        <Link to="/" className="inline-flex items-center text-primary hover:text-primary/80 font-medium">
           ← Back to home
         </Link>
       </div>
+    </div>
     </main>
   );
 }

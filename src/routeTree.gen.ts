@@ -9,8 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as BuyAndSellRouteImport } from './routes/buy-and-sell'
@@ -19,6 +21,11 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccessoriesRouteImport } from './routes/accessories'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
@@ -27,6 +34,11 @@ const ServicesRoute = ServicesRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -73,8 +85,10 @@ export interface FileRoutesByFullPath {
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -84,8 +98,10 @@ export interface FileRoutesByTo {
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -96,8 +112,10 @@ export interface FileRoutesById {
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -109,8 +127,10 @@ export interface FileRouteTypes {
     | '/buy-and-sell'
     | '/contact'
     | '/faq'
+    | '/privacy'
     | '/profile'
     | '/services'
+    | '/terms'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -120,8 +140,10 @@ export interface FileRouteTypes {
     | '/buy-and-sell'
     | '/contact'
     | '/faq'
+    | '/privacy'
     | '/profile'
     | '/services'
+    | '/terms'
   id:
     | '__root__'
     | '/'
@@ -131,8 +153,10 @@ export interface FileRouteTypes {
     | '/buy-and-sell'
     | '/contact'
     | '/faq'
+    | '/privacy'
     | '/profile'
     | '/services'
+    | '/terms'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -143,12 +167,21 @@ export interface RootRouteChildren {
   BuyAndSellRoute: typeof BuyAndSellRoute
   ContactRoute: typeof ContactRoute
   FaqRoute: typeof FaqRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ServicesRoute: typeof ServicesRoute
+  TermsRoute: typeof TermsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
@@ -161,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -223,8 +263,10 @@ const rootRouteChildren: RootRouteChildren = {
   BuyAndSellRoute: BuyAndSellRoute,
   ContactRoute: ContactRoute,
   FaqRoute: FaqRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ServicesRoute: ServicesRoute,
+  TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
