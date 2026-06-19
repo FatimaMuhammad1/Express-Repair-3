@@ -53,7 +53,7 @@ function renderErrorPage() {
 let serverEntryPromise;
 async function getServerEntry() {
   if (!serverEntryPromise) {
-    serverEntryPromise = import("./server-CwGX76HY.mjs").then((n) => n.s).then(
+    serverEntryPromise = import("./server-BA6WEPc5.mjs").then((n) => n.s).then(
       (m) => m.default ?? m
     );
   }
@@ -80,8 +80,18 @@ const server = {
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-      console.error(error);
-      return new Response(renderErrorPage(), {
+      console.error("Server error:", error);
+      return new Response(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>Error</title></head>
+        <body>
+          <h1>Server Error</h1>
+          <p>${error instanceof Error ? error.message : "Unknown error"}</p>
+          <pre>${error instanceof Error ? error.stack : JSON.stringify(error)}</pre>
+        </body>
+        </html>
+      `, {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" }
       });
