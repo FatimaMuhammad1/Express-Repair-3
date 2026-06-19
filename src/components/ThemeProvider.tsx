@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
 type Theme = "dark" | "light" | "system";
 
@@ -35,7 +35,8 @@ export function ThemeProvider({
     }
   });
 
-  useLayoutEffect(() => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
     const root = window.document.documentElement;
 
     const applyTheme = (nextTheme: Theme) => {
