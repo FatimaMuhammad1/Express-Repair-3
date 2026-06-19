@@ -44,19 +44,8 @@ export default {
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
     } catch (error) {
-      console.error("Server error:", error);
-      // Return a simple error page instead of the custom one to debug
-      return new Response(`
-        <!DOCTYPE html>
-        <html>
-        <head><title>Error</title></head>
-        <body>
-          <h1>Server Error</h1>
-          <p>${error instanceof Error ? error.message : 'Unknown error'}</p>
-          <pre>${error instanceof Error ? error.stack : JSON.stringify(error)}</pre>
-        </body>
-        </html>
-      `, {
+      console.error(error);
+      return new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
