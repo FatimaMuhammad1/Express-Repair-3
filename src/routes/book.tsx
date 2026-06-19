@@ -106,7 +106,7 @@ function BookPage() {
         payload.issue_description += `\n\nImage Attachment: ${imageUrl}`;
       }
 
-      const res = await fetch("http://localhost:8000/api/bookings/create", {
+      const res = await fetch(`${API_BASE_URL}/bookings/create`, {
         method: "POST",
         headers,
         body: JSON.stringify(payload),

@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import workshopImage from "@/assets/workshop.jpg";
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -791,7 +791,7 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
       const token = localStorage.getItem("user_token") || localStorage.getItem("admin_token");
       if (!token) return;
       try {
-        const res = await fetch(`http://localhost:8000/api/repairs/my`, {
+        const res = await fetch(`${API_BASE_URL}/repairs/my`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         const data = await res.json();
@@ -832,7 +832,7 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
     setIsDeleting(true);
     try {
       const token = localStorage.getItem("user_token") || localStorage.getItem("admin_token");
-      const res = await fetch(`http://localhost:8000/api/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/auth/me`, {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
