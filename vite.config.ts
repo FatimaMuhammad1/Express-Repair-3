@@ -7,10 +7,7 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  nitro: {
-    preset: "vercel"
-  },
   tanstackStart: {
-    ssr: false, // Disable SSR to fix Vercel deployment error
+    ssr: false, // Disable SSR
   },
 });
