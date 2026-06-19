@@ -26,14 +26,21 @@ export function ThemeProvider({
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined" || typeof localStorage === "undefined") return defaultTheme;
-    try {
-      return (localStorage.getItem(storageKey) as Theme) || defaultTheme;
-    } catch {
-      return defaultTheme;
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
+
+  useEffect(() => {
+    // Load theme from localStorage on client side
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      try {
+        const savedTheme = localStorage.getItem(storageKey) as Theme;
+        if (savedTheme) {
+          setTheme(savedTheme);
+        }
+      } catch {
+        // Ignore localStorage errors
+      }
     }
-  });
+  }, [storageKey]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
