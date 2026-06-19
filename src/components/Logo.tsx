@@ -21,8 +21,12 @@ export function Logo({
       if (theme === "dark") return setResolvedDark(true);
       if (theme === "light") return setResolvedDark(false);
       // system
-      const isSystemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setResolvedDark(Boolean(isSystemDark));
+      if (typeof window !== "undefined" && window.matchMedia) {
+        const isSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        setResolvedDark(Boolean(isSystemDark));
+      } else {
+        setResolvedDark(false);
+      }
     };
     resolve();
   }, [theme, dark]);
