@@ -15,7 +15,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 // Sentry initialization (optional — requires @sentry/react)
-if (import.meta.env.PROD && window.location.hostname !== "localhost") {
+if (typeof window !== "undefined" && import.meta.env.PROD && window.location.hostname !== "localhost") {
   const sentryDsn = import.meta.env.VITE_SENTRY_DSN;
   if (sentryDsn) {
     try {
