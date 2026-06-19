@@ -159,8 +159,7 @@ function RootComponent() {
       if (!token) return;
 
       try {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
-        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+        const res = await fetch("http://localhost:8000/api/auth/me", {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
