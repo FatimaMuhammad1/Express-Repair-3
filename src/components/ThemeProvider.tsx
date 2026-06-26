@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
 
 type Theme = "dark" | "light" | "system";
 
@@ -20,64 +20,70 @@ const initialState: ThemeProviderState = {
 
 export const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
+function resolveTheme(theme: Theme): "dark" | "light" {
+  if (typeof window === "undefined") return "light";
+
+  if (theme === "system") {
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  return theme;
+}
+
+function applyTheme(theme: Theme) {
+  if (typeof window === "undefined") return;
+
+  const root = window.document.documentElement;
+  root.classList.remove("light", "dark");
+  root.classList.add(resolveTheme(theme));
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = "system",
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    if (typeof window === "undefined" || typeof localStorage === "undefined") return defaultTheme;
-    try {
-      return (localStorage.getItem(storageKey) as Theme) || defaultTheme;
-    } catch {
-      return defaultTheme;
-    }
-  });
+  const [theme, setTheme] = useState<Theme>(() => defaultTheme);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const root = window.document.documentElement;
 
-    const applyTheme = (nextTheme: Theme) => {
-      root.classList.remove("light", "dark");
-
-      if (nextTheme === "system") {
-        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-          .matches
-          ? "dark"
-          : "light";
-        root.classList.add(systemTheme);
-        return;
+    try {
+      const storedTheme = localStorage.getItem(storageKey) as Theme | null;
+      if (storedTheme) {
+        setTheme(storedTheme);
       }
+    } catch {
+      // Ignore localStorage errors
+    }
+  }, [storageKey]);
 
-      root.classList.add(nextTheme);
-    };
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
 
     applyTheme(theme);
 
-    if (theme === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      const onChange = (event: MediaQueryListEvent) => {
-        applyTheme(event.matches ? "dark" : "light");
-      };
+    if (theme !== "system") return;
 
-      mediaQuery.addEventListener?.("change", onChange);
-      return () => mediaQuery.removeEventListener?.("change", onChange);
-    }
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyTheme("system");
+
+    mediaQuery.addEventListener?.("change", onChange);
+    return () => mediaQuery.removeEventListener?.("change", onChange);
   }, [theme]);
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
+    setTheme: (nextTheme: Theme) => {
       if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
         try {
-          localStorage.setItem(storageKey, theme);
+          localStorage.setItem(storageKey, nextTheme);
         } catch {
           // Ignore localStorage errors
         }
       }
-      setTheme(theme);
+      setTheme(nextTheme);
     },
   };
 

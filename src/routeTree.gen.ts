@@ -20,6 +20,8 @@ import { Route as BookRouteImport } from './routes/book'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AccessoriesRouteImport } from './routes/accessories'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRepairsIdRouteImport } from './routes/admin.repairs.$id'
+import { Route as AdminCustomersPhoneRouteImport } from './routes/admin.customers.$phone'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -76,11 +78,21 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRepairsIdRoute = AdminRepairsIdRouteImport.update({
+  id: '/repairs/$id',
+  path: '/repairs/$id',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCustomersPhoneRoute = AdminCustomersPhoneRouteImport.update({
+  id: '/customers/$phone',
+  path: '/customers/$phone',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accessories': typeof AccessoriesRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/book': typeof BookRoute
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
@@ -89,11 +101,13 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/admin/customers/$phone': typeof AdminCustomersPhoneRoute
+  '/admin/repairs/$id': typeof AdminRepairsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accessories': typeof AccessoriesRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/book': typeof BookRoute
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
@@ -102,12 +116,14 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/admin/customers/$phone': typeof AdminCustomersPhoneRoute
+  '/admin/repairs/$id': typeof AdminRepairsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/accessories': typeof AccessoriesRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/book': typeof BookRoute
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
@@ -116,6 +132,8 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
   '/terms': typeof TermsRoute
+  '/admin/customers/$phone': typeof AdminCustomersPhoneRoute
+  '/admin/repairs/$id': typeof AdminRepairsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,6 +149,8 @@ export interface FileRouteTypes {
     | '/profile'
     | '/services'
     | '/terms'
+    | '/admin/customers/$phone'
+    | '/admin/repairs/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -144,6 +164,8 @@ export interface FileRouteTypes {
     | '/profile'
     | '/services'
     | '/terms'
+    | '/admin/customers/$phone'
+    | '/admin/repairs/$id'
   id:
     | '__root__'
     | '/'
@@ -157,12 +179,14 @@ export interface FileRouteTypes {
     | '/profile'
     | '/services'
     | '/terms'
+    | '/admin/customers/$phone'
+    | '/admin/repairs/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccessoriesRoute: typeof AccessoriesRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   BookRoute: typeof BookRoute
   BuyAndSellRoute: typeof BuyAndSellRoute
   ContactRoute: typeof ContactRoute
@@ -252,13 +276,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/repairs/$id': {
+      id: '/admin/repairs/$id'
+      path: '/repairs/$id'
+      fullPath: '/admin/repairs/$id'
+      preLoaderRoute: typeof AdminRepairsIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/customers/$phone': {
+      id: '/admin/customers/$phone'
+      path: '/customers/$phone'
+      fullPath: '/admin/customers/$phone'
+      preLoaderRoute: typeof AdminCustomersPhoneRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminCustomersPhoneRoute: typeof AdminCustomersPhoneRoute
+  AdminRepairsIdRoute: typeof AdminRepairsIdRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCustomersPhoneRoute: AdminCustomersPhoneRoute,
+  AdminRepairsIdRoute: AdminRepairsIdRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccessoriesRoute: AccessoriesRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   BookRoute: BookRoute,
   BuyAndSellRoute: BuyAndSellRoute,
   ContactRoute: ContactRoute,

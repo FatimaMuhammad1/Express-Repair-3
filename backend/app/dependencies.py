@@ -31,10 +31,11 @@ def get_current_user(
 def require_roles(*roles: str):
     """Factory that returns a dependency enforcing role-based access."""
     def checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in roles:
+        user_role = current_user.role.value if hasattr(current_user.role, 'value') else str(current_user.role)
+        if user_role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{current_user.role}' is not authorised for this resource",
+                detail=f"Role '{user_role}' is not authorised for this resource",
             )
         return current_user
     return checker

@@ -23,7 +23,7 @@ import {
   Phone,
   MapPin,
 } from "lucide-react";
-import { Layout, PageHero } from "@/components/Layout";
+import { Layout, PageHero } from "@/components/layout/Layout";
 import { HoverLift, Reveal } from "@/components/Reveal";
 import { SectionBackdrop } from "@/components/SectionBackdrop";
 

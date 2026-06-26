@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Layout } from "@/components/Layout";
+import { Layout } from "@/components/layout/Layout";
 import { SectionBackdrop } from "@/components/SectionBackdrop";
 import { Reveal } from "@/components/Reveal";
 import { Card } from "@/components/ui/card";

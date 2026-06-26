@@ -130,9 +130,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var k="vite-ui-theme";var t=localStorage.getItem(k)||"system";var r=document.documentElement;r.classList.remove("light","dark");if(t==="system"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}r.classList.add(t)}catch(e){}})();`,
+          }}
+        />
       </head>
       <body className="relative overflow-x-hidden bg-background">
         <div className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">

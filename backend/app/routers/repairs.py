@@ -12,18 +12,34 @@ from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrack
 from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
 from app.worker import send_email_task, send_whatsapp_task
+from app.utils.mailer import send_repair_status_update
 
 router = APIRouter(prefix="/api/repairs", tags=["Repairs"])
 
-VALID_STATUSES = ["received", "diagnosed", "repairing", "testing", "collection"]
+VALID_STATUSES = ["pending", "received", "diagnosed", "repairing", "testing", "collection", "completed"]
 
 STATUS_PROGRESS = {
+    "pending":     0,
     "received":   20,
     "diagnosed":  40,
     "repairing":  60,
     "testing":    80,
     "collection": 100,
+    "completed":  100,
 }
+
+
+@router.get("/")
+def get_repairs(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
+):
+    """Get all repairs (for dashboard)"""
+    repairs = db.query(Repair).order_by(Repair.created_at.desc()).limit(100).all()
+    return {
+        "success": True,
+        "repairs": [RepairOut.model_validate(r) for r in repairs]
+    }
 
 def _notify_customer(repair, notification_preference, customer_email, event_type="created"):
     tracking_link = f"https://yourdomain.com/track/{repair.tracking_id}"
@@ -48,7 +64,7 @@ def _notify_customer(repair, notification_preference, customer_email, event_type
 def create_repair(
     body: RepairCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician")),
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
 ):
     for _ in range(5):
         tracking_id = generate_tracking_id()
@@ -65,6 +81,8 @@ def create_repair(
         estimated_cost=body.estimated_cost,
         appointment_id=body.appointment_id,
         status="received",
+        priority=body.priority or "normal",
+        technician_id=body.technician_id,
         status_notes="Device received and queued for diagnostics.",
     )
     db.add(repair)
@@ -106,7 +124,7 @@ def update_repair_status(
     tracking_id: str,
     body: RepairStatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician")),
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Choose from: {', '.join(VALID_STATUSES)}")
@@ -120,20 +138,37 @@ def update_repair_status(
         repair.status_notes = body.status_notes
     if body.estimated_cost is not None:
         repair.estimated_cost = body.estimated_cost
+    if body.priority is not None:
+        repair.priority = body.priority
+    if body.technician_id is not None:
+        repair.technician_id = body.technician_id
 
     db.commit()
     db.refresh(repair)
-    
+
     if body.notify_customer:
-        # Assuming email might be linked via appointment, but for simplicity let's just use whatsapp if no email known
-        # Or you could fetch the User object via appointment_id
+        # Get customer email from appointment or user
         customer_email = None
         if repair.appointment and repair.appointment.customer_email:
             customer_email = repair.appointment.customer_email
         elif repair.appointment and repair.appointment.user:
             customer_email = repair.appointment.user.email
-            
-        _notify_customer(repair, "whatsapp" if not customer_email else "email", customer_email, "updated")
+
+        # Send detailed status update email if email is available
+        if customer_email:
+            try:
+                send_repair_status_update(
+                    email=customer_email,
+                    customer_name=repair.customer_name,
+                    tracking_id=repair.tracking_id,
+                    device_model=repair.device_model,
+                    new_status=body.status
+                )
+            except Exception as e:
+                print(f"[Email] Failed to send status update email: {e}")
+        else:
+            # Fallback to generic notification via WhatsApp
+            _notify_customer(repair, "whatsapp", None, "updated")
 
     return {
         "success": True,
@@ -189,7 +224,7 @@ def my_repairs(
 @router.get("/all")
 def all_repairs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician")),
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
 ):
     repairs = db.query(Repair).order_by(Repair.updated_at.desc()).all()
     return {
@@ -242,7 +277,7 @@ def export_repairs_csv(
 @router.get("/stats")
 def get_repair_stats(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician")),
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
 ):
     """Get repair statistics for admin dashboard"""
     total_repairs = db.query(Repair).count()

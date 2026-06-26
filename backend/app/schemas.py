@@ -164,6 +164,8 @@ class RepairCreate(BaseModel):
     device_model: str
     estimated_cost: Optional[Decimal] = Decimal("0.00")
     appointment_id: Optional[UUID] = None
+    priority: Optional[str] = "normal"
+    technician_id: Optional[UUID] = None
 
     @field_validator("customer_phone")
     @classmethod
@@ -176,6 +178,8 @@ class RepairStatusUpdate(BaseModel):
     status_notes: Optional[str] = None
     estimated_cost: Optional[Decimal] = None
     notify_customer: Optional[bool] = False
+    priority: Optional[str] = None
+    technician_id: Optional[UUID] = None
 
 
 class RepairOut(BaseModel):
@@ -185,6 +189,8 @@ class RepairOut(BaseModel):
     customer_phone: Optional[str] = None
     device_model: str
     status: str
+    priority: str
+    technician_id: Optional[UUID] = None
     status_notes: Optional[str]
     estimated_cost: Decimal
     created_at: datetime
@@ -200,9 +206,38 @@ class RepairTrackOut(BaseModel):
     status: str
     status_notes: Optional[str]
     estimated_cost: Decimal
-    progress_percentage: int
-    last_updated: datetime
-    received_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Walk-in Intake ─────────────────────────────────────────────────────────────
+
+class WalkInIntakeRequest(BaseModel):
+    customer_name: str
+    customer_phone: Optional[str] = None
+    customer_email: Optional[EmailStr] = None
+    device_model: str
+    device_type: Optional[str] = "smartphone"  # smartphone, laptop, tablet, console, other
+    issue_description: str
+    estimated_cost: Optional[Decimal] = Decimal("0.00")
+    notification_preference: Optional[str] = "email"  # email or whatsapp
+    create_invoice: bool = False
+    invoice_amount: Optional[Decimal] = None
+    tax_rate: Optional[Decimal] = Decimal("0.00")  # e.g., 0.10 for 10%
+    deposit_amount: Optional[Decimal] = Decimal("0.00")
+    payment_method: Optional[str] = None  # cash, card, bank_transfer
+    due_date: Optional[date] = None
+
+
+class WalkInIntakeResponse(BaseModel):
+    success: bool
+    message: str
+    tracking_id: str
+    repair_id: UUID
+    invoice_number: Optional[str] = None
+    invoice_id: Optional[UUID] = None
 
 class ContactRequest(BaseModel):
     name: str
@@ -215,3 +250,141 @@ class ContactRequest(BaseModel):
     @classmethod
     def check_phone(cls, v):
         return _validate_phone(v)
+
+
+# ── Finance ───────────────────────────────────────────────────────────────────
+
+class TransactionCreate(BaseModel):
+    type: str  # payment, refund, expense
+    amount: Decimal
+    description: Optional[str] = None
+    customer_name: Optional[str] = None
+    invoice_number: Optional[str] = None
+    payment_method: Optional[str] = None
+    branch_id: Optional[UUID] = None
+
+
+class InvoiceCreate(BaseModel):
+    repair_id: Optional[UUID] = None
+    customer_name: str
+    customer_email: Optional[EmailStr] = None
+    customer_phone: Optional[str] = None
+    amount: Decimal
+    tax_amount: Optional[Decimal] = Decimal("0.00")
+    deposit_paid: Optional[Decimal] = Decimal("0.00")
+    due_date: Optional[date] = None
+    branch_id: Optional[UUID] = None
+
+    @field_validator("customer_phone")
+    @classmethod
+    def check_phone(cls, v):
+        return _validate_phone(v)
+
+
+class ExpenseCreate(BaseModel):
+    category: str  # rent, utilities, supplies, wages, other
+    description: str
+    amount: Decimal
+    date: date
+    branch_id: Optional[UUID] = None
+
+
+# ── Warranty ───────────────────────────────────────────────────────────────────
+
+class WarrantyCreate(BaseModel):
+    repair_id: UUID
+    duration: int  # in days
+    start_date: date
+    expiration_date: date
+    notes: Optional[str] = None
+
+
+class WarrantyUpdate(BaseModel):
+    duration: Optional[int] = None
+    start_date: Optional[date] = None
+    expiration_date: Optional[date] = None
+    notes: Optional[str] = None
+
+
+# ── Branches ─────────────────────────────────────────────────────────────────
+
+class BranchCreate(BaseModel):
+    name: str
+    address: str
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    is_active: Optional[bool] = True
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, v):
+        return _validate_phone(v)
+
+
+class BranchUpdate(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[EmailStr] = None
+    is_active: Optional[bool] = None
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, v):
+        return _validate_phone(v)
+
+
+# ── Suppliers ─────────────────────────────────────────────────────────────────
+
+class SupplierCreate(BaseModel):
+    name: str
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    is_active: Optional[bool] = True
+
+    @field_validator("phone")
+    @classmethod
+    def check_phone(cls, v):
+        return _validate_phone(v)
+
+
+# ── Purchase Orders ─────────────────────────────────────────────────────────────
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: Optional[UUID] = None
+    branch_id: Optional[UUID] = None
+    total_amount: Optional[Decimal] = Decimal("0.00")
+    notes: Optional[str] = None
+
+
+# ── Stock Movements ───────────────────────────────────────────────────────────
+
+class StockMovementCreate(BaseModel):
+    product_id: UUID
+    type: str  # in, out, adjustment
+    quantity: int
+    reason: Optional[str] = None
+    branch_id: Optional[UUID] = None
+
+
+# ── Timeline & Notes ───────────────────────────────────────────────────────────
+
+class TimelineEntryCreate(BaseModel):
+    type: str  # status, note, comment
+    title: str
+    description: Optional[str] = None
+
+
+class TechnicianNoteCreate(BaseModel):
+    note: str
+
+
+class InternalCommentCreate(BaseModel):
+    comment: str
+
+
+# ── Customer Notes ───────────────────────────────────────────────────────────
+
+class CustomerNoteCreate(BaseModel):
+    note: str

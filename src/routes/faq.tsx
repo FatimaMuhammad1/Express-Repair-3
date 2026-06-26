@@ -18,7 +18,7 @@ import {
   Wrench,
 } from "lucide-react";
 
-import { Layout, PageHero } from "@/components/Layout";
+import { Layout, PageHero } from "@/components/layout/Layout";
 
 import { SectionBackdrop } from "@/components/SectionBackdrop";
 import { GoogleMapsIcon } from "@/components/GoogleMapsIcon";

@@ -38,7 +38,7 @@ export function Logo({
       <img
         src={src}
         alt="Express Phone & Laptop Repair logo"
-        className={`${compact ? "h-9" : "h-12 md:h-14"} w-auto object-contain ${light ? "drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]" : ""}`}
+        className={`${compact ? "h-9" : "h-16 md:h-20"} w-auto object-contain ${light ? "drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]" : ""}`}
         width={320}
         height={180}
       />

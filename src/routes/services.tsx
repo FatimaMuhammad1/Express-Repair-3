@@ -4,7 +4,7 @@ import {
   Smartphone, Laptop, Tablet, Battery, Droplets, MonitorSmartphone, Bug,
   ArrowRight, CheckCircle2, Award, Truck, ShieldCheck, Zap, Search, Wrench,
 } from "lucide-react";
-import { Layout, PageHero } from "@/components/Layout";
+import { Layout, PageHero } from "@/components/layout/Layout";
 import { Reveal } from "@/components/Reveal";
 import { SectionBackdrop } from "@/components/SectionBackdrop";
 import { Button } from "@/components/ui/button";

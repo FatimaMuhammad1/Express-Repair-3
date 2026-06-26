@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from fastapi.staticfiles import StaticFiles
-from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products
+from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products, users, communications, finance, repair_details, warranty, notifications, branches, inventory, customers, search, dashboard, audit, walkin, roles, financials, repair_parts, reorder, purchase_orders, tax, reminders, invoices, payments_stripe
 import os
 
 # Sentry integration (optional)
@@ -56,6 +56,28 @@ app.include_router(repairs.router)
 app.include_router(uploads.router)
 app.include_router(payments.router)
 app.include_router(products.router)
+app.include_router(users.router)
+app.include_router(communications.router)
+app.include_router(finance.router)
+app.include_router(repair_details.router)
+app.include_router(warranty.router)
+app.include_router(notifications.router)
+app.include_router(branches.router)
+app.include_router(inventory.router)
+app.include_router(customers.router)
+app.include_router(search.router)
+app.include_router(dashboard.router)
+app.include_router(audit.router)
+app.include_router(walkin.router)
+app.include_router(roles.router)
+app.include_router(financials.router)
+app.include_router(repair_parts.router)
+app.include_router(reorder.router)
+app.include_router(purchase_orders.router)
+app.include_router(tax.router)
+app.include_router(reminders.router)
+app.include_router(invoices.router)
+app.include_router(payments_stripe.router)
 
 os.makedirs("static/uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")

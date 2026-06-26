@@ -47,7 +47,7 @@ def create_booking(
         customer_name=body.customer_name,
         customer_phone=body.customer_phone,
         device_model=body.device_model,
-        status="received",
+        status="pending",
     )
     db.add(repair)
     db.commit()
@@ -81,7 +81,7 @@ def my_bookings(
 @router.get("/all")
 def all_bookings(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician")),
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
 ):
     bookings = db.query(Appointment).order_by(Appointment.preferred_date.desc()).all()
     return {
@@ -96,7 +96,7 @@ def update_booking_status(
     booking_id: UUID,
     body: BookingStatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician")),
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Choose from: {', '.join(VALID_STATUSES)}")

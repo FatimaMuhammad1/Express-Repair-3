@@ -133,9 +133,9 @@ def get_product(product_id: UUID, db: Session = Depends(get_db)):
 def create_product(
     body: ProductCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician"))
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))
 ):
-    """Create a new product (admin/technician only)"""
+    """Create a new product (admin/technician/STAFF/SUPER_ADMIN only)"""
     product = Product(**body.model_dump())
     db.add(product)
     db.commit()
@@ -147,9 +147,9 @@ def update_product(
     product_id: UUID,
     body: ProductUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician"))
+    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))
 ):
-    """Update a product (admin/technician only)"""
+    """Update a product (admin/technician/STAFF/SUPER_ADMIN only)"""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")

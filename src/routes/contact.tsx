@@ -30,7 +30,7 @@ import {
 
 import { toast } from "sonner";
 
-import { Layout } from "@/components/Layout";
+import { Layout } from "@/components/layout/Layout";
 
 import { SectionBackdrop } from "@/components/SectionBackdrop";
 import { GoogleMapsIcon } from "@/components/GoogleMapsIcon";

@@ -79,8 +79,6 @@
 
   --color-theme-yellow-border: var(--theme-yellow-border);
 
-  --font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
-  
   --font-display: "Playfair Display", "Plus Jakarta Sans", "Inter", system-ui, serif;
   --font-sans:
     "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -103,17 +101,17 @@
 :root {
   --radius: 0.75rem;
 
-  --background: oklch(0.982 0.012 245);
+  --background: #f3faff;
 
-  --foreground: oklch(0.16 0.055 255);
+  --foreground: #000d23;
 
-  --card: oklch(0.998 0.004 245);
+  --card: #fdffff;
 
-  --card-foreground: oklch(0.18 0.05 255);
+  --card-foreground: #021127;
 
-  --popover: oklch(1 0 0);
+  --popover: #ffffff;
 
-  --popover-foreground: oklch(0.18 0.05 255);
+  --popover-foreground: #021127;
 
   /* Fixora deep blue brand */
 
@@ -125,7 +123,7 @@
 
   --primary-foreground: #ffffff;
 
-  --primary-glow: rgba(91, 188, 255, 0.32);
+  --primary-glow: #5bbcff52;
 
   /* Cream amber yellow — matches service cards (e.g. Tablet Repair) */
 
@@ -141,33 +139,33 @@
 
   --theme-yellow-border: #fcd34d;
 
-  --theme-yellow-glow: rgba(254, 243, 199, 0.45);
+  --theme-yellow-glow: #fef3c773;
 
-  --secondary: oklch(0.995 0.002 245);
+  --secondary: #fcfeff;
 
-  --secondary-foreground: oklch(0.16 0.055 255);
+  --secondary-foreground: #000d23;
 
-  --muted: oklch(0.952 0.025 245);
+  --muted: #e2f1ff;
 
-  --muted-foreground: oklch(0.43 0.055 255);
+  --muted-foreground: #3b516e;
 
-  --accent: oklch(0.95 0.015 248);
+  --accent: #e7f0f8;
 
-  --accent-foreground: oklch(0.16 0.055 255);
+  --accent-foreground: #000d23;
 
-  --destructive: oklch(0.6 0.23 27);
+  --destructive: #ea2126;
 
-  --destructive-foreground: oklch(0.99 0 0);
+  --destructive-foreground: #fcfcfc;
 
-  --success: oklch(0.7 0.17 160);
+  --success: #00bc7b;
 
-  --success-foreground: oklch(0.99 0 0);
+  --success-foreground: #fcfcfc;
 
-  --border: oklch(0.89 0.035 248);
+  --border: #c9ddf1;
 
-  --input: oklch(0.89 0.035 248);
+  --input: #c9ddf1;
 
-  --ring: oklch(0.55 0.23 258);
+  --ring: #0069eb;
 
   /* Rich multi-stop gradients (no flat solids) */
 
@@ -202,19 +200,15 @@
     #5bbcff 100%
   );
 
-  --gradient-footer-blue: linear-gradient(
-   lab(3.09% 1.69 -10.9),
-
-   lab(3.09% 1.69 -10.9)
-  );
+  --gradient-footer-blue: linear-gradient(#060b1c, #060b1c);
 
   --gradient-soft: linear-gradient(
     165deg,
-    rgba(16, 39, 75, 0.08) 0%,
+    #10274b14 0%,
 
-    rgba(91, 188, 255, 0.04) 48%,
+    #5bbcff0a 48%,
 
-    rgba(91, 188, 255, 0.02) 100%
+    #5bbcff05 100%
   );
 
   --gradient-cta: linear-gradient(
@@ -228,49 +222,49 @@
 
   /* Shadows */
 
-  --shadow-glow: 0 26px 80px -26px oklch(0.65 0.19 238 / 0.68);
+  --shadow-glow: 0 26px 80px -26px #009ae7ad;
 
-  --shadow-card: 0 24px 70px -48px oklch(0.32 0.13 255 / 0.48);
+  --shadow-card: 0 24px 70px -48px #00316b7a;
 
-  --shadow-soft: 0 16px 45px -34px oklch(0.36 0.12 255 / 0.38);
+  --shadow-soft: 0 16px 45px -34px #003c7961;
 
   --transition-base: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
-  --background: lab(3.09% 1.69 -10.9);
+  --background: #060b1c;
 
-  --foreground: oklch(0.97 0.01 250);
+  --foreground: #f0f6fc;
 
-  --card: oklch(0.22 0.06 260);
+  --card: #091a36;
 
-  --card-foreground: oklch(0.97 0.01 250);
+  --card-foreground: #f0f6fc;
 
-  --popover: oklch(0.22 0.06 260);
+  --popover: #091a36;
 
-  --popover-foreground: oklch(0.97 0.01 250);
+  --popover-foreground: #f0f6fc;
 
-  --primary: oklch(0.72 0.18 235);
+  --primary: #00b2f8;
 
-  --primary-foreground: oklch(0.15 0.04 260);
+  --primary-foreground: #030b1c;
 
-  --secondary: oklch(0.25 0.02 260);
+  --secondary: #1c222b;
 
-  --secondary-foreground: oklch(0.97 0.01 250);
+  --secondary-foreground: #f0f6fc;
 
-  --muted: oklch(0.25 0.02 260);
+  --muted: #1c222b;
 
-  --muted-foreground: oklch(0.72 0.03 250);
+  --muted-foreground: #97a7b7;
 
-  --accent: oklch(0.3 0.04 250);
+  --accent: #1e2f41;
 
-  --accent-foreground: oklch(0.97 0.01 250);
+  --accent-foreground: #f0f6fc;
 
-  --border: oklch(1 0 0 / 12%);
+  --border: #ffffff1f;
 
-  --input: oklch(1 0 0 / 15%);
+  --input: #ffffff26;
 
-  --ring: oklch(0.72 0.18 235);
+  --ring: #00b2f8;
 }
 
 @layer base {
@@ -280,9 +274,9 @@
 
   body {
     background:
-      radial-gradient(circle at 12% 12%, oklch(0.88 0.12 232 / 0.28), transparent 28rem),
-      radial-gradient(circle at 88% 8%, oklch(0.82 0.16 252 / 0.2), transparent 30rem),
-      linear-gradient(180deg, oklch(0.99 0.008 245), var(--color-background) 28rem);
+      radial-gradient(circle at 12% 12%, #99e3ff47, transparent 28rem),
+      radial-gradient(circle at 88% 8%, #94c9ff33, transparent 30rem),
+      linear-gradient(180deg, #f9fcff, var(--color-background) 28rem);
 
     color: var(--color-foreground);
 
@@ -374,7 +368,7 @@
       [class*="dark:text-"],
       [class*="dark:border-"]
     )) {
-      background-color: oklch(0.12 0.06 260 / 0.88);
+      background-color: #000419e0;
       background-image: none !important;
     }
 
@@ -397,7 +391,7 @@
       [class*="dark:shadow-"],
       [class*="dark:text-"]
     )) {
-      border-color: oklch(0.22 0.08 260 / 0.35);
+      border-color: #0f1e3b59;
     }
 
     html.dark :is([class*="text-slate-"]):not([class*="dark:text-"]) {
@@ -417,14 +411,9 @@
 
   main {
     background:
-      linear-gradient(
-        180deg,
-        transparent 0,
-        oklch(0.975 0.018 245 / 0.65) 34rem,
-        transparent 68rem
-      ),
-      radial-gradient(circle at 8% 42rem, oklch(0.74 0.17 235 / 0.12), transparent 28rem),
-      radial-gradient(circle at 92% 90rem, oklch(0.54 0.2 260 / 0.1), transparent 30rem);
+      linear-gradient(180deg, transparent 0, #f0f8ffa6 34rem, transparent 68rem),
+      radial-gradient(circle at 8% 42rem, #00b9ff1f, transparent 28rem),
+      radial-gradient(circle at 92% 90rem, #1866e01a, transparent 30rem);
   }
 
   main > section {

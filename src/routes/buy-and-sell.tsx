@@ -22,7 +22,7 @@ import {
   PlayCircle,
   Star,
 } from "lucide-react";
-import { Layout } from "@/components/Layout";
+import { Layout } from "@/components/layout/Layout";
 import { Reveal } from "@/components/Reveal";
 import { SectionBackdrop } from "@/components/SectionBackdrop";
 import { Button } from "@/components/ui/button";

@@ -45,7 +45,7 @@ import {
   HardDrive,
 } from "lucide-react";
 
-import { Layout, PageHero } from "@/components/Layout";
+import { Layout, PageHero } from "@/components/layout/Layout";
 import { GoogleMapsIcon } from "@/components/GoogleMapsIcon";
 
 import { Reveal } from "@/components/Reveal";

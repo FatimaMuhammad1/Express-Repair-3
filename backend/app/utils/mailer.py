@@ -109,3 +109,54 @@ def send_booking_confirmation(email: str, customer_name: str, tracking_id: str, 
       </div>
     </div>"""
     send_mail(email, subject, html, text)
+
+
+def send_repair_status_update(email: str, customer_name: str, tracking_id: str, device_model: str, new_status: str):
+    status_messages = {
+        "received": "We've received your device and it's being processed.",
+        "diagnosed": "Our technicians have diagnosed the issue with your device.",
+        "repairing": "Your device is currently being repaired by our expert technicians.",
+        "testing": "Your device is undergoing quality testing before collection.",
+        "collection": "Your device is ready for collection! Please visit our shop to pick it up.",
+    }
+
+    status_colors = {
+        "received": "#6b7280",
+        "diagnosed": "#3b82f6",
+        "repairing": "#8b5cf6",
+        "testing": "#f59e0b",
+        "collection": "#10b981",
+    }
+
+    message = status_messages.get(new_status, "Your repair status has been updated.")
+    color = status_colors.get(new_status, "#6b7280")
+    status_display = new_status[0].upper() + new_status[1:] if new_status else "Unknown"
+
+    subject = f"Repair Status Update – {tracking_id}"
+    text = f"Hi {customer_name}, Your repair for {device_model} status is now: {status_display}. Tracking ID: {tracking_id}"
+    html = f"""
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:24px;border:1px solid #e5e7eb;border-radius:12px;background:#ffffff">
+      <div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px">
+        <h1 style="color:#0095ff;margin:0;font-size:24px">Express Phone & Laptop Repair</h1>
+        <p style="color:#6b7280;margin:8px 0 0;font-size:14px">Nuneaton's Trusted Repair Service</p>
+      </div>
+      <div style="background:#f0f9ff;padding:20px;border-radius:8px;border-left:4px solid {color};margin-bottom:24px">
+        <h2 style="color:#0095ff;margin:0 0 8px;font-size:18px">Status Update</h2>
+        <p style="color:#0369a1;margin:0">Your repair status has been updated.</p>
+      </div>
+      <p style="color:#4b5563;line-height:1.6;margin-bottom:16px">Hi {customer_name},</p>
+      <p style="color:#4b5563;line-height:1.6;margin-bottom:20px">{message}</p>
+      <div style="background:#f9fafb;padding:20px;border-radius:8px;margin:20px 0">
+        <p style="margin:0 0 8px;color:#6b7280;font-size:13px">Tracking ID</p>
+        <p style="margin:0 0 16px;color:#1f2937;font-size:18px;font-weight:bold">{tracking_id}</p>
+        <p style="margin:0 0 8px;color:#6b7280;font-size:13px">Device</p>
+        <p style="margin:0 0 16px;color:#1f2937;font-size:16px">{device_model}</p>
+        <p style="margin:0 0 8px;color:#6b7280;font-size:13px">Current Status</p>
+        <p style="margin:0;color:#1f2937;font-size:16px;font-weight:bold" style="color:{color}">{status_display}</p>
+      </div>
+      <p style="color:#6b7280;font-size:13px;line-height:1.5">Visit our shop at 6 Harefield Road, Nuneaton, CV11 4HD. Call us on 07415 278767 if you have any questions.</p>
+      <div style="margin-top:32px;padding-top:24px;border-top:1px solid #e5e7eb;text-align:center">
+        <p style="color:#9ca3af;font-size:12px;margin:0">Express Phone & Laptop Repair<br/>6 Harefield Road, Nuneaton, CV11 4HD<br/>07415 278767</p>
+      </div>
+    </div>"""
+    send_mail(email, subject, html, text)
