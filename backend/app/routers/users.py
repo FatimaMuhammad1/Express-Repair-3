@@ -21,8 +21,8 @@ class UserCreate(BaseModel):
     phone: Optional[str] = None
 
 @router.get("/staff")
-def get_staff(db: Session = Depends(get_db), _: User = Depends(require_roles("admin", "SUPER_ADMIN"))):
-    staff = db.query(User).filter(User.role.in_(["admin", "technician", "staff"])).all()
+def get_staff(db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN"))):
+    staff = db.query(User).filter(User.role.in_(["staff", "SUPER_ADMIN"])).all()
     return {
         "success": True,
         "staff": [
@@ -38,7 +38,7 @@ def get_staff(db: Session = Depends(get_db), _: User = Depends(require_roles("ad
     }
 
 @router.put("/{user_id}/status")
-def update_user_status(user_id: UUID, body: UserStatusUpdate, db: Session = Depends(get_db), _: User = Depends(require_roles("admin", "SUPER_ADMIN"))):
+def update_user_status(user_id: UUID, body: UserStatusUpdate, db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN"))):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(404, "User not found")

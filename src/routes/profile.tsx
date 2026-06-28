@@ -163,9 +163,18 @@ function AuthPanel({
       const data = await res.json();
 
       if (res.ok && data.success) {
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        window.location.href = "/profile";
+        const userRole = data.user.role?.toLowerCase();
+        if (userRole === "super_admin" || userRole === "staff") {
+          localStorage.setItem("admin_token", data.token);
+          localStorage.setItem("admin_user", JSON.stringify(data.user));
+          router.navigate({ to: "/admin" });
+          window.dispatchEvent(new CustomEvent("auth-change", { detail: { type: "login", role: userRole } }));
+        } else {
+          localStorage.setItem("user_token", data.token);
+          localStorage.setItem("user", JSON.stringify(data.user));
+          onLoginSuccess();
+          window.dispatchEvent(new CustomEvent("auth-change", { detail: { type: "login", role: "user" } }));
+        }
       } else {
         setError(data.message || "Google Sign-In failed");
       }
@@ -197,12 +206,13 @@ function AuthPanel({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.user.role === "admin" || data.user.role === "technician") {
+        const userRole = data.user.role?.toLowerCase();
+        if (userRole === "super_admin" || userRole === "staff") {
           localStorage.setItem("admin_token", data.token);
           localStorage.setItem("admin_user", JSON.stringify(data.user));
           router.navigate({ to: "/admin" });
             // notify header and other components about auth change
-            window.dispatchEvent(new CustomEvent("auth-change", { detail: { type: "login", role: data.user.role } }));
+            window.dispatchEvent(new CustomEvent("auth-change", { detail: { type: "login", role: userRole } }));
         } else {
           localStorage.setItem("user_token", data.token);
           onLoginSuccess();

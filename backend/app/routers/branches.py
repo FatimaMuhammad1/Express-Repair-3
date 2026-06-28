@@ -39,7 +39,7 @@ async def get_branches(
 async def create_branch(
     branch_data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new branch"""
     
@@ -62,7 +62,7 @@ async def update_branch(
     branch_id: str,
     branch_data: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Update a branch"""
     

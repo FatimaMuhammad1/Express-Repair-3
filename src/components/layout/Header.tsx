@@ -20,7 +20,7 @@ import { ModeToggle } from "@/components/ModeToggle";
 type TickerItem = { icon: LucideIcon; text: string; href?: string };
 
 const tickerItems: TickerItem[] = [
-  { icon: ShieldCheck, text: "90-Day Warranty" },
+  { icon: ShieldCheck, text: "Warranty Included" },
   { icon: Clock, text: "Same-Day Repairs" },
   { icon: Zap, text: "Free Diagnostics" },
   { icon: Phone, text: "07415 278767", href: "tel:+447415278767" },

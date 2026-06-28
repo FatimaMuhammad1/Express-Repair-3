@@ -15,7 +15,7 @@ class SendMessageRequest(BaseModel):
     body: str
 
 @router.get("/history")
-def get_history(db: Session = Depends(get_db), _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))):
+def get_history(db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN", "staff"))):
     comms = db.query(Communication).order_by(Communication.created_at.desc()).all()
     return {
         "success": True,
@@ -33,7 +33,7 @@ def get_history(db: Session = Depends(get_db), _: User = Depends(require_roles("
     }
 
 @router.post("/email")
-def send_email(body: SendMessageRequest, db: Session = Depends(get_db), _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))):
+def send_email(body: SendMessageRequest, db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN", "staff"))):
     # Here you would integrate with SendGrid/SMTP
     comm = Communication(type="email", recipient=body.recipient, subject=body.subject, body=body.body, status="sent")
     db.add(comm)
@@ -41,7 +41,7 @@ def send_email(body: SendMessageRequest, db: Session = Depends(get_db), _: User 
     return {"success": True, "message": "Email sent"}
 
 @router.post("/sms")
-def send_sms(body: SendMessageRequest, db: Session = Depends(get_db), _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))):
+def send_sms(body: SendMessageRequest, db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN", "staff"))):
     # Here you would integrate with Twilio/SNS
     comm = Communication(type="sms", recipient=body.recipient, subject="SMS", body=body.body, status="sent")
     db.add(comm)
@@ -49,7 +49,7 @@ def send_sms(body: SendMessageRequest, db: Session = Depends(get_db), _: User = 
     return {"success": True, "message": "SMS sent"}
 
 @router.post("/broadcast")
-def send_broadcast(body: SendMessageRequest, db: Session = Depends(get_db), _: User = Depends(require_roles("admin", "technician"))):
+def send_broadcast(body: SendMessageRequest, db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN", "staff"))):
     # Here you would integrate bulk sending
     comm = Communication(type="broadcast", recipient="All Customers", subject=body.subject, body=body.body, status="sent")
     db.add(comm)

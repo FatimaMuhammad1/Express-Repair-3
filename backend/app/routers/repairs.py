@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from uuid import UUID
 from datetime import datetime, timedelta
 import csv
@@ -32,7 +33,7 @@ STATUS_PROGRESS = {
 @router.get("/")
 def get_repairs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
 ):
     """Get all repairs (for dashboard)"""
     repairs = db.query(Repair).order_by(Repair.created_at.desc()).limit(100).all()
@@ -64,7 +65,7 @@ def _notify_customer(repair, notification_preference, customer_email, event_type
 def create_repair(
     body: RepairCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
 ):
     for _ in range(5):
         tracking_id = generate_tracking_id()
@@ -124,7 +125,7 @@ def update_repair_status(
     tracking_id: str,
     body: RepairStatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Choose from: {', '.join(VALID_STATUSES)}")
@@ -181,7 +182,7 @@ def update_repair_status(
 def delete_repair(
     tracking_id: str,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Delete a repair by tracking ID (admin only)"""
     repair = db.query(Repair).filter(Repair.tracking_id == tracking_id).first()
@@ -224,7 +225,7 @@ def my_repairs(
 @router.get("/all")
 def all_repairs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
 ):
     repairs = db.query(Repair).order_by(Repair.updated_at.desc()).all()
     return {
@@ -237,7 +238,7 @@ def all_repairs(
 @router.get("/export/csv")
 def export_repairs_csv(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Export all repairs to CSV file"""
     repairs = db.query(Repair).order_by(Repair.created_at.desc()).all()
@@ -277,7 +278,7 @@ def export_repairs_csv(
 @router.get("/stats")
 def get_repair_stats(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
 ):
     """Get repair statistics for admin dashboard"""
     total_repairs = db.query(Repair).count()
@@ -288,8 +289,9 @@ def get_repair_stats(
         status_counts[status] = count
     
     # Calculate total revenue from completed repairs
-    completed_repairs = db.query(Repair).filter(Repair.status == "collection").all()
-    total_revenue = sum(r.estimated_cost or 0 for r in completed_repairs)
+    completed_repairs = db.query(Repair).filter(Repair.status == "collection")
+    completed_repairs_count = completed_repairs.count()
+    total_revenue = sum(r.estimated_cost or 0 for r in completed_repairs.all())
     
     # Get repairs from last 30 days
     thirty_days_ago = datetime.now() - timedelta(days=30)
@@ -302,14 +304,14 @@ def get_repair_stats(
             "status_breakdown": status_counts,
             "total_revenue": float(total_revenue),
             "recent_repairs_30_days": recent_repairs,
-            "average_repair_value": float(total_revenue / completed_repairs) if completed_repairs else 0.0,
+            "average_repair_value": float(total_revenue / completed_repairs_count) if completed_repairs_count else 0.0,
         }
     }
 
 @router.get("/my")
 def my_repairs(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("customer", "admin", "technician")),
+    current_user: User = Depends(require_roles("customer", "SUPER_ADMIN")),
 ):
     # This requires linking repairs to users. Let's see if Repair has a user_id or we match by email/phone.
     # Currently Repair has customer_phone and maybe appointment_id. Let's match by appointment -> user_id, 

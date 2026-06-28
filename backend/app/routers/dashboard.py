@@ -117,8 +117,8 @@ async def get_technician_performance(
 ):
     """Get technician performance stats"""
     
-    # Get all technician users
-    technicians = db.query(User).filter(User.role == "technician").all()
+    # Get all staff users (technicians)
+    technicians = db.query(User).filter(User.role == "staff").all()
     
     performance = []
     for tech in technicians:

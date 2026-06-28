@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/audit-logs", tags=["Audit Logs"])
 async def get_audit_logs(
     days: int = Query(7, ge=1, le=365),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Get audit logs for a given period"""
     
@@ -52,7 +52,7 @@ async def get_audit_logs(
 async def export_audit_logs(
     days: int = Query(7, ge=1, le=365),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Export audit logs as CSV"""
     
@@ -98,7 +98,7 @@ async def export_audit_logs(
 @router.delete("/clear")
 async def clear_audit_logs(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Clear all audit logs"""
     

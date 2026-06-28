@@ -153,6 +153,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
 
   useEffect(() => {
     // Quick auth-check on page load
@@ -171,16 +172,21 @@ function RootComponent() {
         
         if (res.ok && data.success && data.user) {
           // Update the stored user
-          if (data.user.role === "admin" || data.user.role === "technician") {
+          const userRole = data.user.role?.toLowerCase();
+          if (userRole === "super_admin" || userRole === "staff") {
             localStorage.setItem("admin_user", JSON.stringify(data.user));
             if (!adminToken && userToken) {
                localStorage.setItem("admin_token", userToken);
                localStorage.removeItem("user_token");
             }
+            // Only redirect to admin if not on profile page
+            if (window.location.pathname !== "/admin" && window.location.pathname !== "/profile") {
+              router.navigate({ to: "/admin" });
+            }
           } else {
             localStorage.setItem("current_user", JSON.stringify(data.user));
           }
-          window.dispatchEvent(new CustomEvent("auth-change", { detail: { type: "refresh", role: data.user.role } }));
+          window.dispatchEvent(new CustomEvent("auth-change", { detail: { type: "refresh", role: userRole } }));
         } else {
           // Invalid token, clear storage
           localStorage.removeItem("user_token");
@@ -195,7 +201,7 @@ function RootComponent() {
     }
     
     checkAuth();
-  }, []);
+  }, [router]);
 
   return (
     <QueryClientProvider client={queryClient}>

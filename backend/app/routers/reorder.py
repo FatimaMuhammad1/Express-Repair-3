@@ -37,7 +37,7 @@ class ReorderSuggestion(BaseModel):
 @router.get("/low-stock")
 def get_low_stock_items(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Get all items that are at or below their reorder threshold"""
     products = db.query(Product).filter(
@@ -72,7 +72,7 @@ def get_low_stock_items(
 @router.post("/generate-reorder-suggestions")
 def generate_reorder_suggestions(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Generate reorder suggestions for all low stock items"""
     products = db.query(Product).filter(
@@ -119,7 +119,7 @@ def update_reorder_settings(
     reorder_quantity: int,
     supplier_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Update reorder settings for a product"""
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -152,7 +152,7 @@ def update_reorder_settings(
 @router.post("/auto-reorder")
 def trigger_auto_reorder(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Trigger automatic reordering for all low stock items that have a supplier"""
     products = db.query(Product).filter(

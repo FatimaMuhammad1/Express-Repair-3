@@ -7,7 +7,7 @@ from app.database import get_db
 from app.models import Repair, RepairTimeline, TechnicianNote, InternalComment, User
 from app.dependencies import get_current_user
 
-router = APIRouter(prefix="/repairs", tags=["Repair Details"])
+router = APIRouter(prefix="/api/repair-details", tags=["Repair Details"])
 
 
 @router.get("/{repair_id}/timeline")

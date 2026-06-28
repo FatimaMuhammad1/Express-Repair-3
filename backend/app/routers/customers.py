@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from app.database import get_db
-from app.models import Repair, CustomerNote, User
+from app.models import Repair, CustomerNote, User, OnlineSale, InHouseSale
 from app.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/customers", tags=["Customers"])
@@ -15,24 +15,59 @@ async def get_all_customers(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all customers (from repairs)"""
+    """Get all customers (from repairs, online sales, and in-house sales)"""
     
-    # Get unique customers from repairs
-    repairs = db.query(Repair).all()
-    
-    # Group by phone to get unique customers
     customers = {}
+    
+    # Get customers from repairs
+    repairs = db.query(Repair).all()
     for repair in repairs:
         if repair.customer_phone not in customers:
             customers[repair.customer_phone] = {
                 "name": repair.customer_name,
                 "phone": repair.customer_phone,
                 "repair_count": 0,
+                "sale_count": 0,
                 "last_repair": None,
+                "last_sale": None,
             }
         customers[repair.customer_phone]["repair_count"] += 1
         if not customers[repair.customer_phone]["last_repair"] or repair.created_at > customers[repair.customer_phone]["last_repair"]:
             customers[repair.customer_phone]["last_repair"] = repair.created_at
+    
+    # Get customers from online sales
+    online_sales = db.query(OnlineSale).all()
+    for sale in online_sales:
+        if sale.customer_phone and sale.customer_phone not in customers:
+            customers[sale.customer_phone] = {
+                "name": sale.customer_name,
+                "phone": sale.customer_phone,
+                "repair_count": 0,
+                "sale_count": 0,
+                "last_repair": None,
+                "last_sale": None,
+            }
+        if sale.customer_phone:
+            customers[sale.customer_phone]["sale_count"] += 1
+            if not customers[sale.customer_phone]["last_sale"] or sale.created_at > customers[sale.customer_phone]["last_sale"]:
+                customers[sale.customer_phone]["last_sale"] = sale.created_at
+    
+    # Get customers from in-house sales
+    inhouse_sales = db.query(InHouseSale).all()
+    for sale in inhouse_sales:
+        if sale.customer_phone and sale.customer_phone not in customers:
+            customers[sale.customer_phone] = {
+                "name": sale.customer_name,
+                "phone": sale.customer_phone,
+                "repair_count": 0,
+                "sale_count": 0,
+                "last_repair": None,
+                "last_sale": None,
+            }
+        if sale.customer_phone:
+            customers[sale.customer_phone]["sale_count"] += 1
+            if not customers[sale.customer_phone]["last_sale"] or sale.created_at > customers[sale.customer_phone]["last_sale"]:
+                customers[sale.customer_phone]["last_sale"] = sale.created_at
     
     return {
         "success": True,
@@ -41,7 +76,9 @@ async def get_all_customers(
                 "name": c["name"],
                 "phone": c["phone"],
                 "repair_count": c["repair_count"],
+                "sale_count": c["sale_count"],
                 "last_repair": c["last_repair"].isoformat() if c["last_repair"] else None,
+                "last_sale": c["last_sale"].isoformat() if c["last_sale"] else None,
             }
             for c in customers.values()
         ]

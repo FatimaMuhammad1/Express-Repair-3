@@ -35,7 +35,7 @@ class TaxCalculationRequest(BaseModel):
 @router.get("/rates")
 def get_tax_rates(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Get all tax rates"""
     rates = db.query(TaxRate).filter(TaxRate.is_active == True).all()
@@ -94,7 +94,7 @@ def get_default_tax_rate(
 def create_tax_rate(
     body: TaxRateCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Create a new tax rate"""
     # If setting as default, unset other defaults
@@ -130,7 +130,7 @@ def update_tax_rate(
     rate_id: UUID,
     body: TaxRateUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Update a tax rate"""
     tax_rate = db.query(TaxRate).filter(TaxRate.id == rate_id).first()
@@ -176,7 +176,7 @@ def update_tax_rate(
 def delete_tax_rate(
     rate_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Delete a tax rate (soft delete by setting is_active to False)"""
     tax_rate = db.query(TaxRate).filter(TaxRate.id == rate_id).first()

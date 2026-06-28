@@ -248,6 +248,40 @@ async def get_invoices(
     }
 
 
+@router.post("/inhouse-sales", status_code=201)
+async def create_inhouse_sale(
+    body: InHouseSaleCreate,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+):
+    """Create a new in-house sale (accessories, etc)"""
+    sale = InHouseSale(
+        reference=body.reference,
+        customer_name=body.customer_name,
+        customer_phone=body.customer_phone,
+        amount=body.amount,
+        item_count=body.item_count,
+        payment_method=body.payment_method
+    )
+    db.add(sale)
+    db.commit()
+    db.refresh(sale)
+    
+    return {
+        "success": True,
+        "message": "In-house sale recorded successfully",
+        "sale": {
+            "id": str(sale.id),
+            "reference": sale.reference,
+            "customer_name": sale.customer_name,
+            "amount": float(sale.amount),
+            "item_count": sale.item_count,
+            "payment_method": sale.payment_method,
+            "created_at": sale.created_at.isoformat()
+        }
+    }
+
+
 @router.get("/expenses")
 async def get_expenses(
     branch_id: Optional[str] = None,
@@ -283,7 +317,7 @@ async def get_expenses(
 async def create_expense(
     expense_data: ExpenseCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new expense"""
     expense = Expense(
@@ -315,7 +349,7 @@ async def update_expense(
     expense_id: UUID,
     expense_data: ExpenseUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Update an expense"""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
@@ -340,7 +374,7 @@ async def update_expense(
 async def delete_expense(
     expense_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Delete an expense"""
     expense = db.query(Expense).filter(Expense.id == expense_id).first()
@@ -402,7 +436,7 @@ async def get_revenue(
 async def create_revenue(
     revenue_data: RevenueCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new revenue entry (as a transaction)"""
     transaction = Transaction(
@@ -461,7 +495,7 @@ async def get_online_sales(
 async def create_online_sale(
     sale_data: OnlineSaleCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new online sale"""
     sale = OnlineSale(
@@ -496,7 +530,7 @@ async def update_online_sale(
     sale_id: UUID,
     sale_data: OnlineSaleUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Update an online sale"""
     sale = db.query(OnlineSale).filter(OnlineSale.id == sale_id).first()
@@ -526,7 +560,7 @@ async def update_online_sale(
 async def delete_online_sale(
     sale_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Delete an online sale"""
     sale = db.query(OnlineSale).filter(OnlineSale.id == sale_id).first()
@@ -564,43 +598,12 @@ async def get_inhouse_sales(
     }
 
 
-@router.post("/inhouse-sales")
-async def create_inhouse_sale(
-    sale_data: InHouseSaleCreate,
-    db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
-):
-    """Create a new in-house sale"""
-    sale = InHouseSale(
-        reference=sale_data.reference,
-        customer_name=sale_data.customer_name,
-        customer_phone=sale_data.customer_phone,
-        amount=sale_data.amount,
-        item_count=sale_data.item_count,
-        payment_method=sale_data.payment_method
-    )
-    db.add(sale)
-    db.commit()
-    db.refresh(sale)
-    
-    return {
-        "success": True,
-        "inhouseSale": {
-            "id": str(sale.id),
-            "reference": sale.reference,
-            "customer": sale.customer_name,
-            "amount": float(sale.amount),
-            "date": sale.created_at.isoformat(),
-        }
-    }
-
-
 @router.put("/inhouse-sales/{sale_id}")
 async def update_inhouse_sale(
     sale_id: UUID,
     sale_data: InHouseSaleUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Update an in-house sale"""
     sale = db.query(InHouseSale).filter(InHouseSale.id == sale_id).first()
@@ -626,7 +629,7 @@ async def update_inhouse_sale(
 async def delete_inhouse_sale(
     sale_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Delete an in-house sale"""
     sale = db.query(InHouseSale).filter(InHouseSale.id == sale_id).first()

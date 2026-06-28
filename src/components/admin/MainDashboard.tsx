@@ -16,7 +16,8 @@ import {
   History,
   FileText,
   RefreshCw,
-  Calendar
+  Calendar,
+  MessageSquare
 } from "lucide-react";
 import {
   LineChart,
@@ -30,79 +31,49 @@ import {
   Pie,
   Cell
 } from "recharts";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { buildUrl, getStoredToken } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function MainDashboard() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [businessData, setBusinessData] = useState([
-    { name: 'Jan', revenue: 15000, profit: 8000, expenses: 7000 },
-    { name: 'Feb', revenue: 18000, profit: 9500, expenses: 8500 },
-    { name: 'Mar', revenue: 22000, profit: 12000, expenses: 10000 },
-    { name: 'Apr', revenue: 19500, profit: 10500, expenses: 9000 },
-    { name: 'May', revenue: 25000, profit: 14000, expenses: 11000 },
-    { name: 'Jun', revenue: 28000, profit: 15500, expenses: 12500 },
-  ]);
-  const [salesChannelData, setSalesChannelData] = useState([
-    { name: 'Online Sales', value: 8500, color: '#8B5CF6' },
-    { name: 'In-House Sales', value: 6200, color: '#06B6D4' },
-    { name: 'Repairs & Services', value: 13300, color: '#22C55E' },
-  ]);
-  const [repairStatusData, setRepairStatusData] = useState([
-    { name: 'Received', value: 12, color: '#6366F1' },
-    { name: 'Diagnosed', value: 8, color: '#A855F7' },
-    { name: 'Repairing', value: 15, color: '#F59E0B' },
-    { name: 'Testing', value: 6, color: '#EC4899' },
-    { name: 'Collection', value: 9, color: '#22C55E' },
-    { name: 'Completed', value: 106, color: '#06B6D4' },
-  ]);
-  const [recentActivities, setRecentActivities] = useState([
-    { id: 1, title: 'New Repair', desc: 'REP-1001 - iPhone 14 Screen', time: '2m ago', icon: Wrench, bg: 'bg-amber-500/20', color: 'text-amber-500' },
-    { id: 2, title: 'Payment Received', desc: '£89.99 - Online Sale', time: '15m ago', icon: DollarSign, bg: 'bg-emerald-500/20', color: 'text-emerald-500' },
-    { id: 3, title: 'Booking Confirmed', desc: 'Alice Thompson - 09:00', time: '1h ago', icon: Calendar, bg: 'bg-blue-500/20', color: 'text-blue-500' },
-    { id: 4, title: 'Stock Alert', desc: 'iPhone 14 Screen low stock', time: '2h ago', icon: Package, bg: 'bg-rose-500/20', color: 'text-rose-500' },
-  ]);
-  const [topSellingItems, setTopSellingItems] = useState([
-    { id: 1, name: 'iPhone 14 Screen', sold: 45, revenue: '£4,050', icon: '📱' },
-    { id: 2, name: 'iPhone 13 Screen', sold: 38, revenue: '£3,040', icon: '📱' },
-    { id: 3, name: 'USB-C Charger', sold: 62, revenue: '£1,550', icon: '🔌' },
-    { id: 4, name: 'Lightning Cable', sold: 89, revenue: '£1,335', icon: '🔌' },
-  ]);
-  const [lowStockAlerts, setLowStockAlerts] = useState([
-    { id: 1, name: 'iPhone 14 Screen', stock: 3, reorder: 10 },
-    { id: 2, name: 'Samsung S23 Screen', stock: 4, reorder: 10 },
-    { id: 3, name: 'iPhone Battery', stock: 5, reorder: 15 },
-  ]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [businessData, setBusinessData] = useState<any[]>([]);
+  const [salesChannelData, setSalesChannelData] = useState<any[]>([]);
+  const [repairStatusData, setRepairStatusData] = useState<any[]>([]);
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [topSellingItems, setTopSellingItems] = useState<any[]>([]);
+  const [lowStockAlerts, setLowStockAlerts] = useState<any[]>([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [refreshInterval, setRefreshInterval] = useState(30000); // 30 seconds
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(new Date());
+  const [refreshInterval, setRefreshInterval] = useState(30000);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
-  const [branches, setBranches] = useState<any[]>([
-    { id: '1', name: 'Nuneaton Main' },
-    { id: '2', name: 'Coventry' },
-    { id: '3', name: 'Leicester' },
-  ]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [timePeriod, setTimePeriod] = useState<string>("all");
   const [stats, setStats] = useState({
-    totalRevenue: 28000,
-    todaySales: 1470,
-    repairsInProgress: 41,
-    lowStockCount: 3,
-    totalProfit: 15500,
-    totalCustomers: 156,
-    totalSalesOrders: 89,
-    totalPurchases: 24,
-    totalInventoryValue: 12500,
-    outstandingReceivables: 3200,
-    outstandingPayables: 1800
+    totalRevenue: 0,
+    todaySales: 0,
+    repairsInProgress: 0,
+    lowStockCount: 0,
+    totalProfit: 0,
+    totalCustomers: 0,
+    totalSalesOrders: 0,
+    totalPurchases: 0,
+    totalInventoryValue: 0,
+    outstandingReceivables: 0,
+    outstandingPayables: 0
   });
 
   // Fetch dashboard data
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
+      
+      // Fetch finance stats
+      const financeStatsRes = await fetch(buildUrl("/finance/stats"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const financeStatsData = await financeStatsRes.json();
       
       // Fetch branches
       const branchesRes = await fetch(buildUrl("/branches"), {
@@ -114,7 +85,7 @@ export default function MainDashboard() {
       }
       
       // Fetch repairs for status overview
-      const repairsRes = await fetch(buildUrl("/repairs"), {
+      const repairsRes = await fetch(buildUrl("/repairs/stats"), {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
       const repairsData = await repairsRes.json();
@@ -149,13 +120,25 @@ export default function MainDashboard() {
       });
       const customersData = await customersRes.json();
       
+      // Fetch recent activities from communications
+      const activitiesRes = await fetch(buildUrl("/communications/history"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const activitiesData = await activitiesRes.json();
+      
+      // Update stats from finance data
+      if (financeStatsData.success && financeStatsData.stats) {
+        setStats(prev => ({
+          ...prev,
+          totalRevenue: financeStatsData.stats.totalRevenue || 0,
+          totalProfit: financeStatsData.stats.netProfit || 0,
+          totalExpenses: financeStatsData.stats.totalExpenses || 0,
+        }));
+      }
+      
       // Process repair status data
-      if (repairsData.success && repairsData.repairs) {
-        const statusCounts = {};
-        repairsData.repairs.forEach(repair => {
-          const status = repair.status || 'unknown';
-          statusCounts[status] = (statusCounts[status] || 0) + 1;
-        });
+      if (repairsData.success && repairsData.stats) {
+        const statusCounts = repairsData.stats.status_breakdown || {};
         
         const statusColors = {
           'received': '#6366F1',
@@ -172,24 +155,28 @@ export default function MainDashboard() {
           color: statusColors[name] || '#64748b'
         })));
         
+        // Calculate repairs in progress (excluding collection and completed)
+        const inProgressCount = Object.entries(statusCounts).reduce((sum, [status, count]) => {
+          return (status !== 'collection' && status !== 'completed') ? sum + count : sum;
+        }, 0);
+        
         setStats(prev => ({
           ...prev,
-          repairsInProgress: repairsData.repairs.filter(r => 
-            ['received', 'diagnosed', 'repairing', 'testing'].includes(r.status)
-          ).length
+          repairsInProgress: inProgressCount,
+          completedRepairs: statusCounts.completed || 0
         }));
       }
       
-      // Process low stock alerts
+      // Process low stock alerts using reorder_threshold
       if (productsData.success && productsData.products) {
         const lowStock = productsData.products
-          .filter(p => p.stock_quantity <= 5)
+          .filter(p => p.stock_quantity <= (p.reorder_threshold || 5))
           .slice(0, 10)
           .map(p => ({
             id: p.id,
             name: p.name,
             stock: p.stock_quantity,
-            reorder: 5
+            reorder: p.reorder_threshold || 5
           }));
         
         setLowStockAlerts(lowStock);
@@ -222,12 +209,72 @@ export default function MainDashboard() {
         setStats(prev => ({ ...prev, totalCustomers: customersData.customers.length }));
       }
       
+      // Process recent activities from communications
+      if (activitiesData.success && activitiesData.communications) {
+        const iconMap: Record<string, any> = {
+          'email': DollarSign,
+          'sms': MessageSquare,
+          'broadcast': Bell,
+        };
+        
+        const activities = activitiesData.communications.slice(0, 4).map((c: any, idx: number) => ({
+          id: idx,
+          title: c.type.charAt(0).toUpperCase() + c.type.slice(1),
+          desc: c.subject || c.body?.substring(0, 30) + '...',
+          time: new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          icon: iconMap[c.type] || Activity,
+          bg: c.type === 'email' ? 'bg-emerald-500/20' : c.type === 'sms' ? 'bg-blue-500/20' : 'bg-amber-500/20',
+          color: c.type === 'email' ? 'text-emerald-500' : c.type === 'sms' ? 'text-blue-500' : 'text-amber-500'
+        }));
+        
+        setRecentActivities(activities);
+      }
+      
+      // Process business data chart - aggregate transactions by month
+      if (transactionsData.success && transactionsData.transactions) {
+        const monthlyData: Record<string, { revenue: number; profit: number; expenses: number }> = {};
+        
+        transactionsData.transactions.forEach((t: any) => {
+          if (t.type === 'payment' && t.status === 'completed') {
+            const date = new Date(t.created_at);
+            const monthKey = date.toLocaleString('default', { month: 'short' });
+            
+            if (!monthlyData[monthKey]) {
+              monthlyData[monthKey] = { revenue: 0, profit: 0, expenses: 0 };
+            }
+            monthlyData[monthKey].revenue += parseFloat(t.amount || 0);
+            monthlyData[monthKey].profit += parseFloat(t.amount || 0) * 0.7; // Assume 30% margin
+          }
+        });
+        
+        // Convert to array and sort by month
+        const sortedMonths = Object.entries(monthlyData)
+          .map(([name, data]) => ({ name, ...data }))
+          .slice(-6); // Last 6 months
+        
+        setBusinessData(sortedMonths);
+      }
+      
       // Process inventory value
       if (productsData.success && productsData.products) {
         const inventoryValue = productsData.products.reduce((sum, p) => 
           sum + (parseFloat(p.price || 0) * (p.stock_quantity || 0)), 0
         );
         setStats(prev => ({ ...prev, totalInventoryValue: inventoryValue }));
+        
+        // Process top selling items (using price as proxy since transactions don't track product IDs)
+        const topItems = productsData.products
+          .sort((a, b) => parseFloat(b.price || 0) - parseFloat(a.price || 0))
+          .slice(0, 4)
+          .map((p, idx) => ({
+            id: idx,
+            name: p.name,
+            sold: p.stock_quantity || 0, // Using stock as proxy for sales
+            revenue: `£${(parseFloat(p.price || 0) * (p.stock_quantity || 0)).toFixed(2)}`,
+            icon: '📱'
+          }));
+        
+        setTopSellingItems(topItems);
       }
       
     } catch (e) {
@@ -237,11 +284,11 @@ export default function MainDashboard() {
       setIsLoading(false);
       setLastUpdated(new Date());
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [fetchDashboardData]);
 
   // Auto-refresh polling
   useEffect(() => {
@@ -252,7 +299,7 @@ export default function MainDashboard() {
     }, refreshInterval);
 
     return () => clearInterval(interval);
-  }, [autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval, fetchDashboardData]);
 
   const handleRefresh = () => {
     fetchDashboardData();
@@ -265,8 +312,8 @@ export default function MainDashboard() {
   };
 
   const handleViewAll = (section: string) => {
-    // Navigate to the respective section
-    window.location.hash = section;
+    // Dispatch custom event for navigation to admin panel
+    window.dispatchEvent(new CustomEvent('navigate-to-section', { detail: { section } }));
   };
   return (
     <div className="flex-1 p-6 text-slate-200">
@@ -415,9 +462,16 @@ export default function MainDashboard() {
         <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-5 lg:col-span-6 flex flex-col">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-semibold text-sm text-white">Business Overview</h3>
-            <button className="text-xs text-slate-400 bg-[#12141D] border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
-              All Time <ChevronDown className="h-3 w-3" />
-            </button>
+            <select
+              value={timePeriod}
+              onChange={(e) => setTimePeriod(e.target.value)}
+              className="text-xs bg-[#12141D] border border-slate-800 text-slate-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
           </div>
           <div className="flex-1 min-h-[220px]">
             {isLoading || businessData.length === 0 ? (
@@ -550,9 +604,16 @@ export default function MainDashboard() {
         <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-5 lg:col-span-4">
           <div className="flex items-center justify-between mb-6">
             <h3 className="font-semibold text-sm text-white">Top Selling Items</h3>
-            <button onClick={() => handleViewAll('inventory_management')} className="text-xs text-slate-400 bg-[#12141D] border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
-              All Time <ChevronDown className="h-3 w-3" />
-            </button>
+            <select
+              value={timePeriod}
+              onChange={(e) => setTimePeriod(e.target.value)}
+              className="text-xs bg-[#12141D] border border-slate-800 text-slate-400 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-500"
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
+            </select>
           </div>
           <div className="w-full">
             {isLoading ? (

@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/financials", tags=["Financials"])
 def get_profit_loss(
     period: str = Query("month", description="month, quarter, or year"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     now = datetime.utcnow()
     
@@ -95,7 +95,7 @@ def get_profit_loss(
 def get_cash_flow(
     period: str = Query("month", description="month, quarter, or year"),
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     now = datetime.utcnow()
     
@@ -161,7 +161,7 @@ def get_cash_flow(
 @router.get("/repair-tracking")
 def get_repair_tracking(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN", "technician", "staff"))
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN"))
 ):
     from app.models import Repair, RepairTimeline
     

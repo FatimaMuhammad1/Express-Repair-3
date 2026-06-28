@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional
+import csv
+import io
 
 from app.database import get_db
 from app.models import Product, Category, TradeRequest, User
@@ -53,8 +55,23 @@ class ProductOut(BaseModel):
     is_for_sale: bool
     created_at: str
 
-    class Config:
-        from_attributes = True
+    @classmethod
+    def from_orm(cls, obj):
+        return cls(
+            id=str(obj.id),
+            name=obj.name,
+            description=obj.description,
+            category=obj.category,
+            brand=obj.brand,
+            model=obj.model,
+            condition=obj.condition,
+            price=obj.price,
+            stock_quantity=obj.stock_quantity,
+            image_url=obj.image_url,
+            is_active=obj.is_active,
+            is_for_sale=obj.is_for_sale,
+            created_at=obj.created_at.isoformat() if obj.created_at else None
+        )
 
 class CategoryCreate(BaseModel):
     name: str
@@ -119,7 +136,7 @@ def get_products(
         query = query.filter(Product.is_for_sale == is_for_sale)
     
     products = query.order_by(Product.created_at.desc()).all()
-    return products
+    return [ProductOut.from_orm(p) for p in products]
 
 @router.get("/{product_id}", response_model=ProductOut)
 def get_product(product_id: UUID, db: Session = Depends(get_db)):
@@ -127,27 +144,27 @@ def get_product(product_id: UUID, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id, Product.is_active == True).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
-    return product
+    return ProductOut.from_orm(product)
 
 @router.post("/", status_code=201, response_model=ProductOut)
 def create_product(
     body: ProductCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
 ):
     """Create a new product (admin/technician/STAFF/SUPER_ADMIN only)"""
     product = Product(**body.model_dump())
     db.add(product)
     db.commit()
     db.refresh(product)
-    return product
+    return ProductOut.from_orm(product)
 
 @router.put("/{product_id}", response_model=ProductOut)
 def update_product(
     product_id: UUID,
     body: ProductUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
 ):
     """Update a product (admin/technician/STAFF/SUPER_ADMIN only)"""
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -159,13 +176,13 @@ def update_product(
     
     db.commit()
     db.refresh(product)
-    return product
+    return ProductOut.from_orm(product)
 
 @router.delete("/{product_id}")
 def delete_product(
     product_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Delete a product (admin only)"""
     product = db.query(Product).filter(Product.id == product_id).first()
@@ -189,7 +206,7 @@ def get_categories(db: Session = Depends(get_db)):
 def create_category(
     body: CategoryCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new category (admin only)"""
     category = Category(**body.model_dump())
@@ -231,7 +248,7 @@ def get_my_trade_requests(
 @router.get("/trade-requests/all")
 def get_all_trade_requests(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician"))
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
 ):
     """Get all trade requests (admin/technician only)"""
     requests = db.query(TradeRequest).order_by(TradeRequest.created_at.desc()).all()
@@ -242,7 +259,7 @@ def update_trade_status(
     request_id: UUID,
     status: str,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician"))
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
 ):
     """Update trade request status (admin/technician only)"""
     valid_statuses = ["pending", "approved", "rejected", "completed"]
@@ -257,3 +274,68 @@ def update_trade_status(
     db.commit()
     db.refresh(trade_request)
     return {"success": True, "message": f"Trade request status updated to {status}", "request": trade_request}
+
+@router.post("/import", status_code=201)
+async def import_products(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+):
+    """Import products from CSV/Excel file"""
+    imported_count = 0
+    errors = []
+    
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Handle CSV file
+        if file.filename.endswith('.csv'):
+            csv_file = io.StringIO(content.decode('utf-8'))
+            csv_reader = csv.DictReader(csv_file)
+            
+            for row in csv_reader:
+                try:
+                    product = Product(
+                        name=row.get('name', ''),
+                        description=row.get('description', ''),
+                        category=row.get('category', 'smartphone'),
+                        brand=row.get('brand', ''),
+                        model=row.get('model', ''),
+                        condition=row.get('condition', 'new'),
+                        price=float(row.get('price', 0)),
+                        stock_quantity=int(row.get('stock_quantity', 0)),
+                        image_url=row.get('image_url', ''),
+                        is_for_sale=True
+                    )
+                    db.add(product)
+                    imported_count += 1
+                except Exception as e:
+                    errors.append(f"Row error: {str(e)}")
+                    continue
+        
+        # Handle Excel file (requires openpyxl or pandas)
+        elif file.filename.endswith(('.xlsx', '.xls')):
+            # For now, return error suggesting CSV format
+            return {
+                "success": False,
+                "detail": "Excel import requires additional dependencies. Please convert to CSV format."
+            }
+        else:
+            return {
+                "success": False,
+                "detail": "Unsupported file format. Please use CSV."
+            }
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "imported_count": imported_count,
+            "errors": errors[:10]  # Return first 10 errors if any
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
+

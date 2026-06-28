@@ -42,6 +42,30 @@ export const API_CONFIG = {
       BY_CATEGORY: (category: string) => `/products?category=${category}&is_for_sale=true`,
     },
     
+    // Finance endpoints
+    FINANCE: {
+      STATS: "/finance/stats",
+      TRANSACTIONS: "/finance/transactions",
+      EXPENSES: "/finance/expenses",
+      REVENUE: "/finance/revenue",
+      ONLINE_SALES: "/finance/online-sales",
+      INHOUSE_SALES: "/finance/inhouse-sales",
+      REPORTS: "/finance/reports",
+    },
+    
+    // Inventory endpoints
+    INVENTORY: {
+      SUPPLIERS: "/inventory/suppliers",
+      STOCK_MOVEMENTS: "/inventory/stock-movements",
+      IMPORT_EXCEL: "/inventory/import/excel",
+    },
+    
+    // Branch endpoints
+    BRANCHES: "/branches",
+    
+    // Customer endpoints
+    CUSTOMERS: "/customers",
+    
     // Contact endpoints
     CONTACT: {
       SUBMIT: "/view/contact",

@@ -33,7 +33,7 @@ async def create_payment_intent(
     currency: str = "gbp",
     customer_email: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "staff", "customer", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff", "customer")),
 ):
     """Create a Stripe payment intent for a repair"""
     
@@ -69,7 +69,7 @@ async def create_payment_intent(
 async def confirm_payment(
     payment_intent_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "staff", "customer", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff", "customer")),
 ):
     """Confirm a Stripe payment after client-side completion"""
     
@@ -93,7 +93,7 @@ async def confirm_payment(
 async def get_payment_status(
     payment_intent_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "staff", "customer", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff", "customer")),
 ):
     """Check the status of a payment intent"""
     
@@ -118,7 +118,7 @@ async def refund_payment(
     amount: Optional[float] = None,
     reason: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Process a refund for a payment"""
     
@@ -170,7 +170,7 @@ async def stripe_webhook(
 @router.get("/config")
 async def get_stripe_config(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "staff", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Get Stripe configuration for frontend (publishable key)"""
     

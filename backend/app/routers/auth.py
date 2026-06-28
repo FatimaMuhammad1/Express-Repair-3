@@ -94,7 +94,7 @@ def verify_email(body: VerifyEmailRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    token = create_access_token({"sub": str(user.id), "role": user.role})
+    token = create_access_token({"sub": str(user.id), "role": str(user.role)})
     return TokenResponse(message="Email verified! You are now logged in.", token=token, user=UserOut.model_validate(user))
 
 
@@ -106,7 +106,7 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
     if not user.is_verified:
         raise HTTPException(403, "Email not verified. Please verify your email first or request a new verification code.")
 
-    token = create_access_token({"sub": str(user.id), "role": user.role})
+    token = create_access_token({"sub": str(user.id), "role": str(user.role)})
     return TokenResponse(message="Login successful.", token=token, user=UserOut.model_validate(user))
 
 @router.post("/resend-verification")
@@ -148,18 +148,24 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
         
         user = db.query(User).filter(User.email == email).first()
         if not user:
+            # Check if email domain matches staff domain (e.g., @fixora.co.uk)
+            if email.endswith("@fixora.co.uk"):
+                role = "staff"
+            else:
+                role = "customer"
+            
             user = User(
                 name=name,
                 email=email,
                 password=hash_password("google_oauth_placeholder"),
-                role="customer",
+                role=role,
                 is_verified=True,
             )
             db.add(user)
             db.commit()
             db.refresh(user)
 
-        token = create_access_token({"sub": str(user.id), "role": user.role})
+        token = create_access_token({"sub": str(user.id), "role": str(user.role)})
         return TokenResponse(message="Login successful.", token=token, user=UserOut.model_validate(user))
     except ValueError:
         raise HTTPException(status_code=401, detail="Invalid Google token")

@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/walkin", tags=["Walk-in Intake"])
 def walk_in_intake(
     body: WalkInIntakeRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "technician", "staff", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN"))
 ):
     """
     Unified walk-in intake: creates customer (via repair record), repair, and optional invoice

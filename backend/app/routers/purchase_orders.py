@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from uuid import UUID
+from uuid import UUID, uuid4
 from decimal import Decimal
 from typing import Optional
 from datetime import datetime
@@ -13,9 +13,53 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/purchase-orders", tags=["Purchase Orders"])
 
 
+@router.post("/", status_code=201)
+def create_purchase_order(
+    body: PurchaseOrderCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+):
+    """Create a new purchase order"""
+    # Generate order number
+    order_number = f"PO-{datetime.now().strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
+    
+    purchase_order = PurchaseOrder(
+        order_number=order_number,
+        supplier_id=body.supplier_id,
+        branch_id=body.branch_id,
+        total_amount=body.total_amount,
+        notes=body.notes,
+        status=TradeRequestStatus.pending,
+        requested_by=current_user.id
+    )
+    
+    db.add(purchase_order)
+    db.commit()
+    db.refresh(purchase_order)
+    
+    return {
+        "success": True,
+        "message": "Purchase order created successfully",
+        "order": {
+            "id": str(purchase_order.id),
+            "order_number": purchase_order.order_number,
+            "status": purchase_order.status.value,
+            "total_amount": float(purchase_order.total_amount),
+            "created_at": purchase_order.created_at.isoformat()
+        }
+    }
+
+
 class PurchaseOrderApproval(BaseModel):
     action: str  # "approve" or "reject"
     rejection_reason: Optional[str] = None
+
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: Optional[UUID] = None
+    branch_id: Optional[UUID] = None
+    total_amount: Decimal
+    notes: Optional[str] = None
 
 
 class PurchaseOrderOut(BaseModel):
@@ -39,7 +83,7 @@ class PurchaseOrderOut(BaseModel):
 @router.get("/pending")
 def get_pending_purchase_orders(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Get all pending purchase orders awaiting approval"""
     orders = db.query(PurchaseOrder).filter(
@@ -121,7 +165,7 @@ def approve_purchase_order(
 def get_purchase_order_history(
     order_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Get approval history for a purchase order"""
     order = db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
@@ -152,7 +196,7 @@ def get_purchase_order_history(
 @router.get("/stats")
 def get_approval_stats(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Get statistics about purchase order approvals"""
     total = db.query(PurchaseOrder).count()

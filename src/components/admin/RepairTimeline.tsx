@@ -12,10 +12,11 @@ interface RepairTimelineProps {
 
 interface TimelineEvent {
   id: string;
-  event_type: string;
+  type: string;
+  title: string;
   description: string;
+  user_id?: string;
   created_at: string;
-  user_name?: string;
 }
 
 interface RepairDetail {
@@ -66,7 +67,7 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
   const fetchTimeline = async () => {
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/repairs/${trackingId}/timeline`), {
+      const res = await fetch(buildUrl(`/repair-details/${repairId}/timeline`), {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -79,10 +80,11 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
       if (repair) {
         setTimeline([{
           id: repair.id,
-          event_type: "status_change",
+          type: "status_change",
+          title: "Status Change",
           description: `Repair created with status: ${repair.status}`,
-          created_at: repair.created_at,
-          user_name: repair.technician_name || "System"
+          user_id: repair.technician_id,
+          created_at: repair.created_at
         }]);
       }
     } finally {
@@ -95,7 +97,7 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
 
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/repairs/${trackingId}/notes`), {
+      const res = await fetch(buildUrl(`/repair-details/${repairId}/notes`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -266,16 +268,16 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
                         <div className="flex-1 bg-[#0B0D17] rounded-lg p-4 border border-[#1F2235]">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-white capitalize">
-                              {event.event_type.replace(/_/g, " ")}
+                              {event.title || event.type.replace(/_/g, " ")}
                             </span>
                             <span className="text-xs text-slate-500">
                               {new Date(event.created_at).toLocaleString()}
                             </span>
                           </div>
                           <p className="text-slate-300 text-sm">{event.description}</p>
-                          {event.user_name && (
+                          {event.user_id && (
                             <p className="text-xs text-slate-500 mt-2">
-                              By: {event.user_name}
+                              User ID: {event.user_id}
                             </p>
                           )}
                         </div>

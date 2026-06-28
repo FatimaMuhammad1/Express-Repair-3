@@ -62,6 +62,8 @@ import {
   Bell,
   ChevronRight,
   Truck,
+  Plus,
+  Upload,
 } from "lucide-react";
 
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -136,24 +138,18 @@ function AdminDashboard({
 
 }) {
 
-  const [repairs, setRepairs] = useState<any[]>([
-    { id: "1", tracking_id: "REP-1001", customer_name: "Alice Thompson", customer_phone: "07700 100001", device_model: "iPhone 14", issue_description: "Screen cracked", status: "received", technician_id: null, estimated_cost: 89.99, created_at: new Date().toISOString() },
-    { id: "2", tracking_id: "REP-1002", customer_name: "Bob Wilson", customer_phone: "07700 100002", device_model: "iPhone 13", issue_description: "Battery replacement", status: "diagnosed", technician_id: "tech1", estimated_cost: 49.99, created_at: new Date(Date.now() - 86400000).toISOString() },
-    { id: "3", tracking_id: "REP-1003", customer_name: "Carol Taylor", customer_phone: "07700 100003", device_model: "Samsung S23", issue_description: "Water damage", status: "repairing", technician_id: "tech2", estimated_cost: 129.99, created_at: new Date(Date.now() - 172800000).toISOString() },
-    { id: "4", tracking_id: "REP-1004", customer_name: "David Evans", customer_phone: "07700 100004", device_model: "MacBook Pro", issue_description: "Software issue", status: "testing", technician_id: "tech1", estimated_cost: 79.99, created_at: new Date(Date.now() - 259200000).toISOString() },
-    { id: "5", tracking_id: "REP-1005", customer_name: "Emma Roberts", customer_phone: "07700 100005", device_model: "iPad Pro", issue_description: "Charging port", status: "collection", technician_id: "tech2", estimated_cost: 59.99, created_at: new Date(Date.now() - 345600000).toISOString() },
-  ]);
+  const [repairs, setRepairs] = useState<any[]>([]);
 
   const [stats, setStats] = useState<any>({
-    total_repairs: 156,
-    pending_repairs: 12,
-    completed_repairs: 134,
-    revenue: 12450.00,
-    active_bookings: 28,
-    low_stock_items: 5,
+    total_repairs: 0,
+    pending_repairs: 0,
+    completed_repairs: 0,
+    revenue: 0,
+    active_bookings: 0,
+    low_stock_items: 0,
   });
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [search, setSearch] = useState("");
 
@@ -204,12 +200,32 @@ function AdminDashboard({
     window.addEventListener('keydown', handleActivity);
     window.addEventListener('click', handleActivity);
 
+    // Navigation event listener from MainDashboard
+    const handleNavigation = (e: CustomEvent) => {
+      const section = e.detail.section;
+      // Map section names to activeSection values
+      const sectionMap: Record<string, string> = {
+        'activity': 'communications',
+        'low_stock_alerts': 'inventory',
+        'customers': 'customers',
+        'online_sales': 'financials',
+        'stock_purchases': 'stock_purchases',
+        'inventory_management': 'inventory',
+        'invoices': 'financials',
+        'expenses': 'financials'
+      };
+      setActiveSection(sectionMap[section] || section);
+    };
+
+    window.addEventListener('navigate-to-section', handleNavigation as EventListener);
+
     return () => {
       clearTimeout(timeoutId);
       clearTimeout(warningId);
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('keydown', handleActivity);
       window.removeEventListener('click', handleActivity);
+      window.removeEventListener('navigate-to-section', handleNavigation as EventListener);
     };
   }, [onLogout]);
 
@@ -219,13 +235,7 @@ function AdminDashboard({
 
   const [timePeriod, setTimePeriod] = useState("all");
 
-  const [products, setProducts] = useState<any[]>([
-    { id: "1", name: "iPhone 14 Screen", category: "Screens", brand: "Apple", model: "iPhone 14", price: 89.99, stock_quantity: 25 },
-    { id: "2", name: "iPhone 13 Screen", category: "Screens", brand: "Apple", model: "iPhone 13", price: 79.99, stock_quantity: 30 },
-    { id: "3", name: "Samsung S23 Screen", category: "Screens", brand: "Samsung", model: "Galaxy S23", price: 94.99, stock_quantity: 20 },
-    { id: "4", name: "iPhone Battery", category: "Batteries", brand: "Apple", model: "Universal", price: 29.99, stock_quantity: 50 },
-    { id: "5", name: "USB-C Charger", category: "Accessories", brand: "Generic", model: "65W", price: 24.99, stock_quantity: 100 },
-  ]);
+  const [products, setProducts] = useState<any[]>([]);
 
   const [inventorySearch, setInventorySearch] = useState("");
 
@@ -233,15 +243,48 @@ function AdminDashboard({
 
   const [showEditProductModal, setShowEditProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+
+  // Repair Parts Inventory
+  const [repairPartsInventory, setRepairPartsInventory] = useState<any[]>([]);
+  const [repairPartsSearch, setRepairPartsSearch] = useState("");
+  const [repairPartsTypeFilter, setRepairPartsTypeFilter] = useState("all");
+  const [showAddRepairPartModal, setShowAddRepairPartModal] = useState(false);
+  const [showEditRepairPartModal, setShowEditRepairPartModal] = useState(false);
+  const [editingRepairPart, setEditingRepairPart] = useState<any>(null);
+  const [newRepairPart, setNewRepairPart] = useState({
+    name: "",
+    description: "",
+    part_type: "screen",
+    brand: "",
+    model: "",
+    sku: "",
+    supplier: "",
+    unit_cost: "",
+    stock_quantity: "",
+    min_stock_level: "5",
+    location: "",
+    notes: ""
+  });
+
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    description: "",
+    category: "smartphones",
+    brand: "",
+    model: "",
+    condition: "new",
+    price: "",
+    stock_quantity: "",
+    image_url: ""
+  });
 
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
   const [editingStaff, setEditingStaff] = useState<any>(null);
 
-  const [staff, setStaff] = useState<any[]>([
-    { id: "1", name: "John Smith", email: "john@fixora.co.uk", phone: "07700 900001", role: "technician" },
-    { id: "2", name: "Sarah Johnson", email: "sarah@fixora.co.uk", phone: "07700 900002", role: "admin" },
-    { id: "3", name: "Mike Williams", email: "mike@fixora.co.uk", phone: "07700 900003", role: "technician" },
-  ]);
+  const [staff, setStaff] = useState<any[]>([]);
 
   const [staffSearch, setStaffSearch] = useState("");
 
@@ -259,11 +302,7 @@ function AdminDashboard({
 
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
-  const [bookings, setBookings] = useState<any[]>([
-    { id: "1", customer_name: "Alice Thompson", phone: "07700 100001", branch_id: "branch1", preferred_date: new Date().toISOString().split('T')[0], preferred_time_slot: "09:00", status: "confirmed", issue_description: "Screen Repair" },
-    { id: "2", customer_name: "Bob Wilson", phone: "07700 100002", branch_id: "branch1", preferred_date: new Date(Date.now() + 86400000).toISOString().split('T')[0], preferred_time_slot: "10:00", status: "pending", issue_description: "Battery Replacement" },
-    { id: "3", customer_name: "Carol Taylor", phone: "07700 100003", branch_id: "branch2", preferred_date: new Date(Date.now() + 172800000).toISOString().split('T')[0], preferred_time_slot: "14:00", status: "confirmed", issue_description: "Screen Repair" },
-  ]);
+  const [bookings, setBookings] = useState<any[]>([]);
 
   const [bookingSearch, setBookingSearch] = useState("");
 
@@ -279,19 +318,11 @@ function AdminDashboard({
   const [inventoryPage, setInventoryPage] = useState(1);
   const [inventoryPerPage, setInventoryPerPage] = useState(10);
 
-  const [expenses, setExpenses] = useState<any[]>([
-    { id: "1", category: "Rent", description: "Monthly rent payment", amount: 1200.00, date: new Date().toISOString().split('T')[0] },
-    { id: "2", category: "Utilities", description: "Electricity bill", amount: 350.00, date: new Date(Date.now() - 86400000).toISOString().split('T')[0] },
-    { id: "3", category: "Supplies", description: "Office supplies", amount: 150.00, date: new Date(Date.now() - 172800000).toISOString().split('T')[0] },
-  ]);
+  const [expenses, setExpenses] = useState<any[]>([]);
   const [expenseSearch, setExpenseSearch] = useState("");
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState("all");
 
-  const [revenueData, setRevenueData] = useState<any[]>([
-    { id: "1", source: "Repairs", description: "Screen repair revenue", amount: 2500.00, date: new Date().toISOString().split('T')[0], status: "received" },
-    { id: "2", source: "Sales", description: "Accessory sales", amount: 1800.00, date: new Date(Date.now() - 86400000).toISOString().split('T')[0], status: "received" },
-    { id: "3", source: "Repairs", description: "Battery replacements", amount: 1200.00, date: new Date(Date.now() - 172800000).toISOString().split('T')[0], status: "received" },
-  ]);
+  const [revenueData, setRevenueData] = useState<any[]>([]);
   const [revenueSearch, setRevenueSearch] = useState("");
 
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
@@ -304,9 +335,28 @@ function AdminDashboard({
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
+  const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({
+    name: "",
+    contact: "",
+    email: "",
+    phone: "",
+    address: "",
+    notes: ""
+  });
 
   const [stockPurchases, setStockPurchases] = useState<any[]>([]);
   const [stockPurchaseSearch, setStockPurchaseSearch] = useState("");
+  const [showAddPurchaseModal, setShowAddPurchaseModal] = useState(false);
+  const [newPurchaseOrder, setNewPurchaseOrder] = useState({
+    supplier_id: "",
+    branch_id: "",
+    reference: "",
+    total_amount: "",
+    date: new Date().toISOString().split('T')[0],
+    status: "pending",
+    notes: ""
+  });
 
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [purchaseOrderSearch, setPurchaseOrderSearch] = useState("");
@@ -316,6 +366,15 @@ function AdminDashboard({
 
   const [inhouseSales, setInhouseSales] = useState<any[]>([]);
   const [inhouseSaleSearch, setInhouseSaleSearch] = useState("");
+  const [showAddInhouseSaleModal, setShowAddInhouseSaleModal] = useState(false);
+  const [newInhouseSale, setNewInhouseSale] = useState({
+    reference: "",
+    customer_name: "",
+    customer_phone: "",
+    amount: "",
+    item_count: "",
+    payment_method: "cash"
+  });
 
   const [invoices, setInvoices] = useState<any[]>([]);
   const [invoiceSearch, setInvoiceSearch] = useState("");
@@ -419,7 +478,6 @@ function AdminDashboard({
     } catch (e) {
 
       console.error(e);
-      toast.error("Failed to fetch repairs");
 
     } finally {
 
@@ -433,9 +491,11 @@ function AdminDashboard({
 
   const fetchStats = async () => {
 
+    setIsLoading(true);
+
     try {
 
-      const res = await fetch(buildUrl(API_CONFIG.ENDPOINTS.REPAIRS.STATS), {
+      const res = await fetch(buildUrl("/repairs/stats"), {
 
         headers: { Authorization: `Bearer ${token}` },
 
@@ -443,12 +503,18 @@ function AdminDashboard({
 
       const data = await res.json();
 
-      if (res.ok && data.success) setStats(data.stats);
+      if (res.ok && data.success) {
+        console.log("Stats data:", data.stats);
+        setStats(data.stats);
+      }
 
     } catch (e) {
 
       console.error(e);
-      toast.error("Failed to fetch stats");
+
+    } finally {
+
+      setIsLoading(false);
 
     }
 
@@ -457,44 +523,25 @@ function AdminDashboard({
 
 
   const exportRepairsCSV = async () => {
-
     try {
-
-      const res = await fetch(buildUrl(API_CONFIG.ENDPOINTS.REPAIRS.EXPORT_CSV), {
-
-        headers: { Authorization: `Bearer ${token}` },
-
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/repairs/export/csv"), {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
-
       if (res.ok) {
-
         const blob = await res.blob();
-
         const url = window.URL.createObjectURL(blob);
-
         const a = document.createElement('a');
-
         a.href = url;
-
         a.download = `repairs_export_${new Date().toISOString().split('T')[0]}.csv`;
-
         document.body.appendChild(a);
-
         a.click();
-
         window.URL.revokeObjectURL(url);
-
         document.body.removeChild(a);
-
       }
-
     } catch (e) {
-
       console.error(e);
-      toast.error("Failed to export repairs");
-
     }
-
   };
 
 
@@ -545,10 +592,11 @@ function AdminDashboard({
 
       );
 
+      // Refetch stats to update dashboard counts
+      fetchStats();
     } catch (e) {
 
       console.error(e);
-      toast.error("Failed to update repair status");
 
       // Revert on error
 
@@ -585,27 +633,11 @@ function AdminDashboard({
     }
   };
 
-  const updateTechnician = async (trackingId: string, technicianId: string) => {
+  const updateTechnician = (trackingId: string, technicianId: string) => {
+    // Technician assignment - local update only, not persisted to backend
     setRepairs(prev => prev.map(r =>
       r.tracking_id === trackingId ? { ...r, technician_id: technicianId || null } : r
     ));
-
-    try {
-      await fetch(
-        buildUrl(API_CONFIG.ENDPOINTS.REPAIRS.UPDATE_STATUS(trackingId)),
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ technician_id: technicianId || null }),
-        },
-      );
-    } catch (e) {
-      console.error("Failed to update technician:", e);
-      toast.error("Failed to update technician");
-    }
   };
 
 
@@ -635,7 +667,6 @@ function AdminDashboard({
     } catch (e) {
 
       console.error(e);
-      toast.error("Failed to delete repair");
 
     }
 
@@ -770,9 +801,7 @@ function AdminDashboard({
 
     totalRepairs > 0 ? Math.round((completedRepairs / totalRepairs) * 100) : 0;
 
-  const inProgressRepairs = stats?.status_breakdown
-    ? Object.values(stats.status_breakdown).reduce((a: number, b: number) => a + b, 0) - completedRepairs
-    : analyticsRepairs.filter((r: any) => r.status !== "collection").length;
+  const inProgressRepairs = repairs.filter((r: any) => r.status !== "collection" && r.status !== "completed").length;
 
   const totalRevenue = stats?.total_revenue || 0;
 
@@ -1125,7 +1154,7 @@ function AdminDashboard({
   }, [activeSection]);
 
   // Fetch roles & permissions
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1143,10 +1172,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch profit & loss
-  const fetchProfitLoss = async () => {
+  const fetchProfitLoss = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1163,10 +1192,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [profitLossPeriod]);
 
   // Fetch cash flow
-  const fetchCashFlow = async () => {
+  const fetchCashFlow = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1183,10 +1212,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [cashFlowPeriod]);
 
   // Fetch repair tracking
-  const fetchRepairTracking = async () => {
+  const fetchRepairTracking = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1194,6 +1223,7 @@ function AdminDashboard({
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
       const data = await res.json();
+      console.log("Repair tracking data:", data);
       if (res.ok && data.success) {
         setRepairTracking(data.repairTracking || []);
       }
@@ -1203,10 +1233,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch expenses
-  const fetchExpenses = async () => {
+  const fetchExpenses = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1223,10 +1253,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch revenue
-  const fetchRevenue = async () => {
+  const fetchRevenue = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1243,10 +1273,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch online sales
-  const fetchOnlineSales = async () => {
+  const fetchOnlineSales = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1263,10 +1293,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch in-house sales
-  const fetchInhouseSales = async () => {
+  const fetchInhouseSales = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1283,10 +1313,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch invoices
-  const fetchInvoices = async () => {
+  const fetchInvoices = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1303,10 +1333,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch payments
-  const fetchPayments = async () => {
+  const fetchPayments = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1323,10 +1353,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch customer history
-  const fetchCustomerHistory = async () => {
+  const fetchCustomerHistory = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1343,10 +1373,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch inventory items
-  const fetchInventoryItems = async () => {
+  const fetchInventoryItems = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1364,10 +1394,31 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Fetch repair parts inventory
+  const fetchRepairPartsInventory = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/repairs/inventory"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      console.log("Repair parts inventory data:", data);
+      if (res.ok && data.success) {
+        setRepairPartsInventory(data.parts || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch repair parts inventory:", e);
+      toast.error("Failed to fetch repair parts inventory");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   // Fetch stock movements
-  const fetchStockMovements = async () => {
+  const fetchStockMovements = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1384,10 +1435,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch suppliers
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1404,10 +1455,44 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
+  }, []);
+
+  // Handler for creating supplier
+  const handleCreateSupplier = async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/suppliers"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(newSupplier)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSuppliers(prev => [data.supplier, ...prev]);
+        setShowAddSupplierModal(false);
+        setNewSupplier({
+          name: "",
+          contact: "",
+          email: "",
+          phone: "",
+          address: "",
+          notes: ""
+        });
+        toast.success("Supplier created successfully");
+      } else {
+        toast.error(data.detail || "Failed to create supplier");
+      }
+    } catch (e) {
+      console.error("Failed to create supplier:", e);
+      toast.error("Failed to create supplier");
+    }
   };
 
   // Fetch stock purchases
-  const fetchStockPurchases = async () => {
+  const fetchStockPurchases = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1424,10 +1509,10 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch purchase orders
-  const fetchPurchaseOrders = async () => {
+  const fetchPurchaseOrders = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
@@ -1444,104 +1529,378 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // useEffect hooks for data fetching
   useEffect(() => {
     if (activeSection === "roles_permissions") {
       fetchRoles();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchRoles]);
 
   useEffect(() => {
     if (activeSection === "profit_loss") {
       fetchProfitLoss();
     }
-  }, [activeSection, profitLossPeriod]);
+  }, [activeSection, fetchProfitLoss]);
 
   useEffect(() => {
     if (activeSection === "cash_flow") {
       fetchCashFlow();
     }
-  }, [activeSection, cashFlowPeriod]);
+  }, [activeSection, fetchCashFlow]);
 
   useEffect(() => {
     if (activeSection === "repair_tracking") {
       fetchRepairTracking();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchRepairTracking]);
 
   useEffect(() => {
     if (activeSection === "expenses") {
       fetchExpenses();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchExpenses]);
 
   useEffect(() => {
     if (activeSection === "revenue") {
       fetchRevenue();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchRevenue]);
 
   useEffect(() => {
     if (activeSection === "online_sales") {
       fetchOnlineSales();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchOnlineSales]);
 
   useEffect(() => {
     if (activeSection === "inhouse_sales") {
       fetchInhouseSales();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchInhouseSales]);
 
   useEffect(() => {
     if (activeSection === "invoices") {
       fetchInvoices();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchInvoices]);
 
   useEffect(() => {
     if (activeSection === "payments") {
       fetchPayments();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchPayments]);
 
   useEffect(() => {
     if (activeSection === "customer_history") {
       fetchCustomerHistory();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchCustomerHistory]);
 
   useEffect(() => {
     if (activeSection === "inventory_management") {
       fetchInventoryItems();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchInventoryItems]);
 
   useEffect(() => {
     if (activeSection === "stock_movements") {
       fetchStockMovements();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchStockMovements]);
 
   useEffect(() => {
     if (activeSection === "supplier_management") {
       fetchSuppliers();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchSuppliers]);
 
   useEffect(() => {
     if (activeSection === "stock_purchases") {
       fetchStockPurchases();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchStockPurchases]);
+
+  // Handler for creating in-house sale
+  const handleCreateInhouseSale = async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/finance/inhouse-sales"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          reference: newInhouseSale.reference || `SALE-${Date.now()}`,
+          customer_name: newInhouseSale.customer_name,
+          customer_phone: newInhouseSale.customer_phone,
+          amount: parseFloat(newInhouseSale.amount),
+          item_count: parseInt(newInhouseSale.item_count),
+          payment_method: newInhouseSale.payment_method
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setInhouseSales(prev => [{
+          id: data.sale.id,
+          reference: data.sale.reference,
+          customer_name: data.sale.customer_name,
+          amount: data.sale.amount,
+          date: data.sale.created_at,
+          payment_method: data.sale.payment_method,
+          status: "completed"
+        }, ...prev]);
+        setShowAddInhouseSaleModal(false);
+        setNewInhouseSale({
+          reference: "",
+          customer_name: "",
+          customer_phone: "",
+          amount: "",
+          item_count: "",
+          payment_method: "cash"
+        });
+        toast.success("In-house sale recorded successfully");
+      } else {
+        toast.error(data.detail || "Failed to record sale");
+      }
+    } catch (e) {
+      console.error("Failed to create in-house sale:", e);
+      toast.error("Failed to record sale");
+    }
+  };
+
+  // Handler for creating product
+  const handleCreateProduct = async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/products"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          name: newProduct.name,
+          description: newProduct.description,
+          category: newProduct.category,
+          brand: newProduct.brand,
+          model: newProduct.model,
+          condition: newProduct.condition,
+          price: parseFloat(newProduct.price),
+          stock_quantity: parseInt(newProduct.stock_quantity),
+          image_url: newProduct.image_url || null
+        })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setProducts(prev => [data, ...prev]);
+        setShowAddProductModal(false);
+        setNewProduct({
+          name: "",
+          description: "",
+          category: "smartphones",
+          brand: "",
+          model: "",
+          condition: "new",
+          price: "",
+          stock_quantity: "",
+          image_url: ""
+        });
+        toast.success("Product created successfully");
+      } else {
+        toast.error(data.detail || "Failed to create product");
+      }
+    } catch (e) {
+      console.error("Failed to create product:", e);
+      toast.error("Failed to create product");
+    }
+  };
+
+  // Handler for importing products from CSV/Excel
+  const handleImportProducts = async () => {
+    if (!importFile) {
+      toast.error("Please select a file to import");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/products/import"), {
+        method: "POST",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(`Successfully imported ${data.imported_count} products`);
+        fetchProducts();
+        setShowImportModal(false);
+        setImportFile(null);
+      } else {
+        toast.error(data.detail || "Failed to import products");
+      }
+    } catch (e) {
+      console.error("Failed to import products:", e);
+      toast.error("Failed to import products");
+    }
+  };
+
+  // Handler for creating repair part
+  const handleCreateRepairPart = async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/repairs/inventory"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          name: newRepairPart.name,
+          description: newRepairPart.description,
+          part_type: newRepairPart.part_type,
+          brand: newRepairPart.brand,
+          model: newRepairPart.model,
+          sku: newRepairPart.sku,
+          supplier: newRepairPart.supplier,
+          unit_cost: parseFloat(newRepairPart.unit_cost),
+          stock_quantity: parseInt(newRepairPart.stock_quantity),
+          min_stock_level: parseInt(newRepairPart.min_stock_level),
+          location: newRepairPart.location,
+          notes: newRepairPart.notes
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRepairPartsInventory(prev => [data.part, ...prev]);
+        setShowAddRepairPartModal(false);
+        setNewRepairPart({
+          name: "",
+          description: "",
+          part_type: "screen",
+          brand: "",
+          model: "",
+          sku: "",
+          supplier: "",
+          unit_cost: "",
+          stock_quantity: "",
+          min_stock_level: "5",
+          location: "",
+          notes: ""
+        });
+        toast.success("Repair part added successfully");
+      } else {
+        toast.error(data.detail || "Failed to add repair part");
+      }
+    } catch (e) {
+      console.error("Failed to create repair part:", e);
+      toast.error("Failed to add repair part");
+    }
+  };
+
+  // Handler for updating repair part
+  const handleUpdateRepairPart = async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/repairs/inventory/${editingRepairPart.id}`), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(editingRepairPart)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRepairPartsInventory(prev => prev.map(p => p.id === editingRepairPart.id ? data.part : p));
+        setShowEditRepairPartModal(false);
+        setEditingRepairPart(null);
+        toast.success("Repair part updated successfully");
+      } else {
+        toast.error(data.detail || "Failed to update repair part");
+      }
+    } catch (e) {
+      console.error("Failed to update repair part:", e);
+      toast.error("Failed to update repair part");
+    }
+  };
+
+  // Handler for deleting repair part
+  const handleDeleteRepairPart = async (partId: string) => {
+    if (!confirm("Are you sure you want to delete this repair part?")) return;
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/repairs/inventory/${partId}`), {
+        method: "DELETE",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        setRepairPartsInventory(prev => prev.filter(p => p.id !== partId));
+        toast.success("Repair part deleted successfully");
+      }
+    } catch (e) {
+      console.error("Failed to delete repair part:", e);
+      toast.error("Failed to delete repair part");
+    }
+  };
+
+  // Handler for creating purchase order
+  const handleCreatePurchaseOrder = async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/purchase-orders"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          supplier_id: newPurchaseOrder.supplier_id || null,
+          branch_id: newPurchaseOrder.branch_id || null,
+          total_amount: parseFloat(newPurchaseOrder.total_amount),
+          notes: newPurchaseOrder.notes
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setStockPurchases(prev => [{
+          id: data.order.id,
+          supplier: suppliers.find(s => s.id === newPurchaseOrder.supplier_id)?.name || "New Supplier",
+          reference: newPurchaseOrder.reference || data.order.order_number,
+          amount: data.order.total_amount,
+          date: newPurchaseOrder.date,
+          status: newPurchaseOrder.status
+        }, ...prev]);
+        setShowAddPurchaseModal(false);
+        setNewPurchaseOrder({
+          supplier_id: "",
+          branch_id: "",
+          reference: "",
+          total_amount: "",
+          date: new Date().toISOString().split('T')[0],
+          status: "pending",
+          notes: ""
+        });
+        toast.success("Purchase order created successfully");
+      } else {
+        toast.error(data.message || "Failed to create purchase order");
+      }
+    } catch (e) {
+      console.error("Failed to create purchase order:", e);
+      toast.error("Failed to create purchase order");
+    }
+  };
 
   useEffect(() => {
     if (activeSection === "purchase_orders") {
       fetchPurchaseOrders();
     }
-  }, [activeSection]);
+  }, [activeSection, fetchPurchaseOrders]);
 
   // CRUD Handlers for Expenses
   const handleCreateExpense = async (expenseData: any) => {
@@ -1569,7 +1928,7 @@ function AdminDashboard({
   const handleUpdateExpense = async (expenseId: string, expenseData: any) => {
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/expenses/${expenseId}`), {
+      const res = await fetch(buildUrl(`/api/finance/expenses/${expenseId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1591,7 +1950,7 @@ function AdminDashboard({
     if (!confirm("Are you sure you want to delete this expense?")) return;
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/expenses/${expenseId}`), {
+      const res = await fetch(buildUrl(`/api/finance/expenses/${expenseId}`), {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
@@ -1654,7 +2013,7 @@ function AdminDashboard({
   const handleUpdateOnlineSale = async (saleId: string, saleData: any) => {
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/online-sales/${saleId}`), {
+      const res = await fetch(buildUrl(`/api/finance/online-sales/${saleId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1676,7 +2035,7 @@ function AdminDashboard({
     if (!confirm("Are you sure you want to delete this online sale?")) return;
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/online-sales/${saleId}`), {
+      const res = await fetch(buildUrl(`/api/finance/online-sales/${saleId}`), {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
@@ -1690,33 +2049,10 @@ function AdminDashboard({
     }
   };
 
-  // CRUD Handlers for In-House Sales
-  const handleCreateInhouseSale = async (saleData: any) => {
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl("/finance/inhouse-sales"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(saleData)
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setInhouseSales(prev => [data.inhouseSale, ...prev]);
-        toast.success("In-house sale created successfully");
-      }
-    } catch (e) {
-      console.error("Failed to create in-house sale:", e);
-      toast.error("Failed to create in-house sale");
-    }
-  };
-
   const handleUpdateInhouseSale = async (saleId: string, saleData: any) => {
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/inhouse-sales/${saleId}`), {
+      const res = await fetch(buildUrl(`/api/finance/inhouse-sales/${saleId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1734,124 +2070,6 @@ function AdminDashboard({
     }
   };
 
-  const handleDeleteInhouseSale = async (saleId: string) => {
-    if (!confirm("Are you sure you want to delete this in-house sale?")) return;
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/inhouse-sales/${saleId}`), {
-        method: "DELETE",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (res.ok) {
-        setInhouseSales(prev => prev.filter(s => s.id !== saleId));
-        toast.success("In-house sale deleted successfully");
-      }
-    } catch (e) {
-      console.error("Failed to delete in-house sale:", e);
-      toast.error("Failed to delete in-house sale");
-    }
-  };
-
-  // CRUD Handlers for Roles
-  const handleCreateRole = async (roleData: any) => {
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl("/roles"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(roleData)
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setRoles(prev => [...prev, { ...data.role, permissions: [], userCount: 0 }]);
-        toast.success("Role created successfully");
-      }
-    } catch (e) {
-      console.error("Failed to create role:", e);
-      toast.error("Failed to create role");
-    }
-  };
-
-  const handleUpdateRole = async (roleId: string, roleData: any) => {
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl(`/roles/${roleId}`), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(roleData)
-      });
-      if (res.ok) {
-        setRoles(prev => prev.map(r => r.id === roleId ? { ...r, ...roleData } : r));
-        toast.success("Role updated successfully");
-      }
-    } catch (e) {
-      console.error("Failed to update role:", e);
-      toast.error("Failed to update role");
-    }
-  };
-
-  const handleDeleteRole = async (roleId: string) => {
-    if (!confirm("Are you sure you want to delete this role?")) return;
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl(`/roles/${roleId}`), {
-        method: "DELETE",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (res.ok) {
-        setRoles(prev => prev.filter(r => r.id !== roleId));
-        toast.success("Role deleted successfully");
-      }
-    } catch (e) {
-      console.error("Failed to delete role:", e);
-      toast.error("Failed to delete role");
-    }
-  };
-
-  const handleAddPermission = async (roleId: string, permData: any) => {
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl(`/roles/${roleId}/permissions`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(permData)
-      });
-      if (res.ok) {
-        fetchRoles();
-        toast.success("Permission added successfully");
-      }
-    } catch (e) {
-      console.error("Failed to add permission:", e);
-      toast.error("Failed to add permission");
-    }
-  };
-
-  const handleRemovePermission = async (roleId: string, permissionId: string) => {
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl(`/roles/${roleId}/permissions/${permissionId}`), {
-        method: "DELETE",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (res.ok) {
-        fetchRoles();
-        toast.success("Permission removed successfully");
-      }
-    } catch (e) {
-      console.error("Failed to remove permission:", e);
-      toast.error("Failed to remove permission");
-    }
-  };
-
   const fetchCommunications = async () => {
     setIsLoading(true);
     try {
@@ -1865,7 +2083,6 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch communications:", e);
-      toast.error("Failed to fetch communications");
     } finally {
       setIsLoading(false);
     }
@@ -1877,13 +2094,19 @@ function AdminDashboard({
     }
   }, [activeSection]);
 
+  useEffect(() => {
+    if (activeSection === "repair_parts_inventory") {
+      fetchRepairPartsInventory();
+    }
+  }, [activeSection, fetchRepairPartsInventory]);
+
   const handleBulkDelete = async () => {
     if (!confirm(`Are you sure you want to delete ${selectedRepairs.size} repairs?`)) return;
     try {
       const token = getStoredToken();
       await Promise.all(
         Array.from(selectedRepairs).map(id =>
-          fetch(buildUrl(`/repairs/${id}`), {
+          fetch(buildUrl(`/api/repairs/${id}`), {
             method: "DELETE",
             headers: {
               ...(token ? { "Authorization": `Bearer ${token}` } : {})
@@ -1967,6 +2190,7 @@ function AdminDashboard({
       icon: Database,
       items: [
         { id: "inventory", icon: Package, label: "Products" },
+        { id: "repair_parts_inventory", icon: Wrench, label: "Repair Parts" },
         { id: "inventory_management", icon: Database, label: "Inventory Management" },
         { id: "stock_movements", icon: TrendingUp, label: "Stock Movements" },
         { id: "low_stock_alerts", icon: AlertCircle, label: "Low Stock Alerts" },
@@ -2017,7 +2241,7 @@ function AdminDashboard({
     ...group,
     items: group.items.filter(item => {
       if (userRole === "STAFF") {
-        return ["dashboard", "repairs", "customers", "bookings", "finance", "walkin"].includes(item.id);
+        return ["walkin", "repairs", "repair_parts_inventory"].includes(item.id);
       }
       return true;
     })
@@ -2117,7 +2341,7 @@ function AdminDashboard({
 
                               onClick={() => setActiveSection(item.id)}
 
-                              className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${activeSection === item.id
+                              className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-xs font-medium transition-all ${activeSection === item.id
 
                                   ? "bg-[#6B46C1] text-white shadow-sm"
 
@@ -2127,8 +2351,8 @@ function AdminDashboard({
 
                             >
 
-                              <div className="flex items-center gap-3">
-                                <span className="truncate">{item.label}</span>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="whitespace-nowrap overflow-hidden text-ellipsis">{item.label}</span>
                               </div>
 
                               {item.badge && (
@@ -2551,7 +2775,7 @@ function AdminDashboard({
 
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
-                            Technician
+                            Assigned Staff
 
                           </th>
 
@@ -2572,35 +2796,20 @@ function AdminDashboard({
                       </thead>
 
                       <tbody>
-
                         {paginatedRepairs.length > 0 ? (
-
                           paginatedRepairs.map((r, idx) => (
-
                             <motion.tr
-
                               key={r.id}
-
                               initial={{ opacity: 0, y: 8 }}
-
                               animate={{ opacity: 1, y: 0 }}
-
                               transition={{ delay: idx * 0.03 }}
-
                               className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
-
                             >
-
                               <td className="px-4 py-3">
-
                                 <input
-
                                   type="checkbox"
-
                                   checked={selectedRepairs.has(r.id)}
-
                                   onChange={(e) => {
-
                                     const newSelected = new Set(selectedRepairs);
 
                                     if (e.target.checked) {
@@ -3024,7 +3233,7 @@ function AdminDashboard({
 
                 {/* Filters */}
 
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
 
                   <div className="relative flex-1">
 
@@ -3069,6 +3278,23 @@ function AdminDashboard({
                       <option value="accessories">Accessories</option>
 
                     </select>
+
+                    <Button
+                      onClick={() => setShowAddProductModal(true)}
+                      className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Product
+                    </Button>
+
+                    <Button
+                      onClick={() => setShowImportModal(true)}
+                      variant="outline"
+                      className="border-[#1F2235] text-white hover:bg-slate-800"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import CSV/Excel
+                    </Button>
 
                   </div>
 
@@ -3286,6 +3512,684 @@ function AdminDashboard({
 
                 </div>
 
+                {/* Add Product Modal */}
+                <AnimatePresence>
+                  {showAddProductModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowAddProductModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Add New Product</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Product Name *</Label>
+                            <Input
+                              value={newProduct.name}
+                              onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Category</Label>
+                            <select
+                              value={newProduct.category}
+                              onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="smartphones">Smartphones</option>
+                              <option value="laptops">Laptops</option>
+                              <option value="tablets">Tablets</option>
+                              <option value="accessories">Accessories</option>
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-slate-300">Brand</Label>
+                              <Input
+                                value={newProduct.brand}
+                                onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-300">Model</Label>
+                              <Input
+                                value={newProduct.model}
+                                onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Condition</Label>
+                            <select
+                              value={newProduct.condition}
+                              onChange={(e) => setNewProduct({ ...newProduct, condition: e.target.value })}
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="new">New</option>
+                              <option value="refurbished">Refurbished</option>
+                              <option value="used">Used</option>
+                            </select>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-slate-300">Price (£) *</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={newProduct.price}
+                                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-300">Stock Quantity *</Label>
+                              <Input
+                                type="number"
+                                value={newProduct.stock_quantity}
+                                onChange={(e) => setNewProduct({ ...newProduct, stock_quantity: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Description</Label>
+                            <Input
+                              value={newProduct.description}
+                              onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="Optional description..."
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Image URL</Label>
+                            <Input
+                              value={newProduct.image_url}
+                              onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="Optional image URL..."
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowAddProductModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleCreateProduct}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Add Product
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Import Products Modal */}
+                <AnimatePresence>
+                  {showImportModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowImportModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Import Products</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">CSV/Excel File</Label>
+                            <Input
+                              type="file"
+                              accept=".csv,.xlsx,.xls"
+                              onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white mt-1"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Supported formats: CSV, Excel (.xlsx, .xls)</p>
+                          </div>
+                          <div className="bg-[#1A1D27] rounded-lg p-4 border border-[#1F2235]">
+                            <p className="text-sm text-slate-400 mb-2">Expected CSV columns:</p>
+                            <code className="text-xs text-slate-300 block">name, description, category, brand, model, condition, price, stock_quantity, image_url</code>
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowImportModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleImportProducts}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Import
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Repair Parts Inventory Section */}
+                {activeSection === "repair_parts_inventory" && (
+                  <>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-20">
+                        <RefreshCw className="h-8 w-8 animate-spin text-violet-500" />
+                      </div>
+                    ) : (
+                      <>
+                        {/* CTA Section */}
+                        <div className="mb-6 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 flex items-center justify-between">
+                          <div>
+                            <h3 className="text-lg font-semibold text-white mb-1">Repair Parts Inventory</h3>
+                            <p className="text-sm text-violet-100">Manage your repair parts stock efficiently</p>
+                          </div>
+                          <Button
+                            onClick={() => setShowAddRepairPartModal(true)}
+                            className="bg-white text-violet-600 hover:bg-violet-50 font-medium"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add New Part
+                          </Button>
+                        </div>
+
+                        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                          <StatCard
+                            title="Total Parts"
+                            value={repairPartsInventory.length}
+                            icon={Wrench}
+                            gradient="from-blue-500 to-cyan-500"
+                          />
+                          <StatCard
+                            title="In Stock"
+                            value={repairPartsInventory.filter((p) => p.stock_quantity > 0).length}
+                            icon={CheckCircle2}
+                            gradient="from-emerald-500 to-green-500"
+                          />
+                          <StatCard
+                            title="Low Stock"
+                            value={repairPartsInventory.filter((p) => p.stock_quantity > 0 && p.stock_quantity <= p.min_stock_level).length}
+                            icon={AlertCircle}
+                            gradient="from-amber-500 to-orange-500"
+                          />
+                          <StatCard
+                            title="Out of Stock"
+                            value={repairPartsInventory.filter((p) => p.stock_quantity === 0).length}
+                            icon={Circle}
+                            gradient="from-rose-500 to-pink-500"
+                          />
+                        </div>
+
+                    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                        <Input
+                          placeholder="Search by name, SKU, or brand"
+                          value={repairPartsSearch}
+                          onChange={(e) => setRepairPartsSearch(e.target.value)}
+                          className="h-10 border border-[#1F2235] bg-[#11131E] pl-10 text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Filter className="h-4 w-4 text-slate-600" />
+                        <select
+                          value={repairPartsTypeFilter}
+                          onChange={(e) => setRepairPartsTypeFilter(e.target.value)}
+                          className="h-10 rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        >
+                          <option value="all">All Types</option>
+                          <option value="screen">Screens</option>
+                          <option value="battery">Batteries</option>
+                          <option value="tool">Tools</option>
+                          <option value="cable">Cables</option>
+                          <option value="other">Other</option>
+                        </select>
+                        <Button
+                          onClick={() => setShowAddRepairPartModal(true)}
+                          className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Part
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-[#1F2235] bg-[#11131E]">
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                Part
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                Type
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                SKU
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                Stock
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                Unit Cost
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                Location
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {repairPartsInventory
+                              .filter((part) => {
+                                const matchesSearch = 
+                                  part.name.toLowerCase().includes(repairPartsSearch.toLowerCase()) ||
+                                  (part.sku && part.sku.toLowerCase().includes(repairPartsSearch.toLowerCase())) ||
+                                  (part.brand && part.brand.toLowerCase().includes(repairPartsSearch.toLowerCase()));
+                                const matchesType = repairPartsTypeFilter === "all" || part.part_type === repairPartsTypeFilter;
+                                return matchesSearch && matchesType;
+                              })
+                              .map((part) => (
+                                <tr key={part.id} className="border-b border-[#1F2235] hover:bg-[#1A1D27] transition-colors">
+                                  <td className="px-6 py-4">
+                                    <div>
+                                      <div className="font-medium text-white">{part.name}</div>
+                                      <div className="text-xs text-slate-400">{part.brand} {part.model}</div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800 capitalize">
+                                      {part.part_type}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-slate-300">{part.sku || "-"}</td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-2">
+                                      <span className={`font-medium ${part.stock_quantity <= part.min_stock_level ? "text-amber-500" : "text-white"}`}>
+                                        {part.stock_quantity}
+                                      </span>
+                                      {part.stock_quantity <= part.min_stock_level && (
+                                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-slate-300">£{part.unit_cost ? parseFloat(part.unit_cost).toFixed(2) : "0.00"}</td>
+                                  <td className="px-6 py-4 text-slate-300">{part.location || "-"}</td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => {
+                                          setEditingRepairPart(part);
+                                          setShowEditRepairPartModal(true);
+                                        }}
+                                        className="text-slate-400 hover:text-white"
+                                      >
+                                        <Wrench className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleDeleteRepairPart(part.id)}
+                                        className="text-slate-400 hover:text-red-500"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {repairPartsInventory.length === 0 && (
+                        <div className="px-6 py-12 text-center text-slate-500">
+                          <Wrench className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                          <p>No repair parts found</p>
+                        </div>
+                      )}
+                    </div>
+                      </>
+                    )}
+
+                    {/* Add Repair Part Modal */}
+                    <AnimatePresence>
+                      {showAddRepairPartModal && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                          onClick={() => setShowAddRepairPartModal(false)}
+                        >
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <h3 className="text-lg font-semibold text-white mb-4">Add Repair Part</h3>
+                            <div className="space-y-4">
+                              <div>
+                                <Label className="text-slate-300">Name</Label>
+                                <Input
+                                  value={newRepairPart.name}
+                                  onChange={(e) => setNewRepairPart({ ...newRepairPart, name: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Part Type</Label>
+                                <select
+                                  value={newRepairPart.part_type}
+                                  onChange={(e) => setNewRepairPart({ ...newRepairPart, part_type: e.target.value })}
+                                  className="w-full rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-white"
+                                >
+                                  <option value="screen">Screen</option>
+                                  <option value="battery">Battery</option>
+                                  <option value="tool">Tool</option>
+                                  <option value="cable">Cable</option>
+                                  <option value="other">Other</option>
+                                </select>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Brand</Label>
+                                  <Input
+                                    value={newRepairPart.brand}
+                                    onChange={(e) => setNewRepairPart({ ...newRepairPart, brand: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Model</Label>
+                                  <Input
+                                    value={newRepairPart.model}
+                                    onChange={(e) => setNewRepairPart({ ...newRepairPart, model: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">SKU</Label>
+                                <Input
+                                  value={newRepairPart.sku}
+                                  onChange={(e) => setNewRepairPart({ ...newRepairPart, sku: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Supplier</Label>
+                                <Input
+                                  value={newRepairPart.supplier}
+                                  onChange={(e) => setNewRepairPart({ ...newRepairPart, supplier: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Unit Cost (£)</Label>
+                                  <Input
+                                    type="number"
+                                    value={newRepairPart.unit_cost}
+                                    onChange={(e) => setNewRepairPart({ ...newRepairPart, unit_cost: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                    required
+                                    min="0"
+                                    step="0.01"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Stock Quantity</Label>
+                                  <Input
+                                    type="number"
+                                    value={newRepairPart.stock_quantity}
+                                    onChange={(e) => setNewRepairPart({ ...newRepairPart, stock_quantity: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                    required
+                                    min="0"
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Min Stock Level</Label>
+                                  <Input
+                                    type="number"
+                                    value={newRepairPart.min_stock_level}
+                                    onChange={(e) => setNewRepairPart({ ...newRepairPart, min_stock_level: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                    required
+                                    min="0"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Location</Label>
+                                  <Input
+                                    value={newRepairPart.location}
+                                    onChange={(e) => setNewRepairPart({ ...newRepairPart, location: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Notes</Label>
+                                <Input
+                                  value={newRepairPart.notes}
+                                  onChange={(e) => setNewRepairPart({ ...newRepairPart, notes: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                />
+                              </div>
+                              <div className="flex gap-3 pt-4">
+                                <Button
+                                  onClick={() => setShowAddRepairPartModal(false)}
+                                  variant="outline"
+                                  className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  onClick={handleCreateRepairPart}
+                                  className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                                >
+                                  Add Part
+                                </Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Edit Repair Part Modal */}
+                    <AnimatePresence>
+                      {showEditRepairPartModal && editingRepairPart && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                          onClick={() => setShowEditRepairPartModal(false)}
+                        >
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <h3 className="text-lg font-semibold text-white mb-4">Edit Repair Part</h3>
+                            <div className="space-y-4">
+                              <div>
+                                <Label className="text-slate-300">Name</Label>
+                                <Input
+                                  value={editingRepairPart.name}
+                                  onChange={(e) => setEditingRepairPart({ ...editingRepairPart, name: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  required
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Part Type</Label>
+                                <select
+                                  value={editingRepairPart.part_type}
+                                  onChange={(e) => setEditingRepairPart({ ...editingRepairPart, part_type: e.target.value })}
+                                  className="w-full rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-white"
+                                >
+                                  <option value="screen">Screen</option>
+                                  <option value="battery">Battery</option>
+                                  <option value="tool">Tool</option>
+                                  <option value="cable">Cable</option>
+                                  <option value="other">Other</option>
+                                </select>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Brand</Label>
+                                  <Input
+                                    value={editingRepairPart.brand}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, brand: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Model</Label>
+                                  <Input
+                                    value={editingRepairPart.model}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, model: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">SKU</Label>
+                                <Input
+                                  value={editingRepairPart.sku}
+                                  onChange={(e) => setEditingRepairPart({ ...editingRepairPart, sku: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                />
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Supplier</Label>
+                                <Input
+                                  value={editingRepairPart.supplier}
+                                  onChange={(e) => setEditingRepairPart({ ...editingRepairPart, supplier: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Unit Cost (£)</Label>
+                                  <Input
+                                    type="number"
+                                    value={editingRepairPart.unit_cost}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, unit_cost: parseFloat(e.target.value) || 0 })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                    required
+                                    min="0"
+                                    step="0.01"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Stock Quantity</Label>
+                                  <Input
+                                    type="number"
+                                    value={editingRepairPart.stock_quantity}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, stock_quantity: parseInt(e.target.value) || 0 })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                    required
+                                    min="0"
+                                  />
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label className="text-slate-300">Min Stock Level</Label>
+                                  <Input
+                                    type="number"
+                                    value={editingRepairPart.min_stock_level}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, min_stock_level: parseInt(e.target.value) || 0 })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                    required
+                                    min="0"
+                                  />
+                                </div>
+                                <div>
+                                  <Label className="text-slate-300">Location</Label>
+                                  <Input
+                                    value={editingRepairPart.location}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, location: e.target.value })}
+                                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Notes</Label>
+                                <Input
+                                  value={editingRepairPart.notes}
+                                  onChange={(e) => setEditingRepairPart({ ...editingRepairPart, notes: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                />
+                              </div>
+                              <div className="flex gap-3 pt-4">
+                                <Button
+                                  onClick={() => setShowEditRepairPartModal(false)}
+                                  variant="outline"
+                                  className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  onClick={handleUpdateRepairPart}
+                                  className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                                >
+                                  Update
+                                </Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
+
                 {/* Edit Product Modal */}
                 <AnimatePresence>
                   {showEditProductModal && editingProduct && (
@@ -3312,6 +4216,7 @@ function AdminDashboard({
                                 value={editingProduct.name || ""}
                                 onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
                                 className="mt-1"
+                                required
                               />
                             </div>
                             <div>
@@ -3320,6 +4225,7 @@ function AdminDashboard({
                                 value={editingProduct.brand || ""}
                                 onChange={(e) => setEditingProduct({ ...editingProduct, brand: e.target.value })}
                                 className="mt-1"
+                                required
                               />
                             </div>
                             <div>
@@ -3328,6 +4234,7 @@ function AdminDashboard({
                                 value={editingProduct.model || ""}
                                 onChange={(e) => setEditingProduct({ ...editingProduct, model: e.target.value })}
                                 className="mt-1"
+                                required
                               />
                             </div>
                             <div>
@@ -3335,8 +4242,11 @@ function AdminDashboard({
                               <Input
                                 type="number"
                                 value={editingProduct.price || ""}
-                                onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })}
+                                onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
                                 className="mt-1"
+                                required
+                                min="0"
+                                step="0.01"
                               />
                             </div>
                             <div>
@@ -3344,8 +4254,10 @@ function AdminDashboard({
                               <Input
                                 type="number"
                                 value={editingProduct.stock_quantity || ""}
-                                onChange={(e) => setEditingProduct({ ...editingProduct, stock_quantity: parseInt(e.target.value) })}
+                                onChange={(e) => setEditingProduct({ ...editingProduct, stock_quantity: parseInt(e.target.value) || 0 })}
                                 className="mt-1"
+                                required
+                                min="0"
                               />
                             </div>
                             <div>
@@ -3422,9 +4334,9 @@ function AdminDashboard({
 
                   <StatCard
 
-                    title="Admins"
+                    title="Staff"
 
-                    value={staff.filter((s) => s.role === "admin").length}
+                    value={staff.filter((s) => s.role === "staff").length}
 
                     icon={ShieldCheck}
 
@@ -3434,9 +4346,9 @@ function AdminDashboard({
 
                   <StatCard
 
-                    title="Technicians"
+                    title="Super Admin"
 
-                    value={staff.filter((s) => s.role === "technician").length}
+                    value={staff.filter((s) => s.role === "SUPER_ADMIN").length}
 
                     icon={Wrench}
 
@@ -3484,11 +4396,11 @@ function AdminDashboard({
 
                       <option value="all">All Roles</option>
 
-                      <option value="admin">Admin</option>
-
-                      <option value="technician">Technician</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
 
                       <option value="staff">Staff</option>
+
+                      <option value="customer">Customer</option>
 
                     </select>
 
@@ -3606,7 +4518,7 @@ function AdminDashboard({
 
                               <td className="px-4 py-3">
 
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${staffMember.role === "admin" ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" : staffMember.role === "technician" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-slate-100 text-slate-700 bg-[#1A1D27] dark:text-slate-300"}`}>
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${staffMember.role === "SUPER_ADMIN" ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" : staffMember.role === "staff" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-slate-100 text-slate-700 bg-[#1A1D27] dark:text-slate-300"}`}>
 
                                   {staffMember.role}
 
@@ -3740,6 +4652,7 @@ function AdminDashboard({
                                 value={editingStaff.name || ""}
                                 onChange={(e) => setEditingStaff({ ...editingStaff, name: e.target.value })}
                                 className="mt-1"
+                                required
                               />
                             </div>
                             <div>
@@ -3749,6 +4662,7 @@ function AdminDashboard({
                                 value={editingStaff.email || ""}
                                 onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
                                 className="mt-1"
+                                required
                               />
                             </div>
                             <div>
@@ -3758,10 +4672,9 @@ function AdminDashboard({
                                 onChange={(e) => setEditingStaff({ ...editingStaff, role: e.target.value })}
                                 className="mt-1 w-full rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-white"
                               >
-                                <option value="admin">Admin</option>
-                                <option value="technician">Technician</option>
-                                <option value="STAFF">Staff</option>
                                 <option value="SUPER_ADMIN">Super Admin</option>
+                                <option value="staff">Staff</option>
+                                <option value="customer">Customer</option>
                               </select>
                             </div>
                           </div>
@@ -4042,6 +4955,190 @@ function AdminDashboard({
                   )}
 
                 </div>
+
+                {/* Email Modal */}
+                <AnimatePresence>
+                  {showEmailModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowEmailModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Send Email</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Recipient Email</Label>
+                            <Input
+                              type="email"
+                              placeholder="customer@example.com"
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Subject</Label>
+                            <Input
+                              placeholder="Email subject"
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Message</Label>
+                            <textarea
+                              placeholder="Your message..."
+                              className="w-full h-32 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowEmailModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => { setShowEmailModal(false); setEmailsSent(prev => prev + 1); toast.success("Email sent successfully"); }}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Send Email
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* SMS Modal */}
+                <AnimatePresence>
+                  {showSmsModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowSmsModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Send SMS</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Phone Number</Label>
+                            <Input
+                              type="tel"
+                              placeholder="+44 7415 278767"
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Message</Label>
+                            <textarea
+                              placeholder="Your SMS message..."
+                              className="w-full h-32 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowSmsModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => { setShowSmsModal(false); setSmsSent(prev => prev + 1); toast.success("SMS sent successfully"); }}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Send SMS
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Broadcast Modal */}
+                <AnimatePresence>
+                  {showBroadcastModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowBroadcastModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Broadcast Message</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Recipient Group</Label>
+                            <select
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="all_customers">All Customers</option>
+                              <option value="active_repairs">Customers with Active Repairs</option>
+                              <option value="recent_purchases">Recent Purchases</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Channel</Label>
+                            <select
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="email">Email</option>
+                              <option value="sms">SMS</option>
+                              <option value="both">Both Email & SMS</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Message</Label>
+                            <textarea
+                              placeholder="Your broadcast message..."
+                              className="w-full h-32 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowBroadcastModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={() => { setShowBroadcastModal(false); toast.success("Broadcast sent successfully"); }}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Send Broadcast
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
               </>
 
@@ -5329,7 +6426,7 @@ function AdminDashboard({
                 </div>
 
                 {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
 
                   <div className="relative flex-1">
 
@@ -5348,6 +6445,14 @@ function AdminDashboard({
                     />
 
                   </div>
+
+                  <Button
+                    onClick={() => setShowAddSupplierModal(true)}
+                    className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Supplier
+                  </Button>
 
                 </div>
 
@@ -5466,6 +6571,98 @@ function AdminDashboard({
 
                 </div>
 
+                {/* Add Supplier Modal */}
+                <AnimatePresence>
+                  {showAddSupplierModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowAddSupplierModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Add New Supplier</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Supplier Name *</Label>
+                            <Input
+                              value={newSupplier.name}
+                              onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Contact Person *</Label>
+                            <Input
+                              value={newSupplier.contact}
+                              onChange={(e) => setNewSupplier({ ...newSupplier, contact: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Email</Label>
+                            <Input
+                              type="email"
+                              value={newSupplier.email}
+                              onChange={(e) => setNewSupplier({ ...newSupplier, email: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Phone</Label>
+                            <Input
+                              value={newSupplier.phone}
+                              onChange={(e) => setNewSupplier({ ...newSupplier, phone: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Address</Label>
+                            <Input
+                              value={newSupplier.address}
+                              onChange={(e) => setNewSupplier({ ...newSupplier, address: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Notes</Label>
+                            <Input
+                              value={newSupplier.notes}
+                              onChange={(e) => setNewSupplier({ ...newSupplier, notes: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="Optional notes..."
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowAddSupplierModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleCreateSupplier}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Add Supplier
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
               </>
 
             )}
@@ -5530,7 +6727,7 @@ function AdminDashboard({
                 </div>
 
                 {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
 
                   <div className="relative flex-1">
 
@@ -5549,6 +6746,14 @@ function AdminDashboard({
                     />
 
                   </div>
+
+                  <Button
+                    onClick={() => setShowAddPurchaseModal(true)}
+                    className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Purchase Order
+                  </Button>
 
                 </div>
 
@@ -5666,6 +6871,112 @@ function AdminDashboard({
                   )}
 
                 </div>
+
+                {/* Add Purchase Order Modal */}
+                <AnimatePresence>
+                  {showAddPurchaseModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowAddPurchaseModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Create Purchase Order</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Supplier</Label>
+                            <select
+                              value={newPurchaseOrder.supplier_id}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, supplier_id: e.target.value })}
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="">Select supplier...</option>
+                              {suppliers.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Reference</Label>
+                            <Input
+                              value={newPurchaseOrder.reference}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, reference: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="PO-001 or leave blank for auto"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-slate-300">Total Amount (£)</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={newPurchaseOrder.total_amount}
+                                onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, total_amount: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-300">Date</Label>
+                              <Input
+                                type="date"
+                                value={newPurchaseOrder.date}
+                                onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, date: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Status</Label>
+                            <select
+                              value={newPurchaseOrder.status}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, status: e.target.value })}
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="approved">Approved</option>
+                              <option value="in_transit">In Transit</option>
+                              <option value="completed">Completed</option>
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Notes</Label>
+                            <Input
+                              value={newPurchaseOrder.notes}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, notes: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="Optional notes..."
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowAddPurchaseModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleCreatePurchaseOrder}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Create Order
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
               </>
 
@@ -5897,7 +7208,7 @@ function AdminDashboard({
 
                     title="Today"
 
-                    value={`£${payments.filter(p => new Date(p.date).toDateString() === new Date().toDateString()).reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(0)}`}
+                    value={`£${payments.filter(p => new Date(p.created_at).toDateString() === new Date().toDateString()).reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(0)}`}
 
                     icon={Calendar}
 
@@ -5912,7 +7223,7 @@ function AdminDashboard({
                     value={`£${payments.filter(p => {
                       const now = new Date();
                       const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                      return new Date(p.date) >= weekAgo;
+                      return new Date(p.created_at) >= weekAgo;
                     }).reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(0)}`}
 
                     icon={TrendingUp}
@@ -5925,7 +7236,7 @@ function AdminDashboard({
 
                     title="This Month"
 
-                    value={`£${payments.filter(p => new Date(p.date).getMonth() === new Date().getMonth()).reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(0)}`}
+                    value={`£${payments.filter(p => new Date(p.created_at).getMonth() === new Date().getMonth()).reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(0)}`}
 
                     icon={Activity}
 
@@ -6010,10 +7321,9 @@ function AdminDashboard({
                       </thead>
 
                       <tbody>
-
                         {payments.filter(p => {
-                          const matchSearch = p.reference?.toLowerCase().includes(paymentSearch.toLowerCase()) ||
-                            p.customer?.toLowerCase().includes(paymentSearch.toLowerCase());
+                          const matchSearch = p.invoice_number?.toLowerCase().includes(paymentSearch.toLowerCase()) ||
+                            p.customer_name?.toLowerCase().includes(paymentSearch.toLowerCase());
                           return matchSearch;
                         }).map((payment, idx) => (
 
@@ -6031,15 +7341,15 @@ function AdminDashboard({
 
                           >
 
-                            <td className="px-4 py-3 font-medium text-white">{payment.reference || "N/A"}</td>
+                            <td className="px-4 py-3 font-medium text-white">{payment.invoice_number || payment.description || "N/A"}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{payment.customer || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{payment.customer_name || "N/A"}</td>
 
                             <td className="px-4 py-3 font-semibold text-emerald-400">£{(payment.amount || 0).toFixed(2)}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{payment.method || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{payment.payment_method || "N/A"}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{new Date(payment.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{new Date(payment.created_at).toLocaleDateString()}</td>
 
                           </motion.tr>
 
@@ -6198,15 +7508,20 @@ function AdminDashboard({
 
                           </th>
 
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            Actions
+
+                          </th>
+
                         </tr>
 
                       </thead>
 
                       <tbody>
-
                         {invoices.filter(i => {
-                          const matchSearch = i.invoiceNumber?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
-                            i.customer?.toLowerCase().includes(invoiceSearch.toLowerCase());
+                          const matchSearch = i.invoice_number?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+                            i.customer_name?.toLowerCase().includes(invoiceSearch.toLowerCase());
                           return matchSearch;
                         }).map((invoice, idx) => (
 
@@ -6224,13 +7539,13 @@ function AdminDashboard({
 
                           >
 
-                            <td className="px-4 py-3 font-medium text-white">{invoice.invoiceNumber || "N/A"}</td>
+                            <td className="px-4 py-3 font-medium text-white">{invoice.invoice_number || "N/A"}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{invoice.customer || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{invoice.customer_name || "N/A"}</td>
 
                             <td className="px-4 py-3 font-semibold text-emerald-400">£{(invoice.amount || 0).toFixed(2)}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{new Date(invoice.dueDate).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "N/A"}</td>
 
                             <td className="px-4 py-3">
 
@@ -6239,6 +7554,56 @@ function AdminDashboard({
                                 {invoice.status || "outstanding"}
 
                               </span>
+
+                            </td>
+
+                            <td className="px-4 py-3">
+
+                              <div className="flex gap-2">
+
+                                <button
+
+                                  onClick={() => toast.success(`Invoice ${invoice.invoice_number} marked as paid`)}
+
+                                  className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 p-2 rounded-lg transition-colors"
+
+                                  title="Mark as paid"
+
+                                >
+
+                                  <CheckCircle2 className="h-4 w-4" />
+
+                                </button>
+
+                                <button
+
+                                  onClick={() => toast.success(`Invoice ${invoice.invoice_number} sent to customer`)}
+
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20 p-2 rounded-lg transition-colors"
+
+                                  title="Send invoice"
+
+                                >
+
+                                  <Send className="h-4 w-4" />
+
+                                </button>
+
+                                <button
+
+                                  onClick={() => toast.success(`Invoice ${invoice.invoice_number} downloaded`)}
+
+                                  className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/20 p-2 rounded-lg transition-colors"
+
+                                  title="Download PDF"
+
+                                >
+
+                                  <FileText className="h-4 w-4" />
+
+                                </button>
+
+                              </div>
 
                             </td>
 
@@ -6330,7 +7695,7 @@ function AdminDashboard({
                 </div>
 
                 {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
 
                   <div className="relative flex-1">
 
@@ -6349,6 +7714,14 @@ function AdminDashboard({
                     />
 
                   </div>
+
+                  <Button
+                    onClick={() => setShowAddInhouseSaleModal(true)}
+                    className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Sale
+                  </Button>
 
                 </div>
 
@@ -6458,6 +7831,106 @@ function AdminDashboard({
                   )}
 
                 </div>
+
+                {/* Add In-House Sale Modal */}
+                <AnimatePresence>
+                  {showAddInhouseSaleModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowAddInhouseSaleModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Record In-House Sale</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Reference</Label>
+                            <Input
+                              value={newInhouseSale.reference}
+                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, reference: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="SALE-001 or leave blank for auto"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Customer Name *</Label>
+                            <Input
+                              value={newInhouseSale.customer_name}
+                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, customer_name: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Customer Phone</Label>
+                            <Input
+                              value={newInhouseSale.customer_phone}
+                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, customer_phone: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label className="text-slate-300">Amount (£) *</Label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={newInhouseSale.amount}
+                                onChange={(e) => setNewInhouseSale({ ...newInhouseSale, amount: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-slate-300">Items Count</Label>
+                              <Input
+                                type="number"
+                                value={newInhouseSale.item_count}
+                                onChange={(e) => setNewInhouseSale({ ...newInhouseSale, item_count: e.target.value })}
+                                className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Payment Method</Label>
+                            <select
+                              value={newInhouseSale.payment_method}
+                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, payment_method: e.target.value })}
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="cash">Cash</option>
+                              <option value="card">Card</option>
+                              <option value="bank_transfer">Bank Transfer</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowAddInhouseSaleModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleCreateInhouseSale}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Record Sale
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
               </>
 
@@ -7992,25 +9465,25 @@ function AdminDashboard({
                 <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <StatCard
                     title="Total Repairs"
-                    value={repairTracking.length}
+                    value={repairs.length}
                     icon={Wrench}
                     gradient="from-blue-500 to-cyan-500"
                   />
                   <StatCard
                     title="In Progress"
-                    value={repairTracking.filter(r => r?.status === "in_progress").length}
+                    value={repairs.filter(r => r?.status !== "collection" && r?.status !== "completed").length}
                     icon={Activity}
                     gradient="from-amber-500 to-orange-500"
                   />
                   <StatCard
                     title="Completed"
-                    value={repairTracking.filter(r => r?.status === "completed").length}
+                    value={repairs.filter(r => r?.status === "completed").length}
                     icon={CheckCircle2}
                     gradient="from-emerald-500 to-green-500"
                   />
                   <StatCard
                     title="Pending"
-                    value={repairTracking.filter(r => r?.status === "pending").length}
+                    value={repairs.filter(r => r?.status === "pending").length}
                     icon={Clock}
                     gradient="from-violet-500 to-purple-500"
                   />
@@ -8059,11 +9532,22 @@ function AdminDashboard({
                         </tr>
                       </thead>
                       <tbody>
-                        {repairTracking.filter(r => {
-                          const matchSearch = r?.trackingId?.toLowerCase().includes(repairTrackingSearch.toLowerCase()) ||
-                            r?.customer?.toLowerCase().includes(repairTrackingSearch.toLowerCase());
+                        {repairs.filter(r => {
+                          const matchSearch = r?.tracking_id?.toLowerCase().includes(repairTrackingSearch.toLowerCase()) ||
+                            r?.customer_name?.toLowerCase().includes(repairTrackingSearch.toLowerCase());
                           return matchSearch;
-                        }).map((repair, idx) => (
+                        }).map((repair, idx) => {
+                          const statusProgress = {
+                            "pending": 0,
+                            "received": 20,
+                            "diagnosed": 40,
+                            "repairing": 60,
+                            "testing": 80,
+                            "collection": 90,
+                            "completed": 100
+                          };
+                          const progress = statusProgress[repair?.status] || 0;
+                          return (
                           <motion.tr
                             key={repair?.id || idx}
                             initial={{ opacity: 0, y: 8 }}
@@ -8071,9 +9555,9 @@ function AdminDashboard({
                             transition={{ delay: idx * 0.03 }}
                             className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
                           >
-                            <td className="px-4 py-3 font-medium text-white">{repair?.trackingId || "N/A"}</td>
-                            <td className="px-4 py-3 text-slate-400">{repair?.customer || "N/A"}</td>
-                            <td className="px-4 py-3 text-slate-400">{repair?.device || "N/A"}</td>
+                            <td className="px-4 py-3 font-medium text-white">{repair?.tracking_id || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{repair?.customer_name || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{repair?.device_model || "N/A"}</td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${repair?.status === "completed" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : repair?.status === "in_progress" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
                                 {repair?.status || "pending"}
@@ -8082,18 +9566,19 @@ function AdminDashboard({
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 h-2 bg-[#1F2235] rounded-full overflow-hidden">
-                                  <div className="h-full bg-[#6B46C1]" style={{ width: `${repair?.progress || 0}%` }}></div>
+                                  <div className="h-full bg-[#6B46C1]" style={{ width: `${progress}%` }}></div>
                                 </div>
-                                <span className="text-xs text-slate-400">{repair?.progress || 0}%</span>
+                                <span className="text-xs text-slate-400">{progress}%</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-slate-400">{new Date(repair?.startDate).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{new Date(repair?.created_at).toLocaleDateString()}</td>
                           </motion.tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
-                  {repairTracking.length === 0 && (
+                  {repairs.length === 0 && (
                     <div className="px-6 py-16 text-center text-slate-400">
                       <Activity className="mx-auto mb-3 h-8 w-8 opacity-40" />
                       <p className="text-sm">No repair tracking data yet</p>

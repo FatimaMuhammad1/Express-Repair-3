@@ -1,7 +1,14 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Optional
+
+try:
+    import pandas as pd
+    import io
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
 
 from app.database import get_db
 from app.models import Supplier, PurchaseOrder, StockMovement, Product, User
@@ -200,3 +207,69 @@ async def add_stock(
     db.commit()
     
     return {"success": True}
+
+
+@router.post("/import/excel")
+async def import_inventory_excel(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Import inventory from Excel file"""
+    
+    if not PANDAS_AVAILABLE:
+        raise HTTPException(500, "Excel import requires pandas. Install with: pip install pandas openpyxl")
+    
+    if not file.filename.endswith(('.xlsx', '.xls', '.csv')):
+        raise HTTPException(400, "File must be Excel (.xlsx, .xls) or CSV")
+    
+    try:
+        # Read file
+        contents = await file.read()
+        
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(io.BytesIO(contents))
+        else:
+            df = pd.read_excel(io.BytesIO(contents))
+        
+        # Validate required columns
+        required_columns = ['name', 'category', 'price', 'stock_quantity']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise HTTPException(400, f"Missing required columns: {missing_columns}")
+        
+        # Import products
+        imported_count = 0
+        errors = []
+        
+        for _, row in df.iterrows():
+            try:
+                product = Product(
+                    name=row['name'],
+                    description=row.get('description', ''),
+                    category=row['category'].lower() if isinstance(row['category'], str) else 'accessories',
+                    brand=row.get('brand'),
+                    model=row.get('model'),
+                    condition=row.get('condition', 'new').lower(),
+                    price=float(row['price']),
+                    stock_quantity=int(row.get('stock_quantity', 0)),
+                    reorder_threshold=int(row.get('reorder_threshold', 5)),
+                    reorder_quantity=int(row.get('reorder_quantity', 10)),
+                    is_active=True,
+                    is_for_sale=True
+                )
+                db.add(product)
+                imported_count += 1
+            except Exception as e:
+                errors.append(f"Row {imported_count + 1}: {str(e)}")
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "imported": imported_count,
+            "errors": errors[:10]  # Limit errors to first 10
+        }
+        
+    except Exception as e:
+        raise HTTPException(500, f"Failed to import file: {str(e)}")

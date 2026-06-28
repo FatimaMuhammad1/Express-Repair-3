@@ -18,9 +18,7 @@ def utcnow():
 
 class UserRole(enum.Enum):
     customer = "customer"
-    technician = "technician"
     staff = "staff"
-    admin = "admin"
     SUPER_ADMIN = "SUPER_ADMIN"
 
 
@@ -273,6 +271,7 @@ class Repair(Base):
     device_model   = Column(String(255), nullable=False)
     status         = Column(Enum(RepairStatus), default=RepairStatus.received, nullable=False, index=True)
     technician_id  = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    priority       = Column(String(20), default="normal", nullable=True, index=True)
     status_notes   = Column(Text, nullable=True)
     estimated_cost = Column(Numeric(10, 2), default=0.00)
     created_at     = Column(DateTime(timezone=True), default=utcnow, index=True)
@@ -341,6 +340,36 @@ class RepairPart(Base):
     __table_args__ = (
         CheckConstraint('quantity > 0', name='check_repair_part_quantity_positive'),
         CheckConstraint('unit_cost >= 0', name='check_repair_part_cost_positive'),
+    )
+
+
+# ── Repair Parts Inventory ───────────────────────────────────────────────────────
+
+class RepairPartInventory(Base):
+    """Inventory of parts and tools used for repairs (not for sale)"""
+    __tablename__ = "repair_parts_inventory"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(255), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    part_type = Column(String(50), nullable=False, index=True)  # e.g., "screen", "battery", "tool", "cable"
+    brand = Column(String(100), nullable=True, index=True)
+    model = Column(String(100), nullable=True)
+    sku = Column(String(100), unique=True, nullable=True, index=True)  # Stock keeping unit
+    supplier = Column(String(255), nullable=True)
+    unit_cost = Column(Numeric(10, 2), default=0.00)  # Cost per unit
+    stock_quantity = Column(Integer, default=0, nullable=False)
+    min_stock_level = Column(Integer, default=5, nullable=False)  # Reorder threshold
+    location = Column(String(100), nullable=True)  # Storage location
+    notes = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), default=utcnow, index=True)
+    updated_at = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        CheckConstraint('stock_quantity >= 0', name='check_repair_part_stock_positive'),
+        CheckConstraint('unit_cost >= 0', name='check_repair_part_cost_positive'),
+        CheckConstraint('min_stock_level >= 0', name='check_repair_part_min_stock_positive'),
     )
 
 

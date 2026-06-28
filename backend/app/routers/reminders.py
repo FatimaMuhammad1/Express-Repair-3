@@ -31,7 +31,7 @@ async def send_appointment_reminder(
     reminder_type: str,
     custom_message: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "staff", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Send a reminder for an appointment (SMS or email)"""
     
@@ -61,7 +61,7 @@ async def schedule_reminder(
     hours_before: int = 24,
     custom_message: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "staff", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Schedule a reminder for an appointment"""
     
@@ -86,7 +86,7 @@ async def send_bulk_reminders(
     reminder_type: str,
     custom_message: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Send reminders to multiple appointments at once"""
     
@@ -110,7 +110,7 @@ async def send_bulk_reminders(
 async def get_upcoming_reminders(
     hours_ahead: int = 24,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "staff", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff")),
 ):
     """Get appointments that need reminders in the next X hours"""
     
@@ -133,7 +133,7 @@ async def test_reminder(
     email_address: Optional[str] = None,
     reminder_type: str = "sms",
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("admin", "SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Send a test reminder to verify SMS/email integration"""
     
