@@ -31,7 +31,7 @@ async def generate_invoice(
     tax_rate_id: Optional[UUID] = None,
     notes: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Generate a PDF invoice for a repair"""
     
@@ -86,7 +86,7 @@ async def preview_invoice(
     repair_id: UUID,
     tax_rate_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Preview invoice data before generating PDF"""
     
@@ -172,7 +172,7 @@ async def generate_batch_invoices(
 @router.get("/tax-rates")
 async def get_available_tax_rates(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get available tax rates for invoice generation"""
     

@@ -33,7 +33,7 @@ STATUS_PROGRESS = {
 @router.get("/")
 def get_repairs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get all repairs (for dashboard)"""
     repairs = db.query(Repair).order_by(Repair.created_at.desc()).limit(100).all()
@@ -65,7 +65,7 @@ def _notify_customer(repair, notification_preference, customer_email, event_type
 def create_repair(
     body: RepairCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     for _ in range(5):
         tracking_id = generate_tracking_id()
@@ -125,7 +125,7 @@ def update_repair_status(
     tracking_id: str,
     body: RepairStatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Choose from: {', '.join(VALID_STATUSES)}")
@@ -225,7 +225,7 @@ def my_repairs(
 @router.get("/all")
 def all_repairs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     repairs = db.query(Repair).order_by(Repair.updated_at.desc()).all()
     return {
@@ -278,7 +278,7 @@ def export_repairs_csv(
 @router.get("/stats")
 def get_repair_stats(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get repair statistics for admin dashboard"""
     total_repairs = db.query(Repair).count()

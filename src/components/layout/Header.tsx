@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   { to: "/services", label: "Services" },
   { to: "/accessories", label: "Accessories" },
   { to: "/buy-and-sell", label: "Buy & Sell" },
-    // FAQ moved to footer; keep it out of header nav
+  // FAQ moved to footer; keep it out of header nav
   { to: "/contact", label: "Contact" },
 ];
 
@@ -181,7 +181,7 @@ export function Header() {
       </motion.div>
 
       <div className="bg-[#ffffff]/90 backdrop-blur-lg border-b border-border dark:bg-slate-950/95 dark:border-slate-700">
-        <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
           <nav className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => renderLink(item))}

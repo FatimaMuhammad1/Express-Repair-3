@@ -150,9 +150,9 @@ def get_product(product_id: UUID, db: Session = Depends(get_db)):
 def create_product(
     body: ProductCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
-    """Create a new product (admin/technician/STAFF/SUPER_ADMIN only)"""
+    """Create a new product (admin only)"""
     product = Product(**body.model_dump())
     db.add(product)
     db.commit()
@@ -164,9 +164,9 @@ def update_product(
     product_id: UUID,
     body: ProductUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
-    """Update a product (admin/technician/STAFF/SUPER_ADMIN only)"""
+    """Update a product (admin only)"""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -248,9 +248,9 @@ def get_my_trade_requests(
 @router.get("/trade-requests/all")
 def get_all_trade_requests(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
-    """Get all trade requests (admin/technician only)"""
+    """Get all trade requests (admin only)"""
     requests = db.query(TradeRequest).order_by(TradeRequest.created_at.desc()).all()
     return {"success": True, "requests": requests}
 
@@ -259,9 +259,9 @@ def update_trade_status(
     request_id: UUID,
     status: str,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
-    """Update trade request status (admin/technician only)"""
+    """Update trade request status (admin only)"""
     valid_statuses = ["pending", "approved", "rejected", "completed"]
     if status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
@@ -279,7 +279,7 @@ def update_trade_status(
 async def import_products(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Import products from CSV/Excel file"""
     imported_count = 0

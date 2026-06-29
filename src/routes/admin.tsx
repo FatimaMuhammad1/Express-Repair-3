@@ -1,4 +1,4 @@
-﻿import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 
@@ -88,6 +88,16 @@ import { toast } from "sonner";
 
 /* -------------------- Helper Functions -------------------- */
 
+// Safe toast wrapper for SSR
+const safeToast = {
+  error: (message: string) => {
+    if (typeof window !== "undefined") toast.error(message);
+  },
+  success: (message: string) => {
+    if (typeof window !== "undefined") toast.success(message);
+  }
+};
+
 function getStatusStyle(status: string) {
   switch (status) {
     case "received":
@@ -158,6 +168,28 @@ function AdminDashboard({
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [activeSection, setActiveSection] = useState("dashboard");
+
+  // Redirect staff to walk-in bookings by default
+  useEffect(() => {
+    const userRole = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("admin_user") || "{}").role : "";
+    if (userRole === "staff") {
+      setActiveSection("walkin");
+    }
+  }, []);
+
+  // Prevent staff from accessing admin-only sections
+  useEffect(() => {
+    const userRole = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("admin_user") || "{}").role : "";
+    const staffAllowedSections = ["walkin", "inhouse_sales"];
+    
+    if (userRole === "staff" && !staffAllowedSections.includes(activeSection)) {
+      setActiveSection("walkin");
+      // Only show toast in browser environment
+      if (typeof window !== "undefined") {
+        safeToast.error("Access denied. Staff can only access Walk-in Bookings and In-House Sales.");
+      }
+    }
+  }, [activeSection]);
 
   const [openDropdowns, setOpenDropdowns] = useState<Record<string, boolean>>({ OPERATIONS: true });
 
@@ -546,71 +578,64 @@ function AdminDashboard({
 
 
 
+  const fetchStaff = async () => {
+    setIsLoading(true);
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/users/staff"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setStaff(data.staff || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch staff:", e);
+      safeToast.error("Failed to fetch staff");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-
     fetchRepairs();
-
     fetchStats();
-
+    fetchStaff();
   }, []);
 
-
-
   const updateStatus = async (trackingId: string, newStatus: string) => {
-
     // Optimistic update - update local state immediately
-
     setRepairs(prev => prev.map(r =>
-
       r.tracking_id === trackingId ? { ...r, status: newStatus } : r
-
     ));
 
-
-
     try {
-
       await fetch(
-
         buildUrl(API_CONFIG.ENDPOINTS.REPAIRS.UPDATE_STATUS(trackingId)),
-
         {
-
           method: "PUT",
-
           headers: {
-
             "Content-Type": "application/json",
-
             Authorization: `Bearer ${token}`,
-
           },
-
           body: JSON.stringify({ status: newStatus, notify_customer: true }),
-
         },
-
       );
-
       // Refetch stats to update dashboard counts
       fetchStats();
     } catch (e) {
-
       console.error(e);
-
       // Revert on error
-
       setRepairs(prev => prev.map(r =>
-
         r.tracking_id === trackingId ? { ...r, status: r.status } : r
-
       ));
-
     }
-
   };
 
   const updatePriority = async (trackingId: string, newPriority: string) => {
+    const repair = repairs.find(r => r.tracking_id === trackingId);
+    if (!repair) return;
+
     setRepairs(prev => prev.map(r =>
       r.tracking_id === trackingId ? { ...r, priority: newPriority } : r
     ));
@@ -624,20 +649,39 @@ function AdminDashboard({
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ priority: newPriority }),
+          body: JSON.stringify({ status: repair.status, priority: newPriority }),
         },
       );
     } catch (e) {
       console.error("Failed to update priority:", e);
-      toast.error("Failed to update priority");
+      if (typeof window !== "undefined") safeToast.error("Failed to update priority");
     }
   };
 
-  const updateTechnician = (trackingId: string, technicianId: string) => {
-    // Technician assignment - local update only, not persisted to backend
+  const updateTechnician = async (trackingId: string, technicianId: string) => {
+    const repair = repairs.find(r => r.tracking_id === trackingId);
+    if (!repair) return;
+
     setRepairs(prev => prev.map(r =>
       r.tracking_id === trackingId ? { ...r, technician_id: technicianId || null } : r
     ));
+
+    try {
+      await fetch(
+        buildUrl(API_CONFIG.ENDPOINTS.REPAIRS.UPDATE_STATUS(trackingId)),
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status: repair.status, technician_id: technicianId || null }),
+        },
+      );
+    } catch (e) {
+      console.error("Failed to update technician:", e);
+      if (typeof window !== "undefined") safeToast.error("Failed to update technician");
+    }
   };
 
 
@@ -927,7 +971,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch products:", e);
-      toast.error("Failed to fetch products");
+      safeToast.error("Failed to fetch products");
     } finally {
       setIsLoading(false);
     }
@@ -954,13 +998,13 @@ function AdminDashboard({
         setProducts(prev => prev.map(p => p.id === editingProduct.id ? editingProduct : p));
         setShowEditProductModal(false);
         setEditingProduct(null);
-        toast.success("Product updated successfully");
+        safeToast.success("Product updated successfully");
       } else {
-        toast.error("Failed to update product");
+        safeToast.error("Failed to update product");
       }
     } catch (e) {
       console.error("Failed to update product:", e);
-      toast.error("Failed to update product");
+      safeToast.error("Failed to update product");
     }
   };
 
@@ -977,7 +1021,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to delete product:", e);
-      toast.error("Failed to delete product");
+      safeToast.error("Failed to delete product");
     }
   };
 
@@ -1002,24 +1046,6 @@ function AdminDashboard({
     );
   }, [staff, staffSearch, roleFilter]);
 
-  const fetchStaff = async () => {
-    setIsLoading(true);
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl("/users/staff"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setStaff(data.staff || []);
-      }
-    } catch (e) {
-      console.error("Failed to fetch staff:", e);
-      toast.error("Failed to fetch staff");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleEditStaff = (staffMember: any) => {
     setEditingStaff(staffMember);
@@ -1046,13 +1072,13 @@ function AdminDashboard({
         setStaff(prev => prev.map(s => s.id === editingStaff.id ? editingStaff : s));
         setShowEditStaffModal(false);
         setEditingStaff(null);
-        toast.success("Staff member updated successfully");
+        safeToast.success("Staff member updated successfully");
       } else {
-        toast.error("Failed to update staff member");
+        safeToast.error("Failed to update staff member");
       }
     } catch (e) {
       console.error("Failed to update staff:", e);
-      toast.error("Failed to update staff member");
+      safeToast.error("Failed to update staff member");
     }
   };
 
@@ -1074,7 +1100,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to toggle staff status:", e);
-      toast.error("Failed to toggle staff status");
+      safeToast.error("Failed to toggle staff status");
     }
   };
 
@@ -1098,7 +1124,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch bookings:", e);
-      toast.error("Failed to fetch bookings");
+      safeToast.error("Failed to fetch bookings");
     } finally {
       setIsLoading(false);
     }
@@ -1121,7 +1147,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to confirm booking:", e);
-      toast.error("Failed to confirm booking");
+      safeToast.error("Failed to confirm booking");
     }
   };
 
@@ -1142,7 +1168,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to cancel booking:", e);
-      toast.error("Failed to cancel booking");
+      safeToast.error("Failed to cancel booking");
     }
   };
 
@@ -1168,7 +1194,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch roles:", e);
-      toast.error("Failed to fetch roles");
+      safeToast.error("Failed to fetch roles");
     } finally {
       setIsLoading(false);
     }
@@ -1188,7 +1214,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch profit & loss:", e);
-      toast.error("Failed to fetch profit & loss");
+      safeToast.error("Failed to fetch profit & loss");
     } finally {
       setIsLoading(false);
     }
@@ -1208,7 +1234,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch cash flow:", e);
-      toast.error("Failed to fetch cash flow");
+      safeToast.error("Failed to fetch cash flow");
     } finally {
       setIsLoading(false);
     }
@@ -1229,7 +1255,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch repair tracking:", e);
-      toast.error("Failed to fetch repair tracking");
+      safeToast.error("Failed to fetch repair tracking");
     } finally {
       setIsLoading(false);
     }
@@ -1249,7 +1275,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch expenses:", e);
-      toast.error("Failed to fetch expenses");
+      safeToast.error("Failed to fetch expenses");
     } finally {
       setIsLoading(false);
     }
@@ -1269,7 +1295,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch revenue:", e);
-      toast.error("Failed to fetch revenue");
+      safeToast.error("Failed to fetch revenue");
     } finally {
       setIsLoading(false);
     }
@@ -1289,7 +1315,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch online sales:", e);
-      toast.error("Failed to fetch online sales");
+      safeToast.error("Failed to fetch online sales");
     } finally {
       setIsLoading(false);
     }
@@ -1309,7 +1335,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch in-house sales:", e);
-      toast.error("Failed to fetch in-house sales");
+      safeToast.error("Failed to fetch in-house sales");
     } finally {
       setIsLoading(false);
     }
@@ -1329,7 +1355,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch invoices:", e);
-      toast.error("Failed to fetch invoices");
+      safeToast.error("Failed to fetch invoices");
     } finally {
       setIsLoading(false);
     }
@@ -1349,7 +1375,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch payments:", e);
-      toast.error("Failed to fetch payments");
+      safeToast.error("Failed to fetch payments");
     } finally {
       setIsLoading(false);
     }
@@ -1369,7 +1395,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch customer history:", e);
-      toast.error("Failed to fetch customer history");
+      safeToast.error("Failed to fetch customer history");
     } finally {
       setIsLoading(false);
     }
@@ -1390,7 +1416,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch inventory items:", e);
-      toast.error("Failed to fetch inventory items");
+      safeToast.error("Failed to fetch inventory items");
     } finally {
       setIsLoading(false);
     }
@@ -1411,7 +1437,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch repair parts inventory:", e);
-      toast.error("Failed to fetch repair parts inventory");
+      safeToast.error("Failed to fetch repair parts inventory");
     } finally {
       setIsLoading(false);
     }
@@ -1422,16 +1448,17 @@ function AdminDashboard({
     setIsLoading(true);
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl("/inventory/movements"), {
+      const res = await fetch(buildUrl("/inventory/stock-movements"), {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
+      console.log("Stock movements response:", res.status);
       const data = await res.json();
       if (res.ok && data.success) {
         setStockMovements(data.movements || []);
       }
     } catch (e) {
       console.error("Failed to fetch stock movements:", e);
-      toast.error("Failed to fetch stock movements");
+      safeToast.error("Failed to fetch stock movements");
     } finally {
       setIsLoading(false);
     }
@@ -1451,7 +1478,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch suppliers:", e);
-      toast.error("Failed to fetch suppliers");
+      safeToast.error("Failed to fetch suppliers");
     } finally {
       setIsLoading(false);
     }
@@ -1481,13 +1508,13 @@ function AdminDashboard({
           address: "",
           notes: ""
         });
-        toast.success("Supplier created successfully");
+        safeToast.success("Supplier created successfully");
       } else {
-        toast.error(data.detail || "Failed to create supplier");
+        safeToast.error(data.detail || "Failed to create supplier");
       }
     } catch (e) {
       console.error("Failed to create supplier:", e);
-      toast.error("Failed to create supplier");
+      safeToast.error("Failed to create supplier");
     }
   };
 
@@ -1505,7 +1532,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch stock purchases:", e);
-      toast.error("Failed to fetch stock purchases");
+      safeToast.error("Failed to fetch stock purchases");
     } finally {
       setIsLoading(false);
     }
@@ -1525,7 +1552,7 @@ function AdminDashboard({
       }
     } catch (e) {
       console.error("Failed to fetch purchase orders:", e);
-      toast.error("Failed to fetch purchase orders");
+      safeToast.error("Failed to fetch purchase orders");
     } finally {
       setIsLoading(false);
     }
@@ -1661,13 +1688,13 @@ function AdminDashboard({
           item_count: "",
           payment_method: "cash"
         });
-        toast.success("In-house sale recorded successfully");
+        safeToast.success("In-house sale recorded successfully");
       } else {
-        toast.error(data.detail || "Failed to record sale");
+        safeToast.error(data.detail || "Failed to record sale");
       }
     } catch (e) {
       console.error("Failed to create in-house sale:", e);
-      toast.error("Failed to record sale");
+      safeToast.error("Failed to record sale");
     }
   };
 
@@ -1708,20 +1735,20 @@ function AdminDashboard({
           stock_quantity: "",
           image_url: ""
         });
-        toast.success("Product created successfully");
+        safeToast.success("Product created successfully");
       } else {
-        toast.error(data.detail || "Failed to create product");
+        safeToast.error(data.detail || "Failed to create product");
       }
     } catch (e) {
       console.error("Failed to create product:", e);
-      toast.error("Failed to create product");
+      safeToast.error("Failed to create product");
     }
   };
 
   // Handler for importing products from CSV/Excel
   const handleImportProducts = async () => {
     if (!importFile) {
-      toast.error("Please select a file to import");
+      safeToast.error("Please select a file to import");
       return;
     }
 
@@ -1737,16 +1764,16 @@ function AdminDashboard({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        toast.success(`Successfully imported ${data.imported_count} products`);
+        safeToast.success(`Successfully imported ${data.imported_count} products`);
         fetchProducts();
         setShowImportModal(false);
         setImportFile(null);
       } else {
-        toast.error(data.detail || "Failed to import products");
+        safeToast.error(data.detail || "Failed to import products");
       }
     } catch (e) {
       console.error("Failed to import products:", e);
-      toast.error("Failed to import products");
+      safeToast.error("Failed to import products");
     }
   };
 
@@ -1793,13 +1820,13 @@ function AdminDashboard({
           location: "",
           notes: ""
         });
-        toast.success("Repair part added successfully");
+        safeToast.success("Repair part added successfully");
       } else {
-        toast.error(data.detail || "Failed to add repair part");
+        safeToast.error(data.detail || "Failed to add repair part");
       }
     } catch (e) {
       console.error("Failed to create repair part:", e);
-      toast.error("Failed to add repair part");
+      safeToast.error("Failed to add repair part");
     }
   };
 
@@ -1820,13 +1847,13 @@ function AdminDashboard({
         setRepairPartsInventory(prev => prev.map(p => p.id === editingRepairPart.id ? data.part : p));
         setShowEditRepairPartModal(false);
         setEditingRepairPart(null);
-        toast.success("Repair part updated successfully");
+        safeToast.success("Repair part updated successfully");
       } else {
-        toast.error(data.detail || "Failed to update repair part");
+        safeToast.error(data.detail || "Failed to update repair part");
       }
     } catch (e) {
       console.error("Failed to update repair part:", e);
-      toast.error("Failed to update repair part");
+      safeToast.error("Failed to update repair part");
     }
   };
 
@@ -1841,11 +1868,11 @@ function AdminDashboard({
       });
       if (res.ok) {
         setRepairPartsInventory(prev => prev.filter(p => p.id !== partId));
-        toast.success("Repair part deleted successfully");
+        safeToast.success("Repair part deleted successfully");
       }
     } catch (e) {
       console.error("Failed to delete repair part:", e);
-      toast.error("Failed to delete repair part");
+      safeToast.error("Failed to delete repair part");
     }
   };
 
@@ -1886,13 +1913,13 @@ function AdminDashboard({
           status: "pending",
           notes: ""
         });
-        toast.success("Purchase order created successfully");
+        safeToast.success("Purchase order created successfully");
       } else {
-        toast.error(data.message || "Failed to create purchase order");
+        safeToast.error(data.message || "Failed to create purchase order");
       }
     } catch (e) {
       console.error("Failed to create purchase order:", e);
-      toast.error("Failed to create purchase order");
+      safeToast.error("Failed to create purchase order");
     }
   };
 
@@ -1917,11 +1944,11 @@ function AdminDashboard({
       const data = await res.json();
       if (res.ok && data.success) {
         setExpenses(prev => [data.expense, ...prev]);
-        toast.success("Expense created successfully");
+        safeToast.success("Expense created successfully");
       }
     } catch (e) {
       console.error("Failed to create expense:", e);
-      toast.error("Failed to create expense");
+      safeToast.error("Failed to create expense");
     }
   };
 
@@ -1938,11 +1965,11 @@ function AdminDashboard({
       });
       if (res.ok) {
         setExpenses(prev => prev.map(e => e.id === expenseId ? { ...e, ...expenseData } : e));
-        toast.success("Expense updated successfully");
+        safeToast.success("Expense updated successfully");
       }
     } catch (e) {
       console.error("Failed to update expense:", e);
-      toast.error("Failed to update expense");
+      safeToast.error("Failed to update expense");
     }
   };
 
@@ -1956,11 +1983,11 @@ function AdminDashboard({
       });
       if (res.ok) {
         setExpenses(prev => prev.filter(e => e.id !== expenseId));
-        toast.success("Expense deleted successfully");
+        safeToast.success("Expense deleted successfully");
       }
     } catch (e) {
       console.error("Failed to delete expense:", e);
-      toast.error("Failed to delete expense");
+      safeToast.error("Failed to delete expense");
     }
   };
 
@@ -1979,11 +2006,11 @@ function AdminDashboard({
       const data = await res.json();
       if (res.ok && data.success) {
         setRevenueData(prev => [data.revenue, ...prev]);
-        toast.success("Revenue created successfully");
+        safeToast.success("Revenue created successfully");
       }
     } catch (e) {
       console.error("Failed to create revenue:", e);
-      toast.error("Failed to create revenue");
+      safeToast.error("Failed to create revenue");
     }
   };
 
@@ -2002,11 +2029,11 @@ function AdminDashboard({
       const data = await res.json();
       if (res.ok && data.success) {
         setOnlineSales(prev => [data.onlineSale, ...prev]);
-        toast.success("Online sale created successfully");
+        safeToast.success("Online sale created successfully");
       }
     } catch (e) {
       console.error("Failed to create online sale:", e);
-      toast.error("Failed to create online sale");
+      safeToast.error("Failed to create online sale");
     }
   };
 
@@ -2023,11 +2050,11 @@ function AdminDashboard({
       });
       if (res.ok) {
         setOnlineSales(prev => prev.map(s => s.id === saleId ? { ...s, ...saleData } : s));
-        toast.success("Online sale updated successfully");
+        safeToast.success("Online sale updated successfully");
       }
     } catch (e) {
       console.error("Failed to update online sale:", e);
-      toast.error("Failed to update online sale");
+      safeToast.error("Failed to update online sale");
     }
   };
 
@@ -2041,11 +2068,11 @@ function AdminDashboard({
       });
       if (res.ok) {
         setOnlineSales(prev => prev.filter(s => s.id !== saleId));
-        toast.success("Online sale deleted successfully");
+        safeToast.success("Online sale deleted successfully");
       }
     } catch (e) {
       console.error("Failed to delete online sale:", e);
-      toast.error("Failed to delete online sale");
+      safeToast.error("Failed to delete online sale");
     }
   };
 
@@ -2062,11 +2089,11 @@ function AdminDashboard({
       });
       if (res.ok) {
         setInhouseSales(prev => prev.map(s => s.id === saleId ? { ...s, ...saleData } : s));
-        toast.success("In-house sale updated successfully");
+        safeToast.success("In-house sale updated successfully");
       }
     } catch (e) {
       console.error("Failed to update in-house sale:", e);
-      toast.error("Failed to update in-house sale");
+      safeToast.error("Failed to update in-house sale");
     }
   };
 
@@ -2116,10 +2143,10 @@ function AdminDashboard({
       );
       setRepairs(prev => prev.filter(r => !selectedRepairs.has(r.id)));
       setSelectedRepairs(new Set());
-      toast.success("Repairs deleted successfully");
+      safeToast.success("Repairs deleted successfully");
     } catch (e) {
       console.error("Failed to delete repairs:", e);
-      toast.error("Failed to delete repairs");
+      safeToast.error("Failed to delete repairs");
     }
   };
 
@@ -2141,10 +2168,10 @@ function AdminDashboard({
       );
       setRepairs(prev => prev.map(r => selectedRepairs.has(r.id) ? { ...r, status } : r));
       setSelectedRepairs(new Set());
-      toast.success(`Repairs marked as ${status}`);
+      safeToast.success(`Repairs marked as ${status}`);
     } catch (e) {
       console.error("Failed to update repairs:", e);
-      toast.error("Failed to update repairs");
+      safeToast.error("Failed to update repairs");
     }
   };
 
@@ -2240,8 +2267,9 @@ function AdminDashboard({
   const filteredSidebarGroups = sidebarGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
-      if (userRole === "STAFF") {
-        return ["walkin", "repairs", "repair_parts_inventory"].includes(item.id);
+      if (userRole === "staff") {
+        // Staff can only access walk-in bookings and in-house sales (buy & sell)
+        return ["walkin", "inhouse_sales"].includes(item.id);
       }
       return true;
     })
@@ -2339,7 +2367,10 @@ function AdminDashboard({
 
                               key={item.id}
 
-                              onClick={() => setActiveSection(item.id)}
+                              onClick={() => {
+                                console.log("Sidebar clicked, setting activeSection to:", item.id);
+                                setActiveSection(item.id);
+                              }}
 
                               className={`flex w-full items-center justify-between gap-2 rounded-lg px-2 py-2 text-xs font-medium transition-all ${activeSection === item.id
 
@@ -3699,56 +3730,54 @@ function AdminDashboard({
                   )}
                 </AnimatePresence>
 
-                {/* Repair Parts Inventory Section */}
-                {activeSection === "repair_parts_inventory" && (
-                  <>
-                    {isLoading ? (
-                      <div className="flex items-center justify-center py-20">
-                        <RefreshCw className="h-8 w-8 animate-spin text-violet-500" />
-                      </div>
-                    ) : (
-                      <>
-                        {/* CTA Section */}
-                        <div className="mb-6 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 flex items-center justify-between">
-                          <div>
-                            <h3 className="text-lg font-semibold text-white mb-1">Repair Parts Inventory</h3>
-                            <p className="text-sm text-violet-100">Manage your repair parts stock efficiently</p>
-                          </div>
-                          <Button
-                            onClick={() => setShowAddRepairPartModal(true)}
-                            className="bg-white text-violet-600 hover:bg-violet-50 font-medium"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add New Part
-                          </Button>
-                        </div>
+              </>
 
-                        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                          <StatCard
-                            title="Total Parts"
-                            value={repairPartsInventory.length}
-                            icon={Wrench}
-                            gradient="from-blue-500 to-cyan-500"
-                          />
-                          <StatCard
-                            title="In Stock"
-                            value={repairPartsInventory.filter((p) => p.stock_quantity > 0).length}
-                            icon={CheckCircle2}
-                            gradient="from-emerald-500 to-green-500"
-                          />
-                          <StatCard
-                            title="Low Stock"
-                            value={repairPartsInventory.filter((p) => p.stock_quantity > 0 && p.stock_quantity <= p.min_stock_level).length}
-                            icon={AlertCircle}
-                            gradient="from-amber-500 to-orange-500"
-                          />
-                          <StatCard
-                            title="Out of Stock"
-                            value={repairPartsInventory.filter((p) => p.stock_quantity === 0).length}
-                            icon={Circle}
-                            gradient="from-rose-500 to-pink-500"
-                          />
-                        </div>
+            )}
+
+            {/* Repair Parts Inventory Section */}
+            {activeSection === "repair_parts_inventory" && (
+              <>
+                    {/* CTA Section */}
+                    <div className="mb-6 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-white mb-1">Repair Parts Inventory</h3>
+                        <p className="text-sm text-violet-100">Manage your repair parts stock efficiently</p>
+                      </div>
+                      <Button
+                        onClick={() => setShowAddRepairPartModal(true)}
+                        className="bg-white text-violet-600 hover:bg-violet-50 font-medium"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add New Part
+                      </Button>
+                    </div>
+
+                    <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                      <StatCard
+                        title="Total Parts"
+                        value={repairPartsInventory.length}
+                        icon={Wrench}
+                        gradient="from-blue-500 to-cyan-500"
+                      />
+                      <StatCard
+                        title="In Stock"
+                        value={repairPartsInventory.filter((p) => p.stock_quantity > 0).length}
+                        icon={CheckCircle2}
+                        gradient="from-emerald-500 to-green-500"
+                      />
+                      <StatCard
+                        title="Low Stock"
+                        value={repairPartsInventory.filter((p) => p.stock_quantity > 0 && p.stock_quantity <= p.min_stock_level).length}
+                        icon={AlertCircle}
+                        gradient="from-amber-500 to-orange-500"
+                      />
+                      <StatCard
+                        title="Out of Stock"
+                        value={repairPartsInventory.filter((p) => p.stock_quantity === 0).length}
+                        icon={Circle}
+                        gradient="from-rose-500 to-pink-500"
+                      />
+                    </div>
 
                     <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
                       <div className="relative flex-1">
@@ -3883,8 +3912,6 @@ function AdminDashboard({
                         </div>
                       )}
                     </div>
-                      </>
-                    )}
 
                     {/* Add Repair Part Modal */}
                     <AnimatePresence>
@@ -4119,7 +4146,7 @@ function AdminDashboard({
                                   <Input
                                     type="number"
                                     value={editingRepairPart.unit_cost}
-                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, unit_cost: parseFloat(e.target.value) || 0 })}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, unit_cost: e.target.value })}
                                     className="border-[#1F2235] bg-[#1A1D27] text-white"
                                     required
                                     min="0"
@@ -4131,7 +4158,7 @@ function AdminDashboard({
                                   <Input
                                     type="number"
                                     value={editingRepairPart.stock_quantity}
-                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, stock_quantity: parseInt(e.target.value) || 0 })}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, stock_quantity: e.target.value })}
                                     className="border-[#1F2235] bg-[#1A1D27] text-white"
                                     required
                                     min="0"
@@ -4144,7 +4171,7 @@ function AdminDashboard({
                                   <Input
                                     type="number"
                                     value={editingRepairPart.min_stock_level}
-                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, min_stock_level: parseInt(e.target.value) || 0 })}
+                                    onChange={(e) => setEditingRepairPart({ ...editingRepairPart, min_stock_level: e.target.value })}
                                     className="border-[#1F2235] bg-[#1A1D27] text-white"
                                     required
                                     min="0"
@@ -4187,8 +4214,8 @@ function AdminDashboard({
                         </motion.div>
                       )}
                     </AnimatePresence>
-                  </>
-                )}
+              </>
+            )}
 
                 {/* Edit Product Modal */}
                 <AnimatePresence>
@@ -4294,10 +4321,6 @@ function AdminDashboard({
                     </>
                   )}
                 </AnimatePresence>
-
-              </>
-
-            )}
 
 
 
@@ -5006,7 +5029,7 @@ function AdminDashboard({
                               Cancel
                             </Button>
                             <Button
-                              onClick={() => { setShowEmailModal(false); setEmailsSent(prev => prev + 1); toast.success("Email sent successfully"); }}
+                              onClick={() => { setShowEmailModal(false); setEmailsSent(prev => prev + 1); safeToast.success("Email sent successfully"); }}
                               className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
                             >
                               Send Email
@@ -5061,7 +5084,7 @@ function AdminDashboard({
                               Cancel
                             </Button>
                             <Button
-                              onClick={() => { setShowSmsModal(false); setSmsSent(prev => prev + 1); toast.success("SMS sent successfully"); }}
+                              onClick={() => { setShowSmsModal(false); setSmsSent(prev => prev + 1); safeToast.success("SMS sent successfully"); }}
                               className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
                             >
                               Send SMS
@@ -5128,7 +5151,7 @@ function AdminDashboard({
                               Cancel
                             </Button>
                             <Button
-                              onClick={() => { setShowBroadcastModal(false); toast.success("Broadcast sent successfully"); }}
+                              onClick={() => { setShowBroadcastModal(false); safeToast.success("Broadcast sent successfully"); }}
                               className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
                             >
                               Send Broadcast
@@ -7563,7 +7586,7 @@ function AdminDashboard({
 
                                 <button
 
-                                  onClick={() => toast.success(`Invoice ${invoice.invoice_number} marked as paid`)}
+                                  onClick={() => safeToast.success(`Invoice ${invoice.invoice_number} marked as paid`)}
 
                                   className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 p-2 rounded-lg transition-colors"
 
@@ -7577,7 +7600,7 @@ function AdminDashboard({
 
                                 <button
 
-                                  onClick={() => toast.success(`Invoice ${invoice.invoice_number} sent to customer`)}
+                                  onClick={() => safeToast.success(`Invoice ${invoice.invoice_number} sent to customer`)}
 
                                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/20 p-2 rounded-lg transition-colors"
 
@@ -7591,7 +7614,7 @@ function AdminDashboard({
 
                                 <button
 
-                                  onClick={() => toast.success(`Invoice ${invoice.invoice_number} downloaded`)}
+                                  onClick={() => safeToast.success(`Invoice ${invoice.invoice_number} downloaded`)}
 
                                   className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/20 p-2 rounded-lg transition-colors"
 
@@ -9537,16 +9560,7 @@ function AdminDashboard({
                             r?.customer_name?.toLowerCase().includes(repairTrackingSearch.toLowerCase());
                           return matchSearch;
                         }).map((repair, idx) => {
-                          const statusProgress = {
-                            "pending": 0,
-                            "received": 20,
-                            "diagnosed": 40,
-                            "repairing": 60,
-                            "testing": 80,
-                            "collection": 90,
-                            "completed": 100
-                          };
-                          const progress = statusProgress[repair?.status] || 0;
+                          const progress = repair?.progress_percentage || 0;
                           return (
                           <motion.tr
                             key={repair?.id || idx}
@@ -9772,7 +9786,7 @@ function AdminDashboard({
                     <h2 className="mb-6 text-lg font-semibold text-white">Data Management</h2>
                     <BackupRestore />
                   </div>
-                  <Button onClick={() => toast.success("Settings saved successfully")} className="bg-violet-600 hover:bg-violet-700">
+                  <Button onClick={() => safeToast.success("Settings saved successfully")} className="bg-violet-600 hover:bg-violet-700">
                     Save All Settings
                   </Button>
                 </div>

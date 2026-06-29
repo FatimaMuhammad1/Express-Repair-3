@@ -56,14 +56,35 @@ function ProfilePage() {
   useEffect(() => {
     const token = localStorage.getItem("user_token");
     const adminToken = localStorage.getItem("admin_token");
+    const storedUser = localStorage.getItem("admin_user");
 
-    if (adminToken) {
+    const fetchUserData = async () => {
+      try {
+        const authToken = adminToken || token;
+        if (!authToken) return;
+
+        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+          headers: { "Authorization": `Bearer ${authToken}` }
+        });
+        const data = await res.json();
+        if (res.ok && data.success && data.user) {
+          setUser(data.user);
+        }
+      } catch (err) {
+        // Fallback to stored user data if API fails
+        if (storedUser) {
+          setUser(JSON.parse(storedUser));
+        }
+      }
+    };
+
+    if (adminToken || token) {
       setLoggedIn(true);
-      setUser({ name: "Admin" });
-    } else if (token) {
-      setLoggedIn(true);
-      // Ideally fetch user profile here. For now just set state.
-      setUser({ name: "Customer" });
+      // First try to use stored user data, then fetch fresh data
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+      fetchUserData();
     }
   }, []);
 
@@ -894,7 +915,12 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Hello, {user?.name || "Customer"}</h1>
-            <p className="text-slate-500 dark:text-slate-400">Manage your devices and track repairs.</p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                {user?.role === "super_admin" ? "Admin" : user?.role === "staff" ? "Staff" : "Customer"}
+              </span>
+              <p className="text-slate-500 dark:text-slate-400">Manage your devices and track repairs.</p>
+            </div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">

@@ -161,25 +161,19 @@ def get_cash_flow(
 @router.get("/repair-tracking")
 def get_repair_tracking(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     from app.models import Repair, RepairTimeline
+    from app.routers.repairs import STATUS_PROGRESS
     
     repairs = db.query(Repair).all()
     result = []
     
-    status_progress = {
-        "received": 10,
-        "diagnosed": 30,
-        "repairing": 50,
-        "testing": 75,
-        "collection": 90,
-        "completed": 100
-    }
-    
     for r in repairs:
-        # Calculate progress based on status
-        progress = status_progress.get(r.status, 0)
+        # Calculate progress based on status using centralized STATUS_PROGRESS
+        # Convert enum to string value for lookup
+        status_value = r.status.value if hasattr(r.status, 'value') else str(r.status)
+        progress = STATUS_PROGRESS.get(status_value, 0)
         
         # Map status to repair_tracking format
         status_map = {

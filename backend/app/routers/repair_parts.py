@@ -102,7 +102,7 @@ class RepairPartInventoryOut(BaseModel):
 def get_repair_parts(
     tracking_id: str,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get all parts used in a repair"""
     repair = db.query(Repair).filter(Repair.tracking_id == tracking_id.upper()).first()
@@ -139,7 +139,7 @@ def add_repair_part(
     tracking_id: str,
     body: RepairPartCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Add a part to a repair"""
     repair = db.query(Repair).filter(Repair.tracking_id == tracking_id.upper()).first()
@@ -208,7 +208,7 @@ def update_repair_part(
     part_id: UUID,
     body: RepairPartUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Update a repair part"""
     repair = db.query(Repair).filter(Repair.tracking_id == tracking_id.upper()).first()
@@ -310,7 +310,7 @@ def get_repair_parts_inventory(
     search: Optional[str] = None,
     low_stock_only: bool = False,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get all repair parts inventory with optional filters"""
     query = db.query(RepairPartInventory).filter(RepairPartInventory.is_active == True)
@@ -360,7 +360,7 @@ def get_repair_parts_inventory(
 def create_repair_part_inventory(
     body: RepairPartInventoryCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Create a new repair part inventory item"""
     # Check if SKU already exists
@@ -417,7 +417,7 @@ def update_repair_part_inventory(
     part_id: UUID,
     body: RepairPartInventoryUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Update a repair part inventory item"""
     part = db.query(RepairPartInventory).filter(RepairPartInventory.id == part_id).first()
@@ -487,7 +487,7 @@ def adjust_repair_part_stock(
     quantity: int,
     movement_type: str = "adjustment",  # "in", "out", "adjustment"
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Adjust stock quantity for a repair part"""
     part = db.query(RepairPartInventory).filter(RepairPartInventory.id == part_id).first()

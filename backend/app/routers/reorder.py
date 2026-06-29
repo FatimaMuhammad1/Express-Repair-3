@@ -37,7 +37,7 @@ class ReorderSuggestion(BaseModel):
 @router.get("/low-stock")
 def get_low_stock_items(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get all items that are at or below their reorder threshold"""
     products = db.query(Product).filter(

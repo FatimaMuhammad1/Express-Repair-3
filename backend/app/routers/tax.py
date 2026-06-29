@@ -35,7 +35,7 @@ class TaxCalculationRequest(BaseModel):
 @router.get("/rates")
 def get_tax_rates(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get all tax rates"""
     rates = db.query(TaxRate).filter(TaxRate.is_active == True).all()

@@ -10,7 +10,9 @@ export function Footer() {
       <GradientBackdrop variant="footer" />
       <div className="relative max-w-7xl mx-auto px-4 py-8 grid gap-10 md:grid-cols-2 lg:grid-cols-5">
         <div className="lg:col-span-2 space-y-4">
-          <Logo dark />
+          <div className="-translate-x-4 md:-translate-x-6">
+            <Logo dark />
+          </div>
           <p className="text-sm text-white/75 max-w-sm">
             Professional same-day repairs for phones, laptops, tablets and electronic devices in
             Nuneaton. Fast service, quality parts, fair prices.

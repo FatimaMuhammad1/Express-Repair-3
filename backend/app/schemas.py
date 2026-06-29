@@ -4,7 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, field_validator
+from pydantic import BaseModel, EmailStr, field_validator, computed_field
 
 
 def _validate_phone(v: str | None) -> str | None:
@@ -196,6 +196,21 @@ class RepairOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @computed_field
+    @property
+    def progress_percentage(self) -> int:
+        """Calculate progress percentage based on repair status"""
+        status_map = {
+            "pending": 0,
+            "received": 20,
+            "diagnosed": 40,
+            "repairing": 60,
+            "testing": 80,
+            "collection": 100,
+            "completed": 100,
+        }
+        return status_map.get(self.status, 0)
+
     model_config = {"from_attributes": True}
 
 
@@ -206,8 +221,23 @@ class RepairTrackOut(BaseModel):
     status: str
     status_notes: Optional[str]
     estimated_cost: Decimal
-    created_at: datetime
-    updated_at: datetime
+    last_updated: datetime
+    received_at: datetime
+
+    @computed_field
+    @property
+    def progress_percentage(self) -> int:
+        """Calculate progress percentage based on repair status"""
+        status_map = {
+            "pending": 0,
+            "received": 20,
+            "diagnosed": 40,
+            "repairing": 60,
+            "testing": 80,
+            "collection": 100,
+            "completed": 100,
+        }
+        return status_map.get(self.status, 0)
 
     model_config = {"from_attributes": True}
 

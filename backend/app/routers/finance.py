@@ -254,7 +254,7 @@ async def create_inhouse_sale(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
 ):
-    """Create a new in-house sale (accessories, etc)"""
+    """Create a new in-house sale (accessories, etc) - Staff can use this for manual accessory book-in"""
     sale = InHouseSale(
         reference=body.reference,
         customer_name=body.customer_name,

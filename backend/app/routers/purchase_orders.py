@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api/purchase-orders", tags=["Purchase Orders"])
 def create_purchase_order(
     body: PurchaseOrderCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new purchase order"""
     # Generate order number
@@ -83,7 +83,7 @@ class PurchaseOrderOut(BaseModel):
 @router.get("/pending")
 def get_pending_purchase_orders(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get all pending purchase orders awaiting approval"""
     orders = db.query(PurchaseOrder).filter(
@@ -165,7 +165,7 @@ def approve_purchase_order(
 def get_purchase_order_history(
     order_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get approval history for a purchase order"""
     order = db.query(PurchaseOrder).filter(PurchaseOrder.id == order_id).first()
@@ -196,7 +196,7 @@ def get_purchase_order_history(
 @router.get("/stats")
 def get_approval_stats(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff")),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Get statistics about purchase order approvals"""
     total = db.query(PurchaseOrder).count()

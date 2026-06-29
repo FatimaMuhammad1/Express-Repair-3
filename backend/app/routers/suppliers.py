@@ -34,7 +34,7 @@ class SupplierUpdate(BaseModel):
 @router.get("")
 def get_suppliers(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Get all suppliers"""
     suppliers = db.query(Supplier).order_by(Supplier.name).all()
@@ -58,7 +58,7 @@ def get_suppliers(
 def create_supplier(
     body: SupplierCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new supplier"""
     existing = db.query(Supplier).filter(Supplier.name == body.name).first()

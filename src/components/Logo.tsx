@@ -34,13 +34,11 @@ export function Logo({
   const src = resolvedDark ? darkLogo : logoImg;
 
   return (
-    <Link to="/" className="flex items-center gap-2 group" aria-label="Express Phone & Laptop Repair home">
+    <Link to="/" className="flex items-center gap-2 group translate-y-1.5" aria-label="Express Phone & Laptop Repair home">
       <img
         src={src}
         alt="Express Phone & Laptop Repair logo"
-        className={`${compact ? "h-9" : "h-16 md:h-20"} w-auto object-contain ${light ? "drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]" : ""}`}
-        width={320}
-        height={180}
+        className={`${compact ? "w-32" : "w-48 md:w-72"} h-auto max-h-14 md:max-h-16 object-contain origin-left ${!resolvedDark ? "scale-[2.5] -translate-x-28 md:-translate-x-56" : "scale-[3] -translate-x-40 md:-translate-x-72 translate-y-1"} ${light ? "drop-shadow-[0_2px_8px_rgba(0,0,0,0.4)]" : ""}`}
       />
       <span className="sr-only">Express Phone & Laptop Repair — Nuneaton</span>
     </Link>

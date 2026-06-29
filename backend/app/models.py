@@ -279,6 +279,20 @@ class Repair(Base):
 
     appointment = relationship("Appointment", back_populates="repair")
     technician = relationship("User", foreign_keys=[technician_id])
+
+    @property
+    def progress_percentage(self) -> int:
+        """Calculate progress percentage based on repair status"""
+        status_map = {
+            "pending": 0,
+            "received": 20,
+            "diagnosed": 40,
+            "repairing": 60,
+            "testing": 80,
+            "collection": 100,
+            "completed": 100,
+        }
+        return status_map.get(self.status.value if hasattr(self.status, 'value') else str(self.status), 0)
     
     __table_args__ = (
         Index('idx_repairs_status_created', 'status', 'created_at'),
