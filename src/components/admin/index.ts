@@ -10,3 +10,5 @@ export { GlobalSearch } from "./GlobalSearch";
 export { DashboardImprovements } from "./DashboardImprovements";
 export { AuditLogs } from "./AuditLogs";
 export { default as WalkInIntake } from "./WalkInIntake";
+export { TradeRequestsManager } from "./TradeRequestsManager";
+export { ServicesManager } from "./ServicesManager";

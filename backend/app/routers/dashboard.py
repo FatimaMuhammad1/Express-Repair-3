@@ -122,25 +122,51 @@ async def get_technician_performance(
     
     performance = []
     for tech in technicians:
-        # Count completed repairs
+        # Count completed repairs assigned to this technician
         completed_repairs = db.query(Repair).filter(
-            Repair.status == "collection"
+            Repair.technician_id == tech.id,
+            Repair.status.in_(["collection", "completed"])
         ).count()
         
-        # Calculate revenue (simplified)
+        # Calculate revenue from this technician's repairs
         revenue = db.query(func.sum(Repair.estimated_cost)).filter(
-            Repair.status == "collection"
+            Repair.technician_id == tech.id,
+            Repair.status.in_(["collection", "completed"])
         ).scalar() or 0
+        
+        # Calculate average repair time (from creation to completion)
+        completed_repairs_list = db.query(Repair).filter(
+            Repair.technician_id == tech.id,
+            Repair.status.in_(["collection", "completed"])
+        ).all()
+        
+        avg_time_hours = 0
+        if completed_repairs_list:
+            total_hours = sum(
+                (r.updated_at - r.created_at).total_seconds() / 3600
+                for r in completed_repairs_list
+                if r.updated_at and r.created_at
+            )
+            avg_time_hours = total_hours / len(completed_repairs_list) if completed_repairs_list else 0
+        
+        # Calculate efficiency (repairs completed per week in last 30 days)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        recent_completed = db.query(Repair).filter(
+            Repair.technician_id == tech.id,
+            Repair.status.in_(["collection", "completed"]),
+            Repair.updated_at >= thirty_days_ago
+        ).count()
+        efficiency = (recent_completed / 4) if recent_completed > 0 else 0  # repairs per week
         
         performance.append({
             "id": str(tech.id),
             "name": tech.name,
             "role": tech.role,
             "completed_repairs": completed_repairs,
-            "avg_time": "2.5d",  # Placeholder
+            "avg_time": f"{avg_time_hours:.1f}h",
             "revenue": float(revenue),
-            "efficiency": "92%",  # Placeholder
-            "rating": 4.5,  # Placeholder
+            "efficiency": f"{efficiency:.1f}/week",
+            "rating": min(5.0, efficiency * 0.5 + 3.0) if efficiency > 0 else 0.0,  # Rating based on efficiency
         })
     
     return {

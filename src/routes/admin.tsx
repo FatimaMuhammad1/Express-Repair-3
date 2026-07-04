@@ -64,6 +64,8 @@ import {
   Truck,
   Plus,
   Upload,
+  Eye,
+  X,
 } from "lucide-react";
 
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -304,7 +306,7 @@ function AdminDashboard({
   const [newProduct, setNewProduct] = useState({
     name: "",
     description: "",
-    category: "smartphones",
+    category: "smartphone",
     brand: "",
     model: "",
     condition: "new",
@@ -334,6 +336,12 @@ function AdminDashboard({
 
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
+  const [emailForm, setEmailForm] = useState({ recipient: "", subject: "", body: "" });
+
+  const [smsForm, setSmsForm] = useState({ recipient: "", body: "" });
+
+  const [broadcastForm, setBroadcastForm] = useState({ subject: "", body: "" });
+
   const [bookings, setBookings] = useState<any[]>([]);
 
   const [bookingSearch, setBookingSearch] = useState("");
@@ -353,15 +361,31 @@ function AdminDashboard({
   const [expenses, setExpenses] = useState<any[]>([]);
   const [expenseSearch, setExpenseSearch] = useState("");
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState("all");
+  const [expenseStatusFilter, setExpenseStatusFilter] = useState("all");
+  const [expenseAnalytics, setExpenseAnalytics] = useState<any>(null);
+  const [expensePage, setExpensePage] = useState(1);
+  const [expensePerPage, setExpensePerPage] = useState(25);
+  const [expenseTotalPages, setExpenseTotalPages] = useState(1);
+  const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
+  const [showExpenseDetailsModal, setShowExpenseDetailsModal] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<any>(null);
+  const [newExpense, setNewExpense] = useState({
+    category: "",
+    description: "",
+    amount: "",
+    tax_amount: "0",
+    date: new Date().toISOString().split('T')[0],
+    branch_id: "",
+    supplier_id: "",
+    payment_method: "",
+    notes: ""
+  });
 
   const [revenueData, setRevenueData] = useState<any[]>([]);
   const [revenueSearch, setRevenueSearch] = useState("");
 
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [inventoryManagementSearch, setInventoryManagementSearch] = useState("");
-
-  const [stockMovements, setStockMovements] = useState<any[]>([]);
-  const [stockMovementSearch, setStockMovementSearch] = useState("");
 
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
 
@@ -377,9 +401,6 @@ function AdminDashboard({
     notes: ""
   });
 
-  const [stockPurchases, setStockPurchases] = useState<any[]>([]);
-  const [stockPurchaseSearch, setStockPurchaseSearch] = useState("");
-  const [showAddPurchaseModal, setShowAddPurchaseModal] = useState(false);
   const [newPurchaseOrder, setNewPurchaseOrder] = useState({
     supplier_id: "",
     branch_id: "",
@@ -387,8 +408,14 @@ function AdminDashboard({
     total_amount: "",
     date: new Date().toISOString().split('T')[0],
     status: "pending",
-    notes: ""
+    notes: "",
+    items: []
   });
+
+  const [showAddPurchaseModal, setShowAddPurchaseModal] = useState(false);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [receiveItems, setReceiveItems] = useState<any[]>([]);
 
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [purchaseOrderSearch, setPurchaseOrderSearch] = useState("");
@@ -837,17 +864,17 @@ function AdminDashboard({
 
   const analyticsRepairs = activeSection === "analytics" ? filteredRepairsByTime : repairs;
 
-  const totalRepairs = stats?.total_repairs || analyticsRepairs.length;
+  const totalRepairs = activeSection === "analytics" ? analyticsRepairs.length : (stats?.total_repairs || repairs.length);
 
-  const completedRepairs = stats?.status_breakdown?.collection || analyticsRepairs.filter((r) => r.status === "collection").length;
+  const completedRepairs = activeSection === "analytics" ? analyticsRepairs.filter((r) => r.status === "collection").length : (stats?.status_breakdown?.collection || repairs.filter((r) => r.status === "collection").length);
 
   const completionRate =
 
     totalRepairs > 0 ? Math.round((completedRepairs / totalRepairs) * 100) : 0;
 
-  const inProgressRepairs = repairs.filter((r: any) => r.status !== "collection" && r.status !== "completed").length;
+  const inProgressRepairs = activeSection === "analytics" ? analyticsRepairs.filter((r: any) => r.status !== "collection" && r.status !== "completed").length : repairs.filter((r: any) => r.status !== "collection" && r.status !== "completed").length;
 
-  const totalRevenue = stats?.total_revenue || 0;
+  const totalRevenue = activeSection === "analytics" ? analyticsRepairs.reduce((sum: number, r: any) => sum + (r.cost || 0), 0) : (stats?.total_revenue || 0);
 
 
 
@@ -964,10 +991,13 @@ function AdminDashboard({
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(buildUrl(API_CONFIG.ENDPOINTS.PRODUCTS.ALL));
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/products"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
       const data = await res.json();
-      if (res.ok && data.success) {
-        setProducts(data.products || []);
+      if (res.ok) {
+        setProducts(data || []);
       }
     } catch (e) {
       console.error("Failed to fetch products:", e);
@@ -1027,7 +1057,7 @@ function AdminDashboard({
 
   // Fetch products when inventory section is active
   useEffect(() => {
-    if (activeSection === "inventory") {
+    if (activeSection === "inventory" || activeSection === "inventory_products") {
       fetchProducts();
     }
   }, [activeSection]);
@@ -1056,25 +1086,31 @@ function AdminDashboard({
     if (!editingStaff) return;
     try {
       const token = getStoredToken();
+      const updateData: any = {
+        name: editingStaff.name,
+        email: editingStaff.email,
+        phone: editingStaff.phone
+      };
+      if (editingStaff.password) {
+        updateData.password = editingStaff.password;
+      }
+      
       const res = await fetch(buildUrl(`/users/${editingStaff.id}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
-        body: JSON.stringify({
-          name: editingStaff.name,
-          email: editingStaff.email,
-          role: editingStaff.role
-        })
+        body: JSON.stringify(updateData)
       });
-      if (res.ok) {
-        setStaff(prev => prev.map(s => s.id === editingStaff.id ? editingStaff : s));
+      const data = await res.json();
+      if (res.ok && data.success) {
+        fetchStaff();
         setShowEditStaffModal(false);
         setEditingStaff(null);
         safeToast.success("Staff member updated successfully");
       } else {
-        safeToast.error("Failed to update staff member");
+        safeToast.error(data.detail || "Failed to update staff member");
       }
     } catch (e) {
       console.error("Failed to update staff:", e);
@@ -1266,18 +1302,44 @@ function AdminDashboard({
     setIsLoading(true);
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl("/finance/expenses"), {
+      const params = new URLSearchParams();
+      if (expenseCategoryFilter !== "all") params.append("category", expenseCategoryFilter);
+      if (expenseStatusFilter !== "all") params.append("status", expenseStatusFilter);
+      if (expenseSearch) params.append("search", expenseSearch);
+      params.append("page", expensePage.toString());
+      params.append("per_page", expensePerPage.toString());
+      params.append("sort_by", "created_at");
+      params.append("sort_order", "desc");
+
+      const res = await fetch(buildUrl(`/finance/expenses?${params.toString()}`), {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
       const data = await res.json();
       if (res.ok && data.success) {
         setExpenses(data.expenses || []);
+        setExpenseTotalPages(data.pagination?.total_pages || 1);
       }
     } catch (e) {
       console.error("Failed to fetch expenses:", e);
       safeToast.error("Failed to fetch expenses");
     } finally {
       setIsLoading(false);
+    }
+  }, [expenseCategoryFilter, expenseStatusFilter, expenseSearch, expensePage, expensePerPage]);
+
+  // Fetch expense analytics
+  const fetchExpenseAnalytics = useCallback(async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/finance/expenses/analytics"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setExpenseAnalytics(data.analytics);
+      }
+    } catch (e) {
+      console.error("Failed to fetch expense analytics:", e);
     }
   }, []);
 
@@ -1443,27 +1505,6 @@ function AdminDashboard({
     }
   }, []);
 
-  // Fetch stock movements
-  const fetchStockMovements = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl("/inventory/stock-movements"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      console.log("Stock movements response:", res.status);
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setStockMovements(data.movements || []);
-      }
-    } catch (e) {
-      console.error("Failed to fetch stock movements:", e);
-      safeToast.error("Failed to fetch stock movements");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   // Fetch suppliers
   const fetchSuppliers = useCallback(async () => {
     setIsLoading(true);
@@ -1483,6 +1524,41 @@ function AdminDashboard({
       setIsLoading(false);
     }
   }, []);
+
+  const handleArchiveSupplier = async (supplierId: string) => {
+    if (!confirm("Are you sure you want to archive this supplier?")) return;
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/suppliers/" + supplierId + "/archive"), {
+        method: "POST",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        setSuppliers(prev => prev.filter(s => s.id !== supplierId));
+        safeToast.success("Supplier archived successfully");
+      }
+    } catch (e) {
+      console.error("Failed to archive supplier:", e);
+      safeToast.error("Failed to archive supplier");
+    }
+  };
+
+  const handleActivateSupplier = async (supplierId: string) => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/suppliers/" + supplierId + "/activate"), {
+        method: "POST",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        fetchSuppliers();
+        safeToast.success("Supplier activated successfully");
+      }
+    } catch (e) {
+      console.error("Failed to activate supplier:", e);
+      safeToast.error("Failed to activate supplier");
+    }
+  };
 
   // Handler for creating supplier
   const handleCreateSupplier = async () => {
@@ -1518,32 +1594,12 @@ function AdminDashboard({
     }
   };
 
-  // Fetch stock purchases
-  const fetchStockPurchases = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl("/inventory/purchases"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setStockPurchases(data.purchases || []);
-      }
-    } catch (e) {
-      console.error("Failed to fetch stock purchases:", e);
-      safeToast.error("Failed to fetch stock purchases");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   // Fetch purchase orders
   const fetchPurchaseOrders = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl("/inventory/orders"), {
+      const res = await fetch(buildUrl("/inventory/purchase-orders"), {
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
       const data = await res.json();
@@ -1559,11 +1615,6 @@ function AdminDashboard({
   }, []);
 
   // useEffect hooks for data fetching
-  useEffect(() => {
-    if (activeSection === "roles_permissions") {
-      fetchRoles();
-    }
-  }, [activeSection, fetchRoles]);
 
   useEffect(() => {
     if (activeSection === "profit_loss") {
@@ -1586,8 +1637,9 @@ function AdminDashboard({
   useEffect(() => {
     if (activeSection === "expenses") {
       fetchExpenses();
+      fetchExpenseAnalytics();
     }
-  }, [activeSection, fetchExpenses]);
+  }, [activeSection, fetchExpenses, fetchExpenseAnalytics]);
 
   useEffect(() => {
     if (activeSection === "revenue") {
@@ -1632,24 +1684,11 @@ function AdminDashboard({
   }, [activeSection, fetchInventoryItems]);
 
   useEffect(() => {
-    if (activeSection === "stock_movements") {
-      fetchStockMovements();
-    }
-  }, [activeSection, fetchStockMovements]);
-
-  useEffect(() => {
     if (activeSection === "supplier_management") {
       fetchSuppliers();
     }
   }, [activeSection, fetchSuppliers]);
 
-  useEffect(() => {
-    if (activeSection === "stock_purchases") {
-      fetchStockPurchases();
-    }
-  }, [activeSection, fetchStockPurchases]);
-
-  // Handler for creating in-house sale
   const handleCreateInhouseSale = async () => {
     try {
       const token = getStoredToken();
@@ -1727,7 +1766,7 @@ function AdminDashboard({
         setNewProduct({
           name: "",
           description: "",
-          category: "smartphones",
+          category: "smartphone",
           brand: "",
           model: "",
           condition: "new",
@@ -1876,6 +1915,59 @@ function AdminDashboard({
     }
   };
 
+  const handleOpenReceiveModal = async (order: any) => {
+    setSelectedOrder(order);
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/purchase-orders/${order.id}/items`), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReceiveItems(data.items.map((item: any) => ({
+          ...item,
+          received_qty: 0
+        })));
+        setShowReceiveModal(true);
+      }
+    } catch (e) {
+      console.error("Failed to fetch order items:", e);
+      safeToast.error("Failed to fetch order items");
+    }
+  };
+
+  const handleReceiveOrder = async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/purchase-orders/${selectedOrder.id}/receive`), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          items: receiveItems.map(item => ({
+            item_id: item.id,
+            received_qty: item.received_qty
+          }))
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShowReceiveModal(false);
+        setSelectedOrder(null);
+        setReceiveItems([]);
+        fetchPurchaseOrders();
+        safeToast.success("Order received successfully");
+      } else {
+        safeToast.error(data.detail || "Failed to receive order");
+      }
+    } catch (e) {
+      console.error("Failed to receive order:", e);
+      safeToast.error("Failed to receive order");
+    }
+  };
+
   // Handler for creating purchase order
   const handleCreatePurchaseOrder = async () => {
     try {
@@ -1890,19 +1982,12 @@ function AdminDashboard({
           supplier_id: newPurchaseOrder.supplier_id || null,
           branch_id: newPurchaseOrder.branch_id || null,
           total_amount: parseFloat(newPurchaseOrder.total_amount),
-          notes: newPurchaseOrder.notes
+          notes: newPurchaseOrder.notes,
+          items: newPurchaseOrder.items || []
         })
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setStockPurchases(prev => [{
-          id: data.order.id,
-          supplier: suppliers.find(s => s.id === newPurchaseOrder.supplier_id)?.name || "New Supplier",
-          reference: newPurchaseOrder.reference || data.order.order_number,
-          amount: data.order.total_amount,
-          date: newPurchaseOrder.date,
-          status: newPurchaseOrder.status
-        }, ...prev]);
         setShowAddPurchaseModal(false);
         setNewPurchaseOrder({
           supplier_id: "",
@@ -1911,7 +1996,8 @@ function AdminDashboard({
           total_amount: "",
           date: new Date().toISOString().split('T')[0],
           status: "pending",
-          notes: ""
+          notes: "",
+          items: []
         });
         safeToast.success("Purchase order created successfully");
       } else {
@@ -1955,7 +2041,7 @@ function AdminDashboard({
   const handleUpdateExpense = async (expenseId: string, expenseData: any) => {
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/api/finance/expenses/${expenseId}`), {
+      const res = await fetch(buildUrl(`/finance/expenses/${expenseId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1977,7 +2063,7 @@ function AdminDashboard({
     if (!confirm("Are you sure you want to delete this expense?")) return;
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/api/finance/expenses/${expenseId}`), {
+      const res = await fetch(buildUrl(`/finance/expenses/${expenseId}`), {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
@@ -2040,7 +2126,7 @@ function AdminDashboard({
   const handleUpdateOnlineSale = async (saleId: string, saleData: any) => {
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/api/finance/online-sales/${saleId}`), {
+      const res = await fetch(buildUrl(`/finance/online-sales/${saleId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -2062,7 +2148,7 @@ function AdminDashboard({
     if (!confirm("Are you sure you want to delete this online sale?")) return;
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/api/finance/online-sales/${saleId}`), {
+      const res = await fetch(buildUrl(`/finance/online-sales/${saleId}`), {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });
@@ -2079,7 +2165,7 @@ function AdminDashboard({
   const handleUpdateInhouseSale = async (saleId: string, saleData: any) => {
     try {
       const token = getStoredToken();
-      const res = await fetch(buildUrl(`/api/finance/inhouse-sales/${saleId}`), {
+      const res = await fetch(buildUrl(`/finance/inhouse-sales/${saleId}`), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -2107,11 +2193,103 @@ function AdminDashboard({
       const data = await res.json();
       if (res.ok && data.success) {
         setMessages(data.communications || []);
+        setEmailsSent(data.communications.filter((c: any) => c.type === "email").length);
+        setSmsSent(data.communications.filter((c: any) => c.type === "sms").length);
       }
     } catch (e) {
       console.error("Failed to fetch communications:", e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!emailForm.recipient || !emailForm.body) {
+      safeToast.error("Please fill in recipient and message");
+      return;
+    }
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/communications/email"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(emailForm)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShowEmailModal(false);
+        setEmailForm({ recipient: "", subject: "", body: "" });
+        safeToast.success("Email sent successfully");
+        fetchCommunications();
+      } else {
+        safeToast.error(data.detail || "Failed to send email");
+      }
+    } catch (e) {
+      console.error("Failed to send email:", e);
+      safeToast.error("Failed to send email");
+    }
+  };
+
+  const handleSendSms = async () => {
+    if (!smsForm.recipient || !smsForm.body) {
+      safeToast.error("Please fill in phone number and message");
+      return;
+    }
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/communications/sms"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(smsForm)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShowSmsModal(false);
+        setSmsForm({ recipient: "", body: "" });
+        safeToast.success("SMS sent successfully");
+        fetchCommunications();
+      } else {
+        safeToast.error(data.detail || "Failed to send SMS");
+      }
+    } catch (e) {
+      console.error("Failed to send SMS:", e);
+      safeToast.error("Failed to send SMS");
+    }
+  };
+
+  const handleBroadcast = async () => {
+    if (!broadcastForm.subject || !broadcastForm.body) {
+      safeToast.error("Please fill in subject and message");
+      return;
+    }
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/communications/broadcast"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify(broadcastForm)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setShowBroadcastModal(false);
+        setBroadcastForm({ subject: "", body: "" });
+        safeToast.success("Broadcast sent successfully");
+        fetchCommunications();
+      } else {
+        safeToast.error(data.detail || "Failed to send broadcast");
+      }
+    } catch (e) {
+      console.error("Failed to send broadcast:", e);
+      safeToast.error("Failed to send broadcast");
     }
   };
 
@@ -2133,7 +2311,7 @@ function AdminDashboard({
       const token = getStoredToken();
       await Promise.all(
         Array.from(selectedRepairs).map(id =>
-          fetch(buildUrl(`/api/repairs/${id}`), {
+          fetch(buildUrl(`/repairs/${id}`), {
             method: "DELETE",
             headers: {
               ...(token ? { "Authorization": `Bearer ${token}` } : {})
@@ -2181,84 +2359,80 @@ function AdminDashboard({
   const userRole = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("admin_user") || "{}").role : "";
 
   // Define sidebar items based on role
-  // Define sidebar items based on role
   const sidebarGroups = [
     {
       label: "OPERATIONS",
       icon: Activity,
       items: [
-        { id: "bookings", icon: Calendar, label: "Online Bookings" },
-        { id: "walkin", icon: User, label: "Walk-in Bookings" },
-        { id: "repairs", icon: Wrench, label: "Repair Orders", badge: repairs.length > 0 ? repairs.length : null, badgeColor: "bg-amber-500" },
-        { id: "repair_tracking", icon: Activity, label: "Repair Tracking" },
+        { id: "repairs", icon: Wrench, label: "Repair Management", badge: repairs.length > 0 ? repairs.length : null, badgeColor: "bg-amber-500" },
+        { id: "walkin", icon: User, label: "Walk-in Intake" },
+        { id: "inhouse_sales", icon: ShoppingCart, label: "In-house Sales" },
+        { id: "bookings", icon: Calendar, label: "Appointment Bookings" },
+        { id: "customers", icon: Users, label: "Customer Management" },
+        { id: "communication", icon: MessageCircle, label: "Customer Communication" },
+        { id: "staff", icon: User, label: "Staff Management" },
       ]
     },
     {
-      label: "SALES",
-      icon: ShoppingCart,
+      label: "SALES & FINANCE",
+      icon: DollarSign,
       items: [
+        { id: "finance", icon: Activity, label: "Financial Overview" },
+        { id: "revenue", icon: TrendingUp, label: "Revenue" },
+        { id: "profit_loss", icon: TrendingUp, label: "Profit & Loss" },
+        { id: "cash_flow", icon: DollarSign, label: "Cash Flow" },
+        { id: "expenses", icon: FileText, label: "Expenses" },
         { id: "online_sales", icon: ShoppingCart, label: "Online Sales" },
-        { id: "inhouse_sales", icon: ShoppingCart, label: "In-House Sales" },
+        { id: "inhouse_sales", icon: ShoppingCart, label: "In-house Sales" },
         { id: "invoices", icon: FileText, label: "Invoices" },
         { id: "payments", icon: DollarSign, label: "Payments" },
-      ]
-    },
-    {
-      label: "PURCHASING",
-      icon: Truck,
-      items: [
-        { id: "purchase_orders", icon: FileText, label: "Purchase Orders" },
-        { id: "stock_purchases", icon: Package, label: "Stock Purchases" },
-        { id: "supplier_management", icon: Users, label: "Supplier Management" },
       ]
     },
     {
       label: "INVENTORY",
       icon: Database,
       items: [
-        { id: "inventory", icon: Package, label: "Products" },
-        { id: "repair_parts_inventory", icon: Wrench, label: "Repair Parts" },
         { id: "inventory_management", icon: Database, label: "Inventory Management" },
-        { id: "stock_movements", icon: TrendingUp, label: "Stock Movements" },
+        { id: "inventory_products", icon: Package, label: "Inventory Products" },
+        { id: "repair_parts_inventory", icon: Wrench, label: "Repair Parts Inventory" },
         { id: "low_stock_alerts", icon: AlertCircle, label: "Low Stock Alerts" },
       ]
     },
     {
-      label: "CUSTOMERS",
-      icon: Users,
+      label: "PURCHASING",
+      icon: Truck,
       items: [
-        { id: "customers", icon: Users, label: "Customers" },
-        { id: "communication", icon: MessageCircle, label: "Customer Communication" },
-        { id: "customer_history", icon: History, label: "Customer History" },
+        { id: "supplier_management", icon: Users, label: "Supplier Management" },
+        { id: "purchase_orders", icon: FileText, label: "Purchase Orders" },
       ]
     },
     {
-      label: "FINANCE",
-      icon: DollarSign,
-      items: [
-        { id: "revenue", icon: TrendingUp, label: "Revenue" },
-        { id: "expenses", icon: FileText, label: "Expenses" },
-        { id: "finance", icon: Activity, label: "Financial Overview" },
-        { id: "profit_loss", icon: TrendingUp, label: "Profit & Loss" },
-        { id: "cash_flow", icon: DollarSign, label: "Cash Flow" },
-      ]
-    },
-    {
-      label: "REPORTS",
+      label: "REPORTS & ANALYTICS",
       icon: FileText,
       items: [
-        { id: "analytics", icon: TrendingUp, label: "Analytics" },
-        { id: "activity", icon: Activity, label: "Activity Logs" },
+        { id: "analytics", icon: TrendingUp, label: "Analytics Dashboard" },
+        { id: "repair_tracking", icon: Activity, label: "Repair Reports" },
+        { id: "activity", icon: Activity, label: "Sales Reports" },
+        { id: "finance", icon: DollarSign, label: "Financial Reports" },
+        { id: "customer_history", icon: History, label: "Customer History" },
       ]
     },
     {
       label: "ADMINISTRATION",
       icon: ShieldCheck,
       items: [
-        { id: "staff", icon: User, label: "Staff Management" },
-        { id: "roles_permissions", icon: ShieldCheck, label: "Roles & Permissions" },
+        { id: "activity", icon: Activity, label: "Activity Log" },
         { id: "audit_logs", icon: History, label: "Audit Logs" },
-        { id: "settings", icon: ShieldCheck, label: "Settings" },
+        { id: "settings", icon: ShieldCheck, label: "Business Settings" },
+      ]
+    },
+    {
+      label: "TOOLS",
+      icon: Wrench,
+      items: [
+        { id: "notifications", icon: Bell, label: "Notification Center" },
+        { id: "search", icon: Search, label: "Global Search" },
+        { id: "backup", icon: RefreshCw, label: "Backup & Restore" },
       ]
     }
   ];
@@ -2463,35 +2637,65 @@ function AdminDashboard({
 
                 {activeSection === "repairs" && "Repair Management"}
 
-                {activeSection === "customers" && "Customer Management"}
-
-                {activeSection === "inventory" && "Inventory Management"}
-
-                {activeSection === "staff" && "Staff Management"}
-
-                {activeSection === "communication" && "Customer Communication"}
+                {activeSection === "walkin" && "Walk-in Intake"}
 
                 {activeSection === "bookings" && "Appointment Bookings"}
 
-                {activeSection === "walkin" && "Walk-in Intake"}
+                {activeSection === "customers" && "Customer Management"}
+
+                {activeSection === "communication" && "Customer Communication"}
+
+                {activeSection === "staff" && "Staff Management"}
 
                 {activeSection === "finance" && "Financial Overview"}
+
+                {activeSection === "revenue" && "Revenue"}
 
                 {activeSection === "profit_loss" && "Profit & Loss"}
 
                 {activeSection === "cash_flow" && "Cash Flow"}
 
-                {activeSection === "repair_tracking" && "Repair Tracking"}
+                {activeSection === "expenses" && "Expenses"}
 
-                {activeSection === "roles_permissions" && "Roles & Permissions"}
+                {activeSection === "online_sales" && "Online Sales"}
 
-                {activeSection === "analytics" && "Analytics & Reports"}
+                {activeSection === "inhouse_sales" && "In-house Sales"}
 
-                {activeSection === "activity" && "Activity Log"}
+                {activeSection === "invoices" && "Invoices"}
+
+                {activeSection === "payments" && "Payments"}
+
+                {activeSection === "inventory_management" && "Inventory Management"}
+
+                {activeSection === "repair_parts_inventory" && "Repair Parts Inventory"}
+
+                {activeSection === "low_stock_alerts" && "Low Stock Alerts"}
+
+                {activeSection === "supplier_management" && "Supplier Management"}
+
+                {activeSection === "purchase_orders" && "Purchase Orders"}
+
+                {activeSection === "analytics" && "Analytics Dashboard"}
+
+                {activeSection === "repair_tracking" && "Repair Reports"}
+
+                {activeSection === "activity" && "Sales Reports"}
+
+                {activeSection === "inventory_products" && "Inventory Products"}
+
+                {activeSection === "finance" && "Financial Reports"}
+
+                {activeSection === "customer_history" && "Customer History"}
 
                 {activeSection === "audit_logs" && "Audit Logs"}
 
                 {activeSection === "settings" && "Business Settings"}
+
+                {activeSection === "notifications" && "Notification Center"}
+
+                {activeSection === "search" && "Global Search"}
+
+                {activeSection === "backup" && "Backup & Restore"}
 
               </h1>
 
@@ -3205,7 +3409,7 @@ function AdminDashboard({
 
 
 
-            {activeSection === "inventory" && (
+            {(activeSection === "inventory" || activeSection === "inventory_products") && (
 
               <>
 
@@ -3578,10 +3782,11 @@ function AdminDashboard({
                               onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                               className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
                             >
-                              <option value="smartphones">Smartphones</option>
-                              <option value="laptops">Laptops</option>
-                              <option value="tablets">Tablets</option>
+                              <option value="smartphone">Smartphones</option>
+                              <option value="laptop">Laptops</option>
+                              <option value="tablet">Tablets</option>
                               <option value="accessories">Accessories</option>
+                              <option value="other">Other</option>
                             </select>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
@@ -4294,10 +4499,11 @@ function AdminDashboard({
                                 onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
                                 className="mt-1 w-full rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-white"
                               >
-                                <option value="smartphones">Smartphones</option>
-                                <option value="laptops">Laptops</option>
-                                <option value="tablets">Tablets</option>
+                                <option value="smartphone">Smartphones</option>
+                                <option value="laptop">Laptops</option>
+                                <option value="tablet">Tablets</option>
                                 <option value="accessories">Accessories</option>
+                                <option value="other">Other</option>
                               </select>
                             </div>
                           </div>
@@ -4689,16 +4895,22 @@ function AdminDashboard({
                               />
                             </div>
                             <div>
-                              <Label className="text-sm text-slate-300">Role</Label>
-                              <select
-                                value={editingStaff.role || ""}
-                                onChange={(e) => setEditingStaff({ ...editingStaff, role: e.target.value })}
-                                className="mt-1 w-full rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-white"
-                              >
-                                <option value="SUPER_ADMIN">Super Admin</option>
-                                <option value="staff">Staff</option>
-                                <option value="customer">Customer</option>
-                              </select>
+                              <Label className="text-sm text-slate-300">Phone</Label>
+                              <Input
+                                value={editingStaff.phone || ""}
+                                onChange={(e) => setEditingStaff({ ...editingStaff, phone: e.target.value })}
+                                className="mt-1"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-sm text-slate-300">New Password (leave blank to keep current)</Label>
+                              <Input
+                                type="password"
+                                value={editingStaff.password || ""}
+                                onChange={(e) => setEditingStaff({ ...editingStaff, password: e.target.value })}
+                                className="mt-1"
+                                placeholder="Enter new password"
+                              />
                             </div>
                           </div>
                           <div className="flex gap-3 mt-6">
@@ -5003,6 +5215,8 @@ function AdminDashboard({
                             <Input
                               type="email"
                               placeholder="customer@example.com"
+                              value={emailForm.recipient}
+                              onChange={(e) => setEmailForm({ ...emailForm, recipient: e.target.value })}
                               className="border-[#1F2235] bg-[#1A1D27] text-white"
                             />
                           </div>
@@ -5010,6 +5224,8 @@ function AdminDashboard({
                             <Label className="text-slate-300">Subject</Label>
                             <Input
                               placeholder="Email subject"
+                              value={emailForm.subject}
+                              onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
                               className="border-[#1F2235] bg-[#1A1D27] text-white"
                             />
                           </div>
@@ -5017,6 +5233,8 @@ function AdminDashboard({
                             <Label className="text-slate-300">Message</Label>
                             <textarea
                               placeholder="Your message..."
+                              value={emailForm.body}
+                              onChange={(e) => setEmailForm({ ...emailForm, body: e.target.value })}
                               className="w-full h-32 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
                             />
                           </div>
@@ -5029,7 +5247,7 @@ function AdminDashboard({
                               Cancel
                             </Button>
                             <Button
-                              onClick={() => { setShowEmailModal(false); setEmailsSent(prev => prev + 1); safeToast.success("Email sent successfully"); }}
+                              onClick={handleSendEmail}
                               className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
                             >
                               Send Email
@@ -5065,6 +5283,8 @@ function AdminDashboard({
                             <Input
                               type="tel"
                               placeholder="+44 7415 278767"
+                              value={smsForm.recipient}
+                              onChange={(e) => setSmsForm({ ...smsForm, recipient: e.target.value })}
                               className="border-[#1F2235] bg-[#1A1D27] text-white"
                             />
                           </div>
@@ -5072,6 +5292,8 @@ function AdminDashboard({
                             <Label className="text-slate-300">Message</Label>
                             <textarea
                               placeholder="Your SMS message..."
+                              value={smsForm.body}
+                              onChange={(e) => setSmsForm({ ...smsForm, body: e.target.value })}
                               className="w-full h-32 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
                             />
                           </div>
@@ -5084,7 +5306,7 @@ function AdminDashboard({
                               Cancel
                             </Button>
                             <Button
-                              onClick={() => { setShowSmsModal(false); setSmsSent(prev => prev + 1); safeToast.success("SMS sent successfully"); }}
+                              onClick={handleSendSms}
                               className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
                             >
                               Send SMS
@@ -5116,29 +5338,20 @@ function AdminDashboard({
                         <h3 className="text-lg font-semibold text-white mb-4">Broadcast Message</h3>
                         <div className="space-y-4">
                           <div>
-                            <Label className="text-slate-300">Recipient Group</Label>
-                            <select
-                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                            >
-                              <option value="all_customers">All Customers</option>
-                              <option value="active_repairs">Customers with Active Repairs</option>
-                              <option value="recent_purchases">Recent Purchases</option>
-                            </select>
-                          </div>
-                          <div>
-                            <Label className="text-slate-300">Channel</Label>
-                            <select
-                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                            >
-                              <option value="email">Email</option>
-                              <option value="sms">SMS</option>
-                              <option value="both">Both Email & SMS</option>
-                            </select>
+                            <Label className="text-slate-300">Subject</Label>
+                            <Input
+                              placeholder="Broadcast subject"
+                              value={broadcastForm.subject}
+                              onChange={(e) => setBroadcastForm({ ...broadcastForm, subject: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            />
                           </div>
                           <div>
                             <Label className="text-slate-300">Message</Label>
                             <textarea
                               placeholder="Your broadcast message..."
+                              value={broadcastForm.body}
+                              onChange={(e) => setBroadcastForm({ ...broadcastForm, body: e.target.value })}
                               className="w-full h-32 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
                             />
                           </div>
@@ -5151,7 +5364,7 @@ function AdminDashboard({
                               Cancel
                             </Button>
                             <Button
-                              onClick={() => { setShowBroadcastModal(false); safeToast.success("Broadcast sent successfully"); }}
+                              onClick={handleBroadcast}
                               className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
                             >
                               Send Broadcast
@@ -5180,7 +5393,7 @@ function AdminDashboard({
 
                     title="Total Expenses"
 
-                    value={`£${expenses.reduce((sum, e) => sum + (e.amount || 0), 0).toFixed(0)}`}
+                    value={`£${expenseAnalytics?.total_expenses?.toFixed(0) || '0'}`}
 
                     icon={DollarSign}
 
@@ -5192,7 +5405,7 @@ function AdminDashboard({
 
                     title="This Month"
 
-                    value={`£${expenses.filter(e => new Date(e.date).getMonth() === new Date().getMonth()).reduce((sum, e) => sum + (e.amount || 0), 0).toFixed(0)}`}
+                    value={`£${expenseAnalytics?.month_expenses?.toFixed(0) || '0'}`}
 
                     icon={Calendar}
 
@@ -5204,11 +5417,7 @@ function AdminDashboard({
 
                     title="This Week"
 
-                    value={`£${expenses.filter(e => {
-                      const now = new Date();
-                      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                      return new Date(e.date) >= weekAgo;
-                    }).reduce((sum, e) => sum + (e.amount || 0), 0).toFixed(0)}`}
+                    value={`£${expenseAnalytics?.week_expenses?.toFixed(0) || '0'}`}
 
                     icon={Activity}
 
@@ -5220,7 +5429,7 @@ function AdminDashboard({
 
                     title="Pending"
 
-                    value={expenses.filter(e => e.status === "pending").length}
+                    value={expenseAnalytics?.pending_count || 0}
 
                     icon={Clock}
 
@@ -5273,9 +5482,33 @@ function AdminDashboard({
 
                       <option value="supplies">Supplies</option>
 
-                      <option value="salaries">Salaries</option>
+                      <option value="wages">Wages</option>
+
+                      <option value="parts">Parts</option>
 
                       <option value="other">Other</option>
+
+                    </select>
+
+                    <select
+
+                      value={expenseStatusFilter}
+
+                      onChange={(e) => setExpenseStatusFilter(e.target.value)}
+
+                      className="h-10 rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+
+                    >
+
+                      <option value="all">All Status</option>
+
+                      <option value="pending">Pending</option>
+
+                      <option value="approved">Approved</option>
+
+                      <option value="rejected">Rejected</option>
+
+                      <option value="paid">Paid</option>
 
                     </select>
 
@@ -5286,9 +5519,23 @@ function AdminDashboard({
                 {/* Expenses Table */}
                 <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
 
-                  <div className="px-6 py-4 border-b border-[#1F2235]">
+                  <div className="px-6 py-4 border-b border-[#1F2235] flex items-center justify-between">
 
                     <h3 className="text-sm font-semibold text-white">Expense Tracking</h3>
+
+                    <Button
+
+                      onClick={() => setShowAddExpenseModal(true)}
+
+                      className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+
+                    >
+
+                      <Plus className="h-4 w-4 mr-2" />
+
+                      Add Expense
+
+                    </Button>
 
                   </div>
 
@@ -5299,6 +5546,12 @@ function AdminDashboard({
                       <thead>
 
                         <tr className="border-b border-[#1F2235] bg-[#11131E]">
+
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            Date
+
+                          </th>
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
@@ -5320,13 +5573,19 @@ function AdminDashboard({
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
-                            Date
+                            Status
 
                           </th>
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
-                            Status
+                            Source
+
+                          </th>
+
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            Actions
 
                           </th>
 
@@ -5336,12 +5595,7 @@ function AdminDashboard({
 
                       <tbody>
 
-                        {expenses.filter(e => {
-                          const matchSearch = e.description?.toLowerCase().includes(expenseSearch.toLowerCase()) ||
-                            e.category?.toLowerCase().includes(expenseSearch.toLowerCase());
-                          const matchCategory = expenseCategoryFilter === "all" || e.category === expenseCategoryFilter;
-                          return matchSearch && matchCategory;
-                        }).map((expense, idx) => (
+                        {expenses.map((expense, idx) => (
 
                           <motion.tr
 
@@ -5357,21 +5611,58 @@ function AdminDashboard({
 
                           >
 
+                            <td className="px-4 py-3 text-slate-400">{new Date(expense.date).toLocaleDateString()}</td>
+
                             <td className="px-4 py-3 font-medium text-white">{expense.description || "N/A"}</td>
 
                             <td className="px-4 py-3 text-slate-400">{expense.category || "N/A"}</td>
 
-                            <td className="px-4 py-3 font-semibold text-rose-400">£{(expense.amount || 0).toFixed(2)}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{new Date(expense.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 font-semibold text-rose-400">£{(expense.total_amount || 0).toFixed(2)}</td>
 
                             <td className="px-4 py-3">
 
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${expense.status === "paid" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                                expense.status === "approved" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                expense.status === "rejected" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                                expense.status === "paid" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                                "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              }`}>
 
                                 {expense.status || "pending"}
 
                               </span>
+
+                            </td>
+
+                            <td className="px-4 py-3">
+
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${expense.source_type === "purchase_order" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400"}`}>
+
+                                {expense.source_type === "purchase_order" ? "Purchase Order" : expense.source_type === "manual" ? "Manual" : "Other"}
+
+                              </span>
+
+                            </td>
+
+                            <td className="px-4 py-3">
+
+                              <div className="flex items-center gap-2">
+
+                                <button
+
+                                  onClick={() => setSelectedExpense(expense)}
+
+                                  className="text-slate-400 hover:text-white transition-colors"
+
+                                  title="View Details"
+
+                                >
+
+                                  <Eye className="h-4 w-4" />
+
+                                </button>
+
+                              </div>
 
                             </td>
 
@@ -5397,7 +5688,358 @@ function AdminDashboard({
 
                   )}
 
+                  {/* Pagination */}
+                  {expenseTotalPages > 1 && (
+                    <div className="mt-4 flex items-center justify-between px-6 py-4 border-t border-[#1F2235]">
+                      <div className="text-sm text-slate-400">
+                        Page {expensePage} of {expenseTotalPages}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setExpensePage(p => Math.max(1, p - 1))}
+                          disabled={expensePage === 1}
+                          className="px-3 py-1 rounded-lg border border-[#1F2235] bg-[#11131E] text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setExpensePage(p => Math.min(expenseTotalPages, p + 1))}
+                          disabled={expensePage === expenseTotalPages}
+                          className="px-3 py-1 rounded-lg border border-[#1F2235] bg-[#11131E] text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
+
+                {/* Add Expense Modal */}
+                <AnimatePresence>
+                  {showAddExpenseModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowAddExpenseModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="w-full max-w-lg rounded-2xl border border-[#1F2235] bg-[#11131E] p-6 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="mb-4 text-lg font-semibold text-white">Add New Expense</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-300">Category</label>
+                            <select
+                              value={newExpense.category}
+                              onChange={(e) => setNewExpense({...newExpense, category: e.target.value})}
+                              className="w-full h-10 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="">Select category</option>
+                              <option value="rent">Rent</option>
+                              <option value="utilities">Utilities</option>
+                              <option value="supplies">Supplies</option>
+                              <option value="wages">Wages</option>
+                              <option value="parts">Parts</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-300">Description</label>
+                            <Input
+                              value={newExpense.description}
+                              onChange={(e) => setNewExpense({...newExpense, description: e.target.value})}
+                              className="h-10 border border-[#1F2235] bg-[#1A1D27] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
+                              placeholder="Expense description"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="mb-1 block text-sm font-medium text-slate-300">Amount (£)</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={newExpense.amount}
+                                onChange={(e) => setNewExpense({...newExpense, amount: e.target.value})}
+                                className="h-10 border border-[#1F2235] bg-[#1A1D27] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-1 block text-sm font-medium text-slate-300">Tax (£)</label>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={newExpense.tax_amount}
+                                onChange={(e) => setNewExpense({...newExpense, tax_amount: e.target.value})}
+                                className="h-10 border border-[#1F2235] bg-[#1A1D27] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-300">Date</label>
+                            <Input
+                              type="date"
+                              value={newExpense.date}
+                              onChange={(e) => setNewExpense({...newExpense, date: e.target.value})}
+                              className="h-10 border border-[#1F2235] bg-[#1A1D27] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-300">Payment Method</label>
+                            <select
+                              value={newExpense.payment_method}
+                              onChange={(e) => setNewExpense({...newExpense, payment_method: e.target.value})}
+                              className="w-full h-10 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="">Select payment method</option>
+                              <option value="cash">Cash</option>
+                              <option value="card">Card</option>
+                              <option value="bank_transfer">Bank Transfer</option>
+                              <option value="check">Check</option>
+                              <option value="credit">Credit</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-300">Notes</label>
+                            <textarea
+                              value={newExpense.notes}
+                              onChange={(e) => setNewExpense({...newExpense, notes: e.target.value})}
+                              className="w-full h-20 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none"
+                              placeholder="Additional notes..."
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowAddExpenseModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={async () => {
+                                try {
+                                  const token = getStoredToken();
+                                  const res = await fetch(buildUrl("/finance/expenses"), {
+                                    method: "POST",
+                                    headers: {
+                                      "Content-Type": "application/json",
+                                      "Authorization": `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({
+                                      ...newExpense,
+                                      amount: parseFloat(newExpense.amount),
+                                      tax_amount: parseFloat(newExpense.tax_amount || 0)
+                                    })
+                                  });
+                                  const data = await res.json();
+                                  if (res.ok && data.success) {
+                                    safeToast.success("Expense added successfully");
+                                    setShowAddExpenseModal(false);
+                                    setNewExpense({
+                                      category: "",
+                                      description: "",
+                                      amount: "",
+                                      tax_amount: "0",
+                                      date: new Date().toISOString().split('T')[0],
+                                      branch_id: "",
+                                      supplier_id: "",
+                                      payment_method: "",
+                                      notes: ""
+                                    });
+                                    fetchExpenses();
+                                  } else {
+                                    safeToast.error(data.detail || "Failed to add expense");
+                                  }
+                                } catch (e) {
+                                  console.error(e);
+                                  safeToast.error("Failed to add expense");
+                                }
+                              }}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Add Expense
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Expense Details Modal */}
+                <AnimatePresence>
+                  {selectedExpense && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setSelectedExpense(null)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="w-full max-w-lg rounded-2xl border border-[#1F2235] bg-[#11131E] p-6 shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="text-lg font-semibold text-white">Expense Details</h3>
+                          <button
+                            onClick={() => setSelectedExpense(null)}
+                            className="text-slate-400 hover:text-white"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-xs text-slate-500 uppercase tracking-wider">Category</label>
+                              <p className="text-sm font-medium text-white">{selectedExpense.category || "N/A"}</p>
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 uppercase tracking-wider">Status</label>
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                                selectedExpense.status === "approved" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                                selectedExpense.status === "rejected" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                                selectedExpense.status === "paid" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
+                                "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              }`}>
+                                {selectedExpense.status || "pending"}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-500 uppercase tracking-wider">Description</label>
+                            <p className="text-sm text-white">{selectedExpense.description || "N/A"}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-xs text-slate-500 uppercase tracking-wider">Amount</label>
+                              <p className="text-sm font-medium text-white">£{(selectedExpense.amount || 0).toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 uppercase tracking-wider">Tax</label>
+                              <p className="text-sm font-medium text-white">£{(selectedExpense.tax_amount || 0).toFixed(2)}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-500 uppercase tracking-wider">Total</label>
+                            <p className="text-lg font-bold text-rose-400">£{(selectedExpense.total_amount || 0).toFixed(2)}</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-xs text-slate-500 uppercase tracking-wider">Date</label>
+                              <p className="text-sm text-white">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+                            </div>
+                            <div>
+                              <label className="text-xs text-slate-500 uppercase tracking-wider">Payment Method</label>
+                              <p className="text-sm text-white">{selectedExpense.payment_method || "N/A"}</p>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-slate-500 uppercase tracking-wider">Source</label>
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${selectedExpense.source_type === "purchase_order" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400"}`}>
+                              {selectedExpense.source_type === "purchase_order" ? "Purchase Order" : selectedExpense.source_type === "manual" ? "Manual" : "Other"}
+                            </span>
+                          </div>
+                          {selectedExpense.notes && (
+                            <div>
+                              <label className="text-xs text-slate-500 uppercase tracking-wider">Notes</label>
+                              <p className="text-sm text-white">{selectedExpense.notes}</p>
+                            </div>
+                          )}
+                          {selectedExpense.status === "pending" && (
+                            <div className="pt-4 border-t border-[#1F2235]">
+                              <label className="text-xs text-slate-500 uppercase tracking-wider mb-2 block">Actions</label>
+                              <div className="flex gap-3">
+                                <Button
+                                  onClick={async () => {
+                                    try {
+                                      const token = getStoredToken();
+                                      const res = await fetch(buildUrl(`/finance/expenses/${selectedExpense.id}/status`), {
+                                        method: "PATCH",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                          "Authorization": `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({ status: "approved" })
+                                      });
+                                      const data = await res.json();
+                                      if (res.ok && data.success) {
+                                        safeToast.success("Expense approved successfully");
+                                        setSelectedExpense(null);
+                                        fetchExpenses();
+                                        fetchExpenseAnalytics();
+                                      } else {
+                                        safeToast.error(data.detail || "Failed to approve expense");
+                                      }
+                                    } catch (e) {
+                                      console.error(e);
+                                      safeToast.error("Failed to approve expense");
+                                    }
+                                  }}
+                                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  onClick={async () => {
+                                    try {
+                                      const token = getStoredToken();
+                                      const res = await fetch(buildUrl(`/finance/expenses/${selectedExpense.id}/status`), {
+                                        method: "PATCH",
+                                        headers: {
+                                          "Content-Type": "application/json",
+                                          "Authorization": `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({ status: "rejected" })
+                                      });
+                                      const data = await res.json();
+                                      if (res.ok && data.success) {
+                                        safeToast.success("Expense rejected successfully");
+                                        setSelectedExpense(null);
+                                        fetchExpenses();
+                                        fetchExpenseAnalytics();
+                                      } else {
+                                        safeToast.error(data.detail || "Failed to reject expense");
+                                      }
+                                    } catch (e) {
+                                      console.error(e);
+                                      safeToast.error("Failed to reject expense");
+                                    }
+                                  }}
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                          <div className="pt-4 border-t border-[#1F2235]">
+                            <Button
+                              onClick={() => setSelectedExpense(null)}
+                              className="w-full bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Close
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
               </>
 
@@ -5989,207 +6631,6 @@ function AdminDashboard({
 
 
 
-            {activeSection === "stock_movements" && (
-
-              <>
-
-                {/* Stock Movements Section */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-                  <StatCard
-
-                    title="Total Movements"
-
-                    value={stockMovements.length}
-
-                    icon={TrendingUp}
-
-                    gradient="from-blue-500 to-cyan-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Stock In"
-
-                    value={stockMovements.filter(m => m.type === "in").length}
-
-                    icon={Package}
-
-                    gradient="from-emerald-500 to-green-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Stock Out"
-
-                    value={stockMovements.filter(m => m.type === "out").length}
-
-                    icon={Package}
-
-                    gradient="from-amber-500 to-orange-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Adjustments"
-
-                    value={stockMovements.filter(m => m.type === "adjustment").length}
-
-                    icon={Activity}
-
-                    gradient="from-violet-500 to-purple-500"
-
-                  />
-
-                </div>
-
-                {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-
-                  <div className="relative flex-1">
-
-                    <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-
-                    <Input
-
-                      placeholder="Search by product or reference"
-
-                      value={stockMovementSearch}
-
-                      onChange={(e) => setStockMovementSearch(e.target.value)}
-
-                      className="h-10 border border-[#1F2235] bg-[#11131E] pl-10 text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
-
-                    />
-
-                  </div>
-
-                </div>
-
-                {/* Stock Movements Table */}
-                <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
-
-                  <div className="px-6 py-4 border-b border-[#1F2235]">
-
-                    <h3 className="text-sm font-semibold text-white">Stock Movement History</h3>
-
-                  </div>
-
-                  <div className="overflow-x-auto">
-
-                    <table className="w-full text-sm">
-
-                      <thead>
-
-                        <tr className="border-b border-[#1F2235] bg-[#11131E]">
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Product
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Type
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Quantity
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Reference
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Date
-
-                          </th>
-
-                        </tr>
-
-                      </thead>
-
-                      <tbody>
-
-                        {stockMovements.filter(m => {
-                          const matchSearch = m.product?.toLowerCase().includes(stockMovementSearch.toLowerCase()) ||
-                            m.reference?.toLowerCase().includes(stockMovementSearch.toLowerCase());
-                          return matchSearch;
-                        }).map((movement, idx) => (
-
-                          <motion.tr
-
-                            key={movement.id}
-
-                            initial={{ opacity: 0, y: 8 }}
-
-                            animate={{ opacity: 1, y: 0 }}
-
-                            transition={{ delay: idx * 0.03 }}
-
-                            className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
-
-                          >
-
-                            <td className="px-4 py-3 font-medium text-white">{movement.product || "N/A"}</td>
-
-                            <td className="px-4 py-3">
-
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${movement.type === "in" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : movement.type === "out" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"}`}>
-
-                                {movement.type || "N/A"}
-
-                              </span>
-
-                            </td>
-
-                            <td className="px-4 py-3 font-semibold text-slate-400">{movement.quantity || 0}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{movement.reference || "N/A"}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{new Date(movement.date).toLocaleDateString()}</td>
-
-                          </motion.tr>
-
-                        ))}
-
-                      </tbody>
-
-                    </table>
-
-                  </div>
-
-                  {stockMovements.length === 0 && (
-
-                    <div className="px-6 py-16 text-center text-slate-400">
-
-                      <TrendingUp className="mx-auto mb-3 h-8 w-8 opacity-40" />
-
-                      <p className="text-sm">No stock movements recorded</p>
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              </>
-
-            )}
-
-
-
             {activeSection === "inventory_management" && (
 
               <>
@@ -6526,6 +6967,18 @@ function AdminDashboard({
 
                           </th>
 
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            Total Spend
+
+                          </th>
+
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            Actions
+
+                          </th>
+
                         </tr>
 
                       </thead>
@@ -6569,6 +7022,17 @@ function AdminDashboard({
                             </td>
 
                             <td className="px-4 py-3 font-semibold text-slate-400">{supplier.totalOrders || 0}</td>
+
+                            <td className="px-4 py-3 font-semibold text-emerald-400">£{supplier.totalSpend ? supplier.totalSpend.toFixed(2) : "0.00"}</td>
+
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => handleArchiveSupplier(supplier.id)}
+                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 p-2 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
 
                           </motion.tr>
 
@@ -6692,321 +7156,6 @@ function AdminDashboard({
 
 
 
-            {activeSection === "stock_purchases" && (
-
-              <>
-
-                {/* Stock Purchases Section */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-                  <StatCard
-
-                    title="Total Purchases"
-
-                    value={`£${stockPurchases.reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(0)}`}
-
-                    icon={Package}
-
-                    gradient="from-blue-500 to-cyan-500"
-
-                  />
-
-                  <StatCard
-
-                    title="This Month"
-
-                    value={`£${stockPurchases.filter(p => new Date(p.date).getMonth() === new Date().getMonth()).reduce((sum, p) => sum + (p.amount || 0), 0).toFixed(0)}`}
-
-                    icon={Calendar}
-
-                    gradient="from-violet-500 to-purple-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Pending"
-
-                    value={stockPurchases.filter(p => p.status === "pending").length}
-
-                    icon={Clock}
-
-                    gradient="from-amber-500 to-orange-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Completed"
-
-                    value={stockPurchases.filter(p => p.status === "completed").length}
-
-                    icon={CheckCircle2}
-
-                    gradient="from-emerald-500 to-green-500"
-
-                  />
-
-                </div>
-
-                {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
-
-                  <div className="relative flex-1">
-
-                    <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-
-                    <Input
-
-                      placeholder="Search by supplier or reference"
-
-                      value={stockPurchaseSearch}
-
-                      onChange={(e) => setStockPurchaseSearch(e.target.value)}
-
-                      className="h-10 border border-[#1F2235] bg-[#11131E] pl-10 text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
-
-                    />
-
-                  </div>
-
-                  <Button
-                    onClick={() => setShowAddPurchaseModal(true)}
-                    className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Purchase Order
-                  </Button>
-
-                </div>
-
-                {/* Stock Purchases Table */}
-                <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
-
-                  <div className="px-6 py-4 border-b border-[#1F2235]">
-
-                    <h3 className="text-sm font-semibold text-white">Stock Purchases</h3>
-
-                  </div>
-
-                  <div className="overflow-x-auto">
-
-                    <table className="w-full text-sm">
-
-                      <thead>
-
-                        <tr className="border-b border-[#1F2235] bg-[#11131E]">
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Supplier
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Reference
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Amount
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Date
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Status
-
-                          </th>
-
-                        </tr>
-
-                      </thead>
-
-                      <tbody>
-
-                        {stockPurchases.filter(p => {
-                          const matchSearch = p.supplier?.toLowerCase().includes(stockPurchaseSearch.toLowerCase()) ||
-                            p.reference?.toLowerCase().includes(stockPurchaseSearch.toLowerCase());
-                          return matchSearch;
-                        }).map((purchase, idx) => (
-
-                          <motion.tr
-
-                            key={purchase.id}
-
-                            initial={{ opacity: 0, y: 8 }}
-
-                            animate={{ opacity: 1, y: 0 }}
-
-                            transition={{ delay: idx * 0.03 }}
-
-                            className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
-
-                          >
-
-                            <td className="px-4 py-3 font-medium text-white">{purchase.supplier || "N/A"}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{purchase.reference || "N/A"}</td>
-
-                            <td className="px-4 py-3 font-semibold text-emerald-400">£{(purchase.amount || 0).toFixed(2)}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{new Date(purchase.date).toLocaleDateString()}</td>
-
-                            <td className="px-4 py-3">
-
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${purchase.status === "completed" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
-
-                                {purchase.status || "pending"}
-
-                              </span>
-
-                            </td>
-
-                          </motion.tr>
-
-                        ))}
-
-                      </tbody>
-
-                    </table>
-
-                  </div>
-
-                  {stockPurchases.length === 0 && (
-
-                    <div className="px-6 py-16 text-center text-slate-400">
-
-                      <Package className="mx-auto mb-3 h-8 w-8 opacity-40" />
-
-                      <p className="text-sm">No stock purchases yet</p>
-
-                    </div>
-
-                  )}
-
-                </div>
-
-                {/* Add Purchase Order Modal */}
-                <AnimatePresence>
-                  {showAddPurchaseModal && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-                      onClick={() => setShowAddPurchaseModal(false)}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <h3 className="text-lg font-semibold text-white mb-4">Create Purchase Order</h3>
-                        <div className="space-y-4">
-                          <div>
-                            <Label className="text-slate-300">Supplier</Label>
-                            <select
-                              value={newPurchaseOrder.supplier_id}
-                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, supplier_id: e.target.value })}
-                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                            >
-                              <option value="">Select supplier...</option>
-                              {suppliers.map(s => (
-                                <option key={s.id} value={s.id}>{s.name}</option>
-                              ))}
-                            </select>
-                          </div>
-                          <div>
-                            <Label className="text-slate-300">Reference</Label>
-                            <Input
-                              value={newPurchaseOrder.reference}
-                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, reference: e.target.value })}
-                              className="border-[#1F2235] bg-[#1A1D27] text-white"
-                              placeholder="PO-001 or leave blank for auto"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-slate-300">Total Amount (£)</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={newPurchaseOrder.total_amount}
-                                onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, total_amount: e.target.value })}
-                                className="border-[#1F2235] bg-[#1A1D27] text-white"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-slate-300">Date</Label>
-                              <Input
-                                type="date"
-                                value={newPurchaseOrder.date}
-                                onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, date: e.target.value })}
-                                className="border-[#1F2235] bg-[#1A1D27] text-white"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <Label className="text-slate-300">Status</Label>
-                            <select
-                              value={newPurchaseOrder.status}
-                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, status: e.target.value })}
-                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                            >
-                              <option value="pending">Pending</option>
-                              <option value="approved">Approved</option>
-                              <option value="in_transit">In Transit</option>
-                              <option value="completed">Completed</option>
-                            </select>
-                          </div>
-                          <div>
-                            <Label className="text-slate-300">Notes</Label>
-                            <Input
-                              value={newPurchaseOrder.notes}
-                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, notes: e.target.value })}
-                              className="border-[#1F2235] bg-[#1A1D27] text-white"
-                              placeholder="Optional notes..."
-                            />
-                          </div>
-                          <div className="flex gap-3 pt-4">
-                            <Button
-                              onClick={() => setShowAddPurchaseModal(false)}
-                              variant="outline"
-                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              onClick={handleCreatePurchaseOrder}
-                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
-                            >
-                              Create Order
-                            </Button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-              </>
-
-            )}
-
-
-
             {activeSection === "purchase_orders" && (
 
               <>
@@ -7065,7 +7214,7 @@ function AdminDashboard({
                 </div>
 
                 {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
 
                   <div className="relative flex-1">
 
@@ -7084,6 +7233,14 @@ function AdminDashboard({
                     />
 
                   </div>
+
+                  <Button
+                    onClick={() => setShowAddPurchaseModal(true)}
+                    className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Purchase Order
+                  </Button>
 
                 </div>
 
@@ -7134,6 +7291,12 @@ function AdminDashboard({
 
                           </th>
 
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            Actions
+
+                          </th>
+
                         </tr>
 
                       </thead>
@@ -7178,6 +7341,17 @@ function AdminDashboard({
 
                             </td>
 
+                            <td className="px-4 py-3">
+
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-400 hover:text-white"
+                                onClick={() => handleOpenReceiveModal(order)}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+
+                              </Button>
+
+                            </td>
+
                           </motion.tr>
 
                         ))}
@@ -7201,6 +7375,140 @@ function AdminDashboard({
                   )}
 
                 </div>
+
+                {/* Add Purchase Order Modal */}
+                <AnimatePresence>
+                  {showAddPurchaseModal && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowAddPurchaseModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Create Purchase Order</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <Label className="text-slate-300">Supplier</Label>
+                            <select
+                              value={newPurchaseOrder.supplier_id}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, supplier_id: e.target.value })}
+                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="">Select supplier...</option>
+                              {suppliers.map(s => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Reference (optional)</Label>
+                            <Input
+                              value={newPurchaseOrder.reference}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, reference: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="PO-001 or leave blank for auto"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Notes (optional)</Label>
+                            <Input
+                              value={newPurchaseOrder.notes}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, notes: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="Optional notes..."
+                            />
+                          </div>
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowAddPurchaseModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleCreatePurchaseOrder}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Create Order
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Receive Order Modal */}
+                <AnimatePresence>
+                  {showReceiveModal && selectedOrder && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                      onClick={() => setShowReceiveModal(false)}
+                    >
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <h3 className="text-lg font-semibold text-white mb-4">Receive Order - {selectedOrder.orderId || selectedOrder.id}</h3>
+                        <div className="space-y-4">
+                          {receiveItems.map((item, idx) => (
+                            <div key={item.id} className="flex items-center gap-4 p-3 bg-[#1A1D27] rounded-lg">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-white">{item.product_name || item.product_id}</p>
+                                <p className="text-xs text-slate-400">Ordered: {item.quantity}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Label className="text-xs text-slate-300">Received:</Label>
+                                <Input
+                                  type="number"
+                                  min="0"
+                                  max={item.quantity}
+                                  value={item.received_qty}
+                                  onChange={(e) => {
+                                    const newItems = [...receiveItems];
+                                    newItems[idx].received_qty = parseInt(e.target.value) || 0;
+                                    setReceiveItems(newItems);
+                                  }}
+                                  className="w-20 h-8 border-[#1F2235] bg-[#11131E] text-white"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                          <div className="flex gap-3 pt-4">
+                            <Button
+                              onClick={() => setShowReceiveModal(false)}
+                              variant="outline"
+                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleReceiveOrder}
+                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                            >
+                              Receive Order
+                            </Button>
+                          </div>
+                        </div>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
 
               </>
 
@@ -7586,7 +7894,24 @@ function AdminDashboard({
 
                                 <button
 
-                                  onClick={() => safeToast.success(`Invoice ${invoice.invoice_number} marked as paid`)}
+                                  onClick={async () => {
+                                    const token = getStoredToken();
+                                    const res = await fetch(buildUrl(`/finance/invoices/${invoice.id}`), {
+                                      method: "PATCH",
+                                      headers: {
+                                        "Content-Type": "application/json",
+                                        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+                                      },
+                                      body: JSON.stringify({ status: "paid" }),
+                                    });
+                                    if (res.ok) {
+                                      safeToast.success(`Invoice ${invoice.invoice_number} marked as paid`);
+                                      fetchInvoices();
+                                      window.dispatchEvent(new CustomEvent("finance-refresh", { detail: { type: "invoice-updated", invoiceId: invoice.id } }));
+                                    } else {
+                                      safeToast.error("Failed to update invoice status");
+                                    }
+                                  }}
 
                                   className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 p-2 rounded-lg transition-colors"
 
@@ -9152,108 +9477,6 @@ function AdminDashboard({
 
               </>
 
-            )}
-
-            {activeSection === "roles_permissions" && (
-              <>
-                {/* Roles & Permissions Section */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <StatCard
-                    title="Total Roles"
-                    value={roles.length}
-                    icon={ShieldCheck}
-                    gradient="from-blue-500 to-cyan-500"
-                  />
-                  <StatCard
-                    title="Active Permissions"
-                    value={permissions.length}
-                    icon={CheckCircle2}
-                    gradient="from-emerald-500 to-green-500"
-                  />
-                  <StatCard
-                    title="Admin Users"
-                    value={roles.filter(r => r.name === "Admin").length}
-                    icon={User}
-                    gradient="from-violet-500 to-purple-500"
-                  />
-                  <StatCard
-                    title="Staff Users"
-                    value={roles.filter(r => r.name === "Staff").length}
-                    icon={Users}
-                    gradient="from-amber-500 to-orange-500"
-                  />
-                </div>
-
-                {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-                    <Input
-                      placeholder="Search by role name"
-                      value={rolesSearch}
-                      onChange={(e) => setRolesSearch(e.target.value)}
-                      className="h-10 border border-[#1F2235] bg-[#11131E] pl-10 text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
-                    />
-                  </div>
-                </div>
-
-                {/* Roles Table */}
-                <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
-                  <div className="px-6 py-4 border-b border-[#1F2235]">
-                    <h3 className="text-sm font-semibold text-white">Roles & Permissions</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[#1F2235] bg-[#11131E]">
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                            Role Name
-                          </th>
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                            Description
-                          </th>
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                            Permissions
-                          </th>
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                            Users
-                          </th>
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                            Status
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {roles.filter(r => r?.name?.toLowerCase().includes(rolesSearch.toLowerCase())).map((role, idx) => (
-                          <motion.tr
-                            key={role?.id || idx}
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.03 }}
-                            className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
-                          >
-                            <td className="px-4 py-3 font-medium text-white">{role?.name || "N/A"}</td>
-                            <td className="px-4 py-3 text-slate-400">{role?.description || "N/A"}</td>
-                            <td className="px-4 py-3 text-slate-400">{role?.permissions?.length || 0} permissions</td>
-                            <td className="px-4 py-3 text-slate-400">{role?.userCount || 0}</td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${role?.isActive ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"}`}>
-                                {role?.isActive ? "Active" : "Inactive"}
-                              </span>
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {roles.length === 0 && (
-                    <div className="px-6 py-16 text-center text-slate-400">
-                      <ShieldCheck className="mx-auto mb-3 h-8 w-8 opacity-40" />
-                      <p className="text-sm">No roles configured yet</p>
-                    </div>
-                  )}
-                </div>
-              </>
             )}
 
             {activeSection === "profit_loss" && (

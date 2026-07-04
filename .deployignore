@@ -1,0 +1,63 @@
+# Deployment ignore file for Hostinger
+# Exclude these files/folders when deploying
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+*.egg-info/
+dist/
+build/
+
+# Frontend
+node_modules/
+.next/
+out/
+.cache/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Development
+*.log
+logs/
+*.tmp
+*.temp
+
+# Documentation (optional - remove if needed)
+*.md
+!README.md
+
+# Test/Development scripts
+create_staff_user.py
+fix_categories.py
+cleanup_test_data.py
+*.test.py

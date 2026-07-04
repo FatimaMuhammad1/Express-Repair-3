@@ -33,12 +33,19 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
   const [products, setProducts] = useState<any[]>([]);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
-  const [stockMovements, setStockMovements] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [showAddPurchaseOrder, setShowAddPurchaseOrder] = useState(false);
+  const [newCategory, setNewCategory] = useState({ name: "", description: "" });
+  const [newPurchaseOrder, setNewPurchaseOrder] = useState({
+    supplier_id: "",
+    items: [] as Array<{ product_id: string; quantity: number; unit_cost: number }>,
+  });
 
   useEffect(() => {
     fetchInventoryData();
@@ -47,11 +54,11 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
   const fetchInventoryData = async () => {
     setLoading(true);
     try {
-      const [productsRes, suppliersRes, ordersRes, movementsRes] = await Promise.all([
-        fetch(buildUrl(`/inventory?branch_id=${branchId === "all" ? "" : branchId}`), { headers: getAuthHeaders() }),
-        fetch(buildUrl("/suppliers"), { headers: getAuthHeaders() }),
-        fetch(buildUrl("/purchase-orders"), { headers: getAuthHeaders() }),
-        fetch(buildUrl("/stock-movements"), { headers: getAuthHeaders() }),
+      const [productsRes, suppliersRes, ordersRes, categoriesRes] = await Promise.all([
+        fetch(buildUrl(`/api/inventory?branch_id=${branchId === "all" ? "" : branchId}`), { headers: getAuthHeaders() }),
+        fetch(buildUrl("/api/suppliers"), { headers: getAuthHeaders() }),
+        fetch(buildUrl("/api/purchase-orders"), { headers: getAuthHeaders() }),
+        fetch(buildUrl("/api/products/categories"), { headers: getAuthHeaders() }),
       ]);
 
       if (productsRes.ok) {
@@ -66,9 +73,9 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
         const data = await ordersRes.json();
         setPurchaseOrders(data.orders || []);
       }
-      if (movementsRes.ok) {
-        const data = await movementsRes.json();
-        setStockMovements(data.movements || []);
+      if (categoriesRes.ok) {
+        const data = await categoriesRes.json();
+        setCategories(data.categories || []);
       }
     } catch (error) {
       console.error("Failed to fetch inventory data:", error);
@@ -89,7 +96,7 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
 
   const handleDeductStock = async (productId: string, quantity: number, reason: string) => {
     try {
-      const res = await fetch(buildUrl(`/inventory/${productId}/deduct`), {
+      const res = await fetch(buildUrl(`/api/inventory/${productId}/deduct`), {
         method: "POST",
         headers: {
           ...getAuthHeaders(),
@@ -111,7 +118,7 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
 
   const handleAddStock = async (productId: string, quantity: number, reason: string) => {
     try {
-      const res = await fetch(buildUrl(`/inventory/${productId}/add`), {
+      const res = await fetch(buildUrl(`/api/inventory/${productId}/add`), {
         method: "POST",
         headers: {
           ...getAuthHeaders(),
@@ -131,6 +138,97 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
     }
   };
 
+  const handleAddCategory = async () => {
+    if (!newCategory.name.trim()) {
+      toast.error("Please enter a category name");
+      return;
+    }
+    try {
+      const res = await fetch(buildUrl("/api/products/categories"), {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newCategory),
+      });
+      if (res.ok) {
+        toast.success("Category added successfully");
+        setNewCategory({ name: "", description: "" });
+        setShowAddCategory(false);
+        fetchInventoryData();
+      } else {
+        toast.error("Failed to add category");
+      }
+    } catch (error) {
+      toast.error("Failed to add category");
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    try {
+      const res = await fetch(buildUrl(`/api/products/categories/${categoryId}`), {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        toast.success("Category deleted successfully");
+        fetchInventoryData();
+      } else {
+        toast.error("Failed to delete category");
+      }
+    } catch (error) {
+      toast.error("Failed to delete category");
+    }
+  };
+
+  const handleAddPurchaseOrderItem = () => {
+    setNewPurchaseOrder({
+      ...newPurchaseOrder,
+      items: [...newPurchaseOrder.items, { product_id: "", quantity: 1, unit_cost: 0 }],
+    });
+  };
+
+  const handleRemovePurchaseOrderItem = (index: number) => {
+    setNewPurchaseOrder({
+      ...newPurchaseOrder,
+      items: newPurchaseOrder.items.filter((_, i) => i !== index),
+    });
+  };
+
+  const handleUpdatePurchaseOrderItem = (index: number, field: string, value: any) => {
+    const updatedItems = [...newPurchaseOrder.items];
+    updatedItems[index] = { ...updatedItems[index], [field]: value };
+    setNewPurchaseOrder({ ...newPurchaseOrder, items: updatedItems });
+  };
+
+  const handleCreatePurchaseOrder = async () => {
+    if (!newPurchaseOrder.supplier_id || newPurchaseOrder.items.length === 0) {
+      toast.error("Please select a supplier and add at least one item");
+      return;
+    }
+    try {
+      const res = await fetch(buildUrl("/api/purchase-orders"), {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newPurchaseOrder),
+      });
+      if (res.ok) {
+        toast.success("Purchase order created successfully");
+        setNewPurchaseOrder({ supplier_id: "", items: [] });
+        setShowAddPurchaseOrder(false);
+        fetchInventoryData();
+      } else {
+        toast.error("Failed to create purchase order");
+      }
+    } catch (error) {
+      toast.error("Failed to create purchase order");
+    }
+  };
+
   const lowStockProducts = products.filter((p) => p.stock_quantity < 5);
   const outOfStockProducts = products.filter((p) => p.stock_quantity === 0);
 
@@ -140,7 +238,7 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">Enhanced Inventory</h2>
-          <p className="text-slate-400">Manage products, suppliers, and stock movements</p>
+          <p className="text-slate-400">Manage products, suppliers, and purchase orders</p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline">
@@ -257,6 +355,13 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
           Products
         </Button>
         <Button
+          variant={activeTab === "categories" ? "default" : "ghost"}
+          onClick={() => setActiveTab("categories")}
+        >
+          <Filter className="mr-2 h-4 w-4" />
+          Categories
+        </Button>
+        <Button
           variant={activeTab === "suppliers" ? "default" : "ghost"}
           onClick={() => setActiveTab("suppliers")}
         >
@@ -269,13 +374,6 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
         >
           <History className="mr-2 h-4 w-4" />
           Purchase Orders
-        </Button>
-        <Button
-          variant={activeTab === "movements" ? "default" : "ghost"}
-          onClick={() => setActiveTab("movements")}
-        >
-          <TrendingUp className="mr-2 h-4 w-4" />
-          Stock Movements
         </Button>
       </div>
 
@@ -406,6 +504,73 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
         </>
       )}
 
+      {/* Categories Tab */}
+      {activeTab === "categories" && (
+        <Card className="p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">Categories</h3>
+            <Button onClick={() => setShowAddCategory(!showAddCategory)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Category
+            </Button>
+          </div>
+          
+          {showAddCategory && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mb-4 space-y-3 rounded-lg bg-[#1A1D27] p-4"
+            >
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Category Name</label>
+                <Input
+                  placeholder="e.g., Smartphones, Laptops"
+                  value={newCategory.name}
+                  onChange={(e) => setNewCategory({ ...newCategory, name: e.target.value })}
+                  className="border-[#1F2235] bg-[#11131E]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Description</label>
+                <Input
+                  placeholder="Optional description..."
+                  value={newCategory.description}
+                  onChange={(e) => setNewCategory({ ...newCategory, description: e.target.value })}
+                  className="border-[#1F2235] bg-[#11131E]"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowAddCategory(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleAddCategory}>
+                  Add Category
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
+          <div className="space-y-3">
+            {categories.map((category) => (
+              <div key={category.id} className="flex items-center justify-between rounded-lg border border-[#1F2235] p-4">
+                <div>
+                  <p className="font-medium text-white">{category.name}</p>
+                  {category.description && (
+                    <p className="text-sm text-slate-600">{category.description}</p>
+                  )}
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)}>
+                  <Trash2 className="h-4 w-4 text-rose-600" />
+                </Button>
+              </div>
+            ))}
+            {categories.length === 0 && (
+              <p className="text-center text-slate-500">No categories added yet</p>
+            )}
+          </div>
+        </Card>
+      )}
+
       {/* Suppliers Tab */}
       {activeTab === "suppliers" && (
         <Card className="p-6">
@@ -445,11 +610,111 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-white">Purchase Orders</h3>
-            <Button>
+            <Button onClick={() => setShowAddPurchaseOrder(!showAddPurchaseOrder)}>
               <Plus className="mr-2 h-4 w-4" />
               New Order
             </Button>
           </div>
+          
+          {showAddPurchaseOrder && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="mb-4 space-y-4 rounded-lg bg-[#1A1D27] p-4"
+            >
+              <div>
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Supplier</label>
+                <Select
+                  value={newPurchaseOrder.supplier_id}
+                  onValueChange={(value) => setNewPurchaseOrder({ ...newPurchaseOrder, supplier_id: value })}
+                >
+                  <SelectTrigger className="border-[#1F2235] bg-[#11131E]">
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map((supplier) => (
+                      <SelectItem key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">Items</label>
+                  <Button variant="outline" size="sm" onClick={handleAddPurchaseOrderItem}>
+                    <Plus className="mr-1 h-3 w-3" />
+                    Add Item
+                  </Button>
+                </div>
+                {newPurchaseOrder.items.map((item, index) => (
+                  <div key={index} className="mb-2 grid gap-2 rounded-lg border border-[#1F2235] p-3">
+                    <div className="grid gap-2 md:grid-cols-3">
+                      <div>
+                        <label className="mb-1 block text-xs text-slate-500">Product</label>
+                        <Select
+                          value={item.product_id}
+                          onValueChange={(value) => handleUpdatePurchaseOrderItem(index, "product_id", value)}
+                        >
+                          <SelectTrigger className="border-[#1F2235] bg-[#11131E]">
+                            <SelectValue placeholder="Select product" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {products.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-slate-500">Quantity</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleUpdatePurchaseOrderItem(index, "quantity", parseInt(e.target.value) || 1)}
+                          className="border-[#1F2235] bg-[#11131E]"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-slate-500">Unit Cost (£)</label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={item.unit_cost}
+                          onChange={(e) => handleUpdatePurchaseOrderItem(index, "unit_cost", parseFloat(e.target.value) || 0)}
+                          className="border-[#1F2235] bg-[#11131E]"
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemovePurchaseOrderItem(index)}
+                      className="text-rose-600 hover:text-rose-700"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Remove
+                    </Button>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setShowAddPurchaseOrder(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={handleCreatePurchaseOrder}>
+                  Create Order
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           <div className="space-y-3">
             {purchaseOrders.map((order) => (
               <div key={order.id} className="flex items-center justify-between rounded-lg border border-[#1F2235] p-4">
@@ -477,42 +742,6 @@ export function EnhancedInventory({ token }: EnhancedInventoryProps) {
         </Card>
       )}
 
-      {/* Stock Movements Tab */}
-      {activeTab === "movements" && (
-        <Card className="p-6">
-          <div className="mb-4">
-            <h3 className="text-lg font-semibold text-white">Stock Movements</h3>
-          </div>
-          <div className="space-y-3">
-            {stockMovements.slice(0, 20).map((movement) => (
-              <div key={movement.id} className="flex items-center justify-between rounded-lg border border-[#1F2235] p-4">
-                <div className="flex items-center gap-3">
-                  <div className={`rounded-full p-2 ${movement.type === "in" ? "bg-emerald-100" : "bg-rose-100"}`}>
-                    {movement.type === "in" ? (
-                      <ArrowUpRight className="h-4 w-4 text-emerald-600" />
-                    ) : (
-                      <ArrowDownRight className="h-4 w-4 text-rose-600" />
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">{movement.product_name}</p>
-                    <p className="text-sm text-slate-600">{movement.reason}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className={`font-semibold ${movement.type === "in" ? "text-emerald-600" : "text-rose-600"}`}>
-                    {movement.type === "in" ? "+" : "-"}{movement.quantity}
-                  </p>
-                  <p className="text-xs text-slate-500">{new Date(movement.created_at).toLocaleDateString()}</p>
-                </div>
-              </div>
-            ))}
-            {stockMovements.length === 0 && (
-              <p className="text-center text-slate-500">No stock movements recorded</p>
-            )}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

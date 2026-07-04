@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from datetime import datetime
+from typing import Optional
+from uuid import UUID
 
 from app.database import get_db
 from app.models import Notification, User
@@ -9,6 +11,30 @@ from app.dependencies import get_current_user
 router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
 
 
+def create_notification(
+    db: Session,
+    user_id: UUID,
+    notification_type: str,
+    title: str,
+    message: str,
+    link: Optional[str] = None
+):
+    """Helper function to create a notification for a user"""
+    notification = Notification(
+        user_id=user_id,
+        type=notification_type,
+        title=title,
+        message=message,
+        link=link,
+        read=False
+    )
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+    return notification
+
+
+@router.get("", include_in_schema=False)
 @router.get("/")
 async def get_notifications(
     db: Session = Depends(get_db),

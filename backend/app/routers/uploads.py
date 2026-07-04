@@ -11,7 +11,7 @@ UPLOAD_DIR = "static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Allowed file extensions
-ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
+ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp", "pdf"}
 # Max file size: 10MB
 MAX_FILE_SIZE = 10 * 1024 * 1024
 
@@ -29,9 +29,9 @@ async def upload_file(file: UploadFile = File(...)):
             detail=f"Invalid file type. Allowed types: {', '.join(ALLOWED_EXTENSIONS)}"
         )
     
-    # Check content type
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File provided is not an image.")
+    # Check content type (allow both images and PDFs)
+    if not file.content_type or not (file.content_type.startswith("image/") or file.content_type == "application/pdf"):
+        raise HTTPException(status_code=400, detail="File provided is not an image or PDF.")
     
     # Check file size
     file.file.seek(0, os.SEEK_END)

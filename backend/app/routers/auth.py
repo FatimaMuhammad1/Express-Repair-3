@@ -1,6 +1,10 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+import secrets
+import string
+import re
+import logging
 
 from app.database import get_db
 from app.models import User, Otp
@@ -18,7 +22,30 @@ from app.dependencies import get_current_user
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/auth", tags=["Auth"])
+
+
+def _generate_secure_password(length: int = 32) -> str:
+    """Generate a cryptographically secure random password for OAuth users"""
+    alphabet = string.ascii_letters + string.digits + string.punctuation
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
+
+
+def _validate_password_complexity(password: str) -> tuple[bool, str]:
+    """Validate password meets complexity requirements"""
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter"
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter"
+    if not re.search(r'\d', password):
+        return False, "Password must contain at least one digit"
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character"
+    return True, ""
 
 
 def _store_otp(db: Session, email: str, purpose: str) -> str:
@@ -34,13 +61,17 @@ from app.worker import send_sms_task
 
 @router.post("/signup", status_code=201)
 def signup(body: SignupRequest, db: Session = Depends(get_db)):
+    # Validate password complexity
+    is_valid, error_msg = _validate_password_complexity(body.password)
+    if not is_valid:
+        raise HTTPException(400, error_msg)
+    
     # Trim whitespace from email
     email = body.email.strip().lower()
     
     # Check if user already exists (case-insensitive)
     existing_user = db.query(User).filter(User.email == email).first()
     if existing_user:
-        print(f"[Signup] Email already exists: {email}")
         raise HTTPException(400, "A user with this email already exists.")
 
     user = User(
@@ -62,7 +93,7 @@ def signup(body: SignupRequest, db: Session = Depends(get_db)):
         try:
             send_sms_task.delay(body.phone, f"Your Electronics Repair Shop verification OTP is: {code}")
         except Exception as e:
-            print(f"[Signup] Failed to send SMS (Redis may not be running): {e}")
+            pass  # SMS failure shouldn't block signup
 
     return {
         "success": True,
@@ -131,7 +162,7 @@ def resend_verification(body: dict, db: Session = Depends(get_db)):
         try:
             send_sms_task.delay(user.phone, f"Your Electronics Repair Shop verification OTP is: {code}")
         except Exception as e:
-            print(f"[Resend Verification] Failed to send SMS (Redis may not be running): {e}")
+            logger.warning(f"[Resend Verification] Failed to send SMS (Redis may not be running): {e}")
     
     return {
         "success": True,
@@ -157,7 +188,7 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
             user = User(
                 name=name,
                 email=email,
-                password=hash_password("google_oauth_placeholder"),
+                password=hash_password(_generate_secure_password()),
                 role=role,
                 is_verified=True,
             )
@@ -184,6 +215,11 @@ def forgot_password(body: ForgotPasswordRequest, db: Session = Depends(get_db)):
 
 @router.post("/reset-password")
 def reset_password(body: ResetPasswordRequest, db: Session = Depends(get_db)):
+    # Validate password complexity
+    is_valid, error_msg = _validate_password_complexity(body.new_password)
+    if not is_valid:
+        raise HTTPException(400, error_msg)
+    
     otp = (
         db.query(Otp)
         .filter(Otp.email == body.email, Otp.otp_code == body.otp_code, Otp.purpose == "password_reset")

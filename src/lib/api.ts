@@ -7,8 +7,8 @@
  */
 
 export const API_CONFIG = {
-  // Base URL for API calls - uses environment variable or falls back to localhost
-  BASE_URL: import.meta.env.DEV ? "http://localhost:8000/api" : (import.meta.env.VITE_API_URL || "http://localhost:8000/api"),
+  // Base URL for API calls - uses relative path in dev for Vite proxy, absolute in production
+  BASE_URL: import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL || "http://localhost:8000/api"),
   
   // API endpoints
   ENDPOINTS: {

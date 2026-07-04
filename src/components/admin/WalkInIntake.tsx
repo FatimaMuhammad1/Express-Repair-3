@@ -70,7 +70,7 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
         invoice_amount: formData.create_invoice && formData.invoice_amount ? parseFloat(formData.invoice_amount) : null,
         tax_rate: formData.create_invoice && formData.tax_rate ? parseFloat(formData.tax_rate) / 100 : 0,
         deposit_amount: formData.create_invoice && formData.deposit_amount ? parseFloat(formData.deposit_amount) : null,
-        payment_method: formData.create_invoice && formData.deposit_amount ? formData.payment_method : null,
+        payment_method: (formData.create_invoice && formData.deposit_amount && formData.payment_method) ? formData.payment_method : undefined,
         due_date: formData.create_invoice && formData.due_date ? formData.due_date : null,
       };
 
@@ -112,7 +112,8 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
         });
       } else {
         console.error("Walk-in intake error:", data);
-        setError(data.message || data.detail || "Failed to create walk-in intake");
+        const errorMessage = typeof data.detail === 'string' ? data.detail : data.message || "Failed to create walk-in intake";
+        setError(errorMessage);
       }
     } catch (err) {
       setError("Could not reach backend");

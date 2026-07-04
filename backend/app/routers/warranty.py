@@ -7,7 +7,13 @@ from app.database import get_db
 from app.models import Warranty, WarrantyHistory, Repair, User
 from app.dependencies import get_current_user
 
-router = APIRouter(prefix="/warranty", tags=["Warranty"])
+router = APIRouter(prefix="/api/warranty", tags=["Warranty"])
+
+
+def parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
 
 
 @router.get("/repairs/{repair_id}")
@@ -55,8 +61,8 @@ async def create_warranty(
     if existing:
         # Update existing warranty
         existing.duration = warranty_data.get("duration", existing.duration)
-        existing.start_date = datetime.strptime(warranty_data.get("start_date"), "%Y-%m-%d").date() if warranty_data.get("start_date") else existing.start_date
-        existing.expiration_date = datetime.strptime(warranty_data.get("expiration_date"), "%Y-%m-%d").date() if warranty_data.get("expiration_date") else existing.expiration_date
+        existing.start_date = parse_date(warranty_data.get("start_date")) or existing.start_date
+        existing.expiration_date = parse_date(warranty_data.get("expiration_date")) or existing.expiration_date
         existing.notes = warranty_data.get("notes", existing.notes)
         db.commit()
         
@@ -72,7 +78,7 @@ async def create_warranty(
         return {"success": True, "warranty_id": str(existing.id)}
     
     # Create new warranty
-    start_date = datetime.strptime(warranty_data.get("start_date"), "%Y-%m-%d").date() if warranty_data.get("start_date") else date.today()
+    start_date = parse_date(warranty_data.get("start_date")) or date.today()
     duration = warranty_data.get("duration", 90)
     expiration_date = start_date + timedelta(days=duration)
     
@@ -113,7 +119,7 @@ async def extend_warranty(
         raise HTTPException(status_code=404, detail="Warranty not found")
     
     additional_days = extend_data.get("additional_days", 0)
-    new_expiration = datetime.strptime(extend_data.get("new_expiration_date"), "%Y-%m-%d").date() if extend_data.get("new_expiration_date") else warranty.expiration_date + timedelta(days=additional_days)
+    new_expiration = parse_date(extend_data.get("new_expiration_date")) or warranty.expiration_date + timedelta(days=additional_days)
     
     warranty.expiration_date = new_expiration
     db.commit()

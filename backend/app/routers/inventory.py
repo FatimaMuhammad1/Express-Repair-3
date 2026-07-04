@@ -13,6 +13,7 @@ except ImportError:
 from app.database import get_db
 from app.models import Supplier, PurchaseOrder, StockMovement, Product, User
 from app.dependencies import get_current_user
+from app.routers.notifications import create_notification
 
 router = APIRouter(prefix="/api/inventory", tags=["Inventory"])
 
@@ -175,6 +176,20 @@ async def deduct_stock(
     )
     db.add(movement)
     db.commit()
+    
+    # Check for low stock and create notification
+    if product.stock_quantity <= 5:
+        # Notify all admin users about low stock
+        admin_users = db.query(User).filter(User.role == "SUPER_ADMIN").all()
+        for admin in admin_users:
+            create_notification(
+                db,
+                admin.id,
+                "low_stock_alert",
+                "Low Stock Alert",
+                f"Product '{product.name}' is running low on stock. Current quantity: {product.stock_quantity}",
+                "/admin/inventory"
+            )
     
     return {"success": True}
 

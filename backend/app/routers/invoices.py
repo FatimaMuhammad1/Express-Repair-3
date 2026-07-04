@@ -33,15 +33,14 @@ async def generate_invoice(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
-    """Generate a PDF invoice for a repair"""
+    """Generate a professional HTML invoice for a repair (can be printed/saved as PDF from browser)"""
     
     repair = db.query(Repair).filter(Repair.id == repair_id).first()
     if not repair:
         raise HTTPException(404, "Repair not found")
     
-    # Get tax rate if provided
-    tax_rate = None
-    tax_percentage = 0
+    # Get tax rate - use provided tax_rate_id, or default to 20% VAT
+    tax_percentage = 20.0  # Default UK VAT rate
     if tax_rate_id:
         tax_rate = db.query(TaxRate).filter(TaxRate.id == tax_rate_id).first()
         if tax_rate:
@@ -52,11 +51,96 @@ async def generate_invoice(
     tax_amount = subtotal * (tax_percentage / 100)
     total = subtotal + tax_amount
     
-    # In a real implementation, this would:
-    # 1. Use a PDF library like ReportLab or WeasyPrint
-    # 2. Generate a professional invoice with company branding
-    # 3. Include repair details, customer info, line items, taxes
-    # 4. Save to storage and return a URL
+    # Generate professional HTML invoice
+    invoice_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Invoice INV-{repair.tracking_id}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
+            .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0095ff; padding-bottom: 20px; margin-bottom: 20px; }}
+            .company {{ color: #0095ff; }}
+            .invoice-details {{ text-align: right; }}
+            .section {{ margin-bottom: 20px; }}
+            .section-title {{ font-weight: bold; color: #333; margin-bottom: 10px; }}
+            table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+            th, td {{ padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }}
+            th {{ background-color: #f5f5f5; }}
+            .totals {{ text-align: right; margin-top: 20px; }}
+            .total-row {{ display: flex; justify-content: flex-end; padding: 5px 0; }}
+            .total-label {{ width: 150px; }}
+            .total-value {{ width: 100px; font-weight: bold; }}
+            .grand-total {{ font-size: 18px; color: #0095ff; border-top: 2px solid #0095ff; padding-top: 10px; }}
+            .footer {{ margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px; }}
+            @media print {{ body {{ margin: 0; }} }}
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <div class="company">
+                <h1 style="margin: 0; color: #0095ff;">Express Phone & Laptop Repair</h1>
+                <p style="margin: 5px 0; color: #666;">Nuneaton's Trusted Repair Service</p>
+                <p style="margin: 5px 0; color: #666;">6 Harefield Road, Nuneaton, CV11 4HD</p>
+                <p style="margin: 5px 0; color: #666;">07415 278767</p>
+            </div>
+            <div class="invoice-details">
+                <h2 style="margin: 0;">INVOICE</h2>
+                <p style="margin: 5px 0;"><strong>Invoice Number:</strong> INV-{repair.tracking_id}</p>
+                <p style="margin: 5px 0;"><strong>Date:</strong> {datetime.utcnow().strftime('%B %d, %Y')}</p>
+                <p style="margin: 5px 0;"><strong>Status:</strong> {repair.status.value if repair.status else 'Pending'}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Bill To:</div>
+            <p><strong>{repair.customer_name}</strong></p>
+            <p>Phone: {repair.customer_phone or 'N/A'}</p>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Repair Details:</div>
+            <table>
+                <tr>
+                    <th>Tracking ID</th>
+                    <th>Device Model</th>
+                    <th>Status</th>
+                    <th>Amount</th>
+                </tr>
+                <tr>
+                    <td>{repair.tracking_id}</td>
+                    <td>{repair.device_model}</td>
+                    <td>{repair.status.value if repair.status else 'Pending'}</td>
+                    <td>£{subtotal:.2f}</td>
+                </tr>
+            </table>
+        </div>
+
+        <div class="totals">
+            <div class="total-row">
+                <span class="total-label">Subtotal:</span>
+                <span class="total-value">£{subtotal:.2f}</span>
+            </div>
+            <div class="total-row">
+                <span class="total-label">Tax ({tax_percentage}%):</span>
+                <span class="total-value">£{tax_amount:.2f}</span>
+            </div>
+            <div class="total-row grand-total">
+                <span class="total-label">Total:</span>
+                <span class="total-value">£{total:.2f}</span>
+            </div>
+        </div>
+
+        {f'<div class="section"><div class="section-title">Notes:</div><p>{notes}</p></div>' if notes else ''}
+
+        <div class="footer">
+            <p>Thank you for your business!</p>
+            <p>Payment terms: Due upon collection</p>
+            <p>Generated by {current_user.name} on {datetime.utcnow().strftime('%B %d, %Y at %I:%M %p')}</p>
+        </div>
+    </body>
+    </html>
+    """
     
     return {
         "success": True,
@@ -76,8 +160,9 @@ async def generate_invoice(
             "notes": notes,
             "generated_at": datetime.utcnow().isoformat(),
             "generated_by": current_user.name,
+            "html": invoice_html,
         },
-        "note": "In production, this would generate an actual PDF file using ReportLab or WeasyPrint"
+        "print_instruction": "Use the returned HTML to display/print the invoice. Users can print to PDF from their browser."
     }
 
 

@@ -9,11 +9,17 @@ from app.config import settings
 # ── Passwords ────────────────────────────────────────────────────────────────
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    # Truncate to 72 bytes (bcrypt limitation)
+    password_bytes = password.encode('utf-8')
+    truncated_password = password_bytes[:72]
+    return bcrypt.hashpw(truncated_password, bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
+    # Truncate to 72 bytes for consistency
+    plain_bytes = plain.encode('utf-8')
+    truncated_plain = plain_bytes[:72]
+    return bcrypt.checkpw(truncated_plain, hashed.encode())
 
 
 # ── JWT ───────────────────────────────────────────────────────────────────────

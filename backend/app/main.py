@@ -1,10 +1,16 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+import time
+import logging
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from fastapi.staticfiles import StaticFiles
-from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products, users, communications, finance, repair_details, warranty, notifications, branches, inventory, customers, search, dashboard, audit, walkin, roles, financials, repair_parts, reorder, purchase_orders, tax, reminders, invoices, payments_stripe
+from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products, users, communications, finance, repair_details, warranty, notifications, branches, inventory, customers, search, dashboard, audit, walkin, roles, financials, repair_parts, reorder, purchase_orders, tax, reminders, invoices, payments_stripe, suppliers, services, settings
 import os
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Sentry integration (optional)
 try:
@@ -23,10 +29,10 @@ async def lifespan(app: FastAPI):
     # Create tables on startup — graceful warning if DB is not yet reachable
     try:
         Base.metadata.create_all(bind=engine)
-        print("[DB] Tables verified / created successfully.")
+        logger.info("[DB] Tables verified / created successfully.")
     except Exception as e:
-        print(f"[DB] WARNING: Could not connect to database on startup: {e}")
-        print("[DB] Make sure PostgreSQL is running and DATABASE_URL in .env is correct.")
+        logger.warning(f"[DB] WARNING: Could not connect to database on startup: {e}")
+        logger.warning("[DB] Make sure PostgreSQL is running and DATABASE_URL in .env is correct.")
     yield  # app runs here
 
 
@@ -35,17 +41,40 @@ app = FastAPI(
     title="Electronics Repair Shop API",
     description="Full backend for an electronics repair shop — auth, OTP, bookings, and repair tracking.",
     version="2.0.0",
+    redirect_slashes=False,
 )
 
-# CORS — read from environment or allow all for development
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",") if os.getenv("ALLOWED_ORIGINS") else ["*"]
+# CORS — allow the local frontend and any configured origins
+allowed_origins = [
+    "http://localhost:8080",
+    "http://127.0.0.1:8080",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+configured_origins = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
+for origin in configured_origins:
+    origin = origin.strip()
+    if origin:
+        allowed_origins.append(origin)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.perf_counter()
+    response = await call_next(request)
+    process_time = time.perf_counter() - start_time
+    # Only log slow requests (>500ms) in production
+    if process_time > 0.5 or os.getenv("ENV") != "production":
+        logger.info(f"[REQUEST] {request.method} {request.url.path} -> {response.status_code} ({process_time:.3f}s)")
+    return response
 
 # Mount routers
 app.include_router(auth.router)
@@ -78,6 +107,9 @@ app.include_router(tax.router)
 app.include_router(reminders.router)
 app.include_router(invoices.router)
 app.include_router(payments_stripe.router)
+app.include_router(suppliers.router)
+app.include_router(services.router)
+app.include_router(settings.router)
 
 os.makedirs("static/uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")

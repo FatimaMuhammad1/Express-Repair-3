@@ -32,7 +32,7 @@ export function WarrantyManager({ repairId, token }: WarrantyManagerProps) {
 
   const fetchWarranty = async () => {
     try {
-      const res = await fetch(buildUrl(`/repairs/${repairId}/warranty`), {
+      const res = await fetch(buildUrl(`/warranty/repairs/${repairId}`), {
         headers: getAuthHeaders(),
       });
       const data = await res.json();
@@ -55,7 +55,7 @@ export function WarrantyManager({ repairId, token }: WarrantyManagerProps) {
 
   const fetchWarrantyHistory = async () => {
     try {
-      const res = await fetch(buildUrl(`/repairs/${repairId}/warranty/history`), {
+      const res = await fetch(buildUrl(`/warranty/repairs/${repairId}/history`), {
         headers: getAuthHeaders(),
       });
       const data = await res.json();
@@ -91,7 +91,7 @@ export function WarrantyManager({ repairId, token }: WarrantyManagerProps) {
     try {
       const expirationDate = calculateExpirationDate(formData.startDate, formData.duration);
       
-      const res = await fetch(buildUrl(`/repairs/${repairId}/warranty`), {
+      const res = await fetch(buildUrl(`/warranty/repairs/${repairId}`), {
         method: "POST",
         headers: {
           ...getAuthHeaders(),
@@ -100,7 +100,7 @@ export function WarrantyManager({ repairId, token }: WarrantyManagerProps) {
         body: JSON.stringify({
           duration: formData.duration,
           start_date: formData.startDate,
-          expiration_date: expirationDate.toISOString(),
+          expiration_date: expirationDate.toISOString().split("T")[0],
           notes: formData.notes,
         }),
       });
@@ -126,7 +126,7 @@ export function WarrantyManager({ repairId, token }: WarrantyManagerProps) {
       const newExpiration = new Date(currentExpiration);
       newExpiration.setDate(newExpiration.getDate() + additionalDays);
       
-      const res = await fetch(buildUrl(`/repairs/${repairId}/warranty/extend`), {
+      const res = await fetch(buildUrl(`/warranty/repairs/${repairId}/extend`), {
         method: "POST",
         headers: {
           ...getAuthHeaders(),
@@ -134,7 +134,7 @@ export function WarrantyManager({ repairId, token }: WarrantyManagerProps) {
         },
         body: JSON.stringify({
           additional_days: additionalDays,
-          new_expiration_date: newExpiration.toISOString(),
+          new_expiration_date: newExpiration.toISOString().split("T")[0],
         }),
       });
 

@@ -32,8 +32,8 @@ def create_checkout_session(body: CheckoutSessionRequest):
                 'quantity': 1,
             }],
             mode='payment',
-            success_url=f"http://localhost:5173/profile?payment=success&tracking_id={body.tracking_id}",
-            cancel_url=f"http://localhost:5173/profile?payment=cancelled",
+            success_url=f"{settings.FRONTEND_URL}/profile?payment=success&tracking_id={body.tracking_id}",
+            cancel_url=f"{settings.FRONTEND_URL}/profile?payment=cancelled",
             metadata={
                 "tracking_id": body.tracking_id
             }

@@ -20,7 +20,12 @@ class Settings(BaseSettings):
     TELNYX_API_KEY: str = ""
     TELNYX_FROM_NUMBER: str = ""
 
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_FROM_NUMBER: str = ""
+
     STRIPE_SECRET_KEY: str = ""
+    FRONTEND_URL: str = "http://localhost:5173"
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

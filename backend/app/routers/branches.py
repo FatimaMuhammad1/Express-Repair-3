@@ -10,6 +10,7 @@ from app.dependencies import get_current_user, require_roles
 router = APIRouter(prefix="/api/branches", tags=["Branches"])
 
 
+@router.get("", include_in_schema=False)
 @router.get("/")
 async def get_branches(
     db: Session = Depends(get_db),
@@ -35,6 +36,7 @@ async def get_branches(
     }
 
 
+@router.post("", include_in_schema=False)
 @router.post("/")
 async def create_branch(
     branch_data: dict,

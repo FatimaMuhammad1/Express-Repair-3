@@ -56,15 +56,23 @@ function RepairDetailsPage() {
   
   const [repair, setRepair] = useState<any>(null);
   const [timeline, setTimeline] = useState<any[]>([]);
+  const [repairParts, setRepairParts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [technicianNote, setTechnicianNote] = useState("");
   const [internalComment, setInternalComment] = useState("");
   const [showAddNote, setShowAddNote] = useState(false);
   const [showAddComment, setShowAddComment] = useState(false);
+  const [showAddPart, setShowAddPart] = useState(false);
+  const [showAddCustomerNote, setShowAddCustomerNote] = useState(false);
+  const [newPart, setNewPart] = useState({ part_name: "", quantity: 1, unit_cost: "", notes: "" });
+  const [customerNote, setCustomerNote] = useState("");
+  const [customerNotes, setCustomerNotes] = useState<any[]>([]);
 
   useEffect(() => {
     fetchRepairDetails();
     fetchTimeline();
+    fetchRepairParts();
+    fetchCustomerNotes();
   }, [id]);
 
   const fetchRepairDetails = async () => {
@@ -94,6 +102,62 @@ function RepairDetailsPage() {
       }
     } catch (error) {
       console.error("Failed to fetch timeline:", error);
+    }
+  };
+
+  const fetchRepairParts = async () => {
+    try {
+      const res = await fetch(buildUrl(`/repairs/${id}/parts`), {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRepairParts(data.parts || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch repair parts:", error);
+    }
+  };
+
+  const fetchCustomerNotes = async () => {
+    if (!repair?.customer_phone) return;
+    try {
+      const res = await fetch(buildUrl(`/customers/phone/${repair.customer_phone}/notes`), {
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCustomerNotes(data.notes || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch customer notes:", error);
+    }
+  };
+
+  const handleAddCustomerNote = async () => {
+    if (!customerNote.trim() || !repair?.customer_phone) {
+      toast.error("Please enter a note");
+      return;
+    }
+    try {
+      const res = await fetch(buildUrl(`/customers/${repair.customer_phone}/notes`), {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ note: customerNote }),
+      });
+      if (res.ok) {
+        toast.success("Customer note added");
+        setCustomerNote("");
+        setShowAddCustomerNote(false);
+        fetchCustomerNotes();
+      } else {
+        toast.error("Failed to add customer note");
+      }
+    } catch (error) {
+      toast.error("Failed to add customer note");
     }
   };
 
@@ -138,6 +202,58 @@ function RepairDetailsPage() {
       }
     } catch (error) {
       toast.error("Failed to add comment");
+    }
+  };
+
+  const handleAddRepairPart = async () => {
+    if (!newPart.part_name.trim()) {
+      toast.error("Please enter a part name");
+      return;
+    }
+    try {
+      const res = await fetch(buildUrl(`/repairs/${id}/parts`), {
+        method: "POST",
+        headers: {
+          ...getAuthHeaders(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          part_name: newPart.part_name,
+          quantity: newPart.quantity,
+          unit_cost: newPart.unit_cost ? parseFloat(newPart.unit_cost) : null,
+          notes: newPart.notes,
+        }),
+      });
+      if (res.ok) {
+        toast.success("Part added successfully");
+        setNewPart({ part_name: "", quantity: 1, unit_cost: "", notes: "" });
+        setShowAddPart(false);
+        fetchRepairParts();
+        fetchRepairDetails(); // Update cost breakdown
+      } else {
+        const data = await res.json();
+        toast.error(data.detail || "Failed to add part");
+      }
+    } catch (error) {
+      toast.error("Failed to add part");
+    }
+  };
+
+  const handleDeleteRepairPart = async (partId: string) => {
+    try {
+      const res = await fetch(buildUrl(`/repairs/${id}/parts/${partId}`), {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        toast.success("Part removed successfully");
+        fetchRepairParts();
+        fetchRepairDetails(); // Update cost breakdown
+      } else {
+        toast.error("Failed to remove part");
+      }
+    } catch (error) {
+      toast.error("Failed to remove part");
     }
   };
 
@@ -262,6 +378,56 @@ function RepairDetailsPage() {
               </div>
             </Card>
 
+            {/* Customer Notes */}
+            <Card className="p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Customer Notes</h2>
+                <Button variant="outline" size="sm" onClick={() => setShowAddCustomerNote(!showAddCustomerNote)}>
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Add Note
+                </Button>
+              </div>
+              
+              {showAddCustomerNote && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mb-4 space-y-3"
+                >
+                  <Textarea
+                    placeholder="Add a customer note (visible to all staff for this customer)..."
+                    value={customerNote}
+                    onChange={(e) => setCustomerNote(e.target.value)}
+                    className="min-h-[80px]"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowAddCustomerNote(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleAddCustomerNote}>
+                      Save Note
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              <div className="space-y-3">
+                {customerNotes.length > 0 ? (
+                  customerNotes.map((note: any, idx: number) => (
+                    <div key={idx} className="rounded-lg bg-blue-50 dark:bg-blue-950/20 p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-white text-sm">{note.user || "Unknown"}</span>
+                        <span className="text-xs text-slate-500">{new Date(note.created_at).toLocaleDateString()}</span>
+                      </div>
+                      <p className="text-sm text-slate-300">{note.note}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-sm text-slate-500">No customer notes yet</p>
+                )}
+              </div>
+            </Card>
+
             {/* Timeline */}
             <Card className="p-6">
               <div className="mb-4 flex items-center justify-between">
@@ -355,6 +521,101 @@ function RepairDetailsPage() {
                   ))
                 ) : (
                   <p className="text-center text-sm text-slate-500">No technician notes yet</p>
+                )}
+              </div>
+            </Card>
+
+            {/* Parts Used */}
+            <Card className="p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">Parts Used</h2>
+                <Button variant="outline" size="sm" onClick={() => setShowAddPart(!showAddPart)}>
+                  <Package className="mr-2 h-4 w-4" />
+                  Add Part
+                </Button>
+              </div>
+              
+              {showAddPart && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  className="mb-4 space-y-3 rounded-lg bg-[#1A1D27] p-4"
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Part Name</label>
+                      <Input
+                        placeholder="e.g., iPhone 14 Screen"
+                        value={newPart.part_name}
+                        onChange={(e) => setNewPart({ ...newPart, part_name: e.target.value })}
+                        className="border-[#1F2235] bg-[#11131E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Quantity</label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={newPart.quantity}
+                        onChange={(e) => setNewPart({ ...newPart, quantity: parseInt(e.target.value) || 1 })}
+                        className="border-[#1F2235] bg-[#11131E]"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Unit Cost (£)</label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={newPart.unit_cost}
+                        onChange={(e) => setNewPart({ ...newPart, unit_cost: e.target.value })}
+                        className="border-[#1F2235] bg-[#11131E]"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Notes</label>
+                    <Input
+                      placeholder="Optional notes..."
+                      value={newPart.notes}
+                      onChange={(e) => setNewPart({ ...newPart, notes: e.target.value })}
+                      className="border-[#1F2235] bg-[#11131E]"
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowAddPart(false)}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={handleAddRepairPart}>
+                      Add Part
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+
+              <div className="space-y-3">
+                {repairParts.length > 0 ? (
+                  repairParts.map((part: any) => (
+                    <div key={part.id} className="flex items-center justify-between rounded-lg border border-[#1F2235] p-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-white">{part.part_name}</span>
+                          <Badge variant="outline" className="text-xs">Qty: {part.quantity}</Badge>
+                        </div>
+                        <div className="mt-1 text-sm text-slate-600">
+                          £{part.unit_cost?.toFixed(2) || "0.00"} each × {part.quantity} = <span className="font-semibold text-white">£{part.total_cost?.toFixed(2) || "0.00"}</span>
+                        </div>
+                        {part.notes && (
+                          <p className="mt-1 text-xs text-slate-500">{part.notes}</p>
+                        )}
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteRepairPart(part.id)}>
+                        <Trash2 className="h-4 w-4 text-rose-600" />
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-sm text-slate-500">No parts added yet</p>
                 )}
               </div>
             </Card>

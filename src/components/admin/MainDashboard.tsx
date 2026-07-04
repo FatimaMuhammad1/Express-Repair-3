@@ -33,6 +33,7 @@ import {
 } from "recharts";
 import { useEffect, useState, useCallback } from "react";
 import { buildUrl, getStoredToken } from "@/lib/api";
+import { buildBusinessOverviewData } from "@/lib/dashboardData";
 import { toast } from "sonner";
 
 export default function MainDashboard() {
@@ -68,69 +69,115 @@ export default function MainDashboard() {
     setIsLoading(true);
     try {
       const token = getStoredToken();
-      
+
+      let financeStatsData = { success: false, stats: null };
+      let branchesData = { success: false, branches: [] };
+      let repairsData = { success: false, stats: null };
+      let productsData = [];
+      let transactionsData = { success: false, transactions: [] };
+      let onlineSalesData = { success: false, onlineSales: [] };
+      let inhouseSalesData = { success: false, inhouseSales: [] };
+      let customersData = { success: false, customers: [] };
+      let activitiesData = { success: false, communications: [] };
+      let revenueData = { success: false, revenue: [] };
+
       // Fetch finance stats
-      const financeStatsRes = await fetch(buildUrl("/finance/stats"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const financeStatsData = await financeStatsRes.json();
-      
-      // Fetch branches
-      const branchesRes = await fetch(buildUrl("/branches"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const branchesData = await branchesRes.json();
-      if (branchesData.success && branchesData.branches) {
-        setBranches(branchesData.branches);
+      try {
+        const financeStatsRes = await fetch(buildUrl("/finance/stats"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        financeStatsData = await financeStatsRes.json();
+      } catch (e) {
+        console.error("Failed to fetch finance stats:", e);
       }
-      
+
+      // Fetch branches
+      try {
+        const branchesRes = await fetch(buildUrl("/branches"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        branchesData = await branchesRes.json();
+        if (branchesData.success && branchesData.branches) {
+          setBranches(branchesData.branches);
+        }
+      } catch (e) {
+        console.error("Failed to fetch branches:", e);
+      }
+
       // Fetch repairs for status overview
-      const repairsRes = await fetch(buildUrl("/repairs/stats"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const repairsData = await repairsRes.json();
-      
+      try {
+        const repairsRes = await fetch(buildUrl("/repairs/stats"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        repairsData = await repairsRes.json();
+      } catch (e) {
+        console.error("Failed to fetch repairs stats:", e);
+      }
+
       // Fetch products for low stock alerts
-      const productsRes = await fetch(buildUrl("/products"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const productsData = await productsRes.json();
-      
-      // Fetch transactions for revenue data
-      const transactionsRes = await fetch(buildUrl("/finance/transactions"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const transactionsData = await transactionsRes.json();
-      
+      try {
+        const productsRes = await fetch(buildUrl("/products"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        productsData = await productsRes.json();
+      } catch (e) {
+        console.error("Failed to fetch products:", e);
+      }
+
+      // Fetch revenue data for business overview chart
+      try {
+        const revenueRes = await fetch(buildUrl("/finance/revenue"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        revenueData = await revenueRes.json();
+      } catch (e) {
+        console.error("Failed to fetch revenue data:", e);
+      }
+
       // Fetch online sales
-      const onlineSalesRes = await fetch(buildUrl("/finance/online-sales"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const onlineSalesData = await onlineSalesRes.json();
-      
+      try {
+        const onlineSalesRes = await fetch(buildUrl("/finance/online-sales"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        onlineSalesData = await onlineSalesRes.json();
+      } catch (e) {
+        console.error("Failed to fetch online sales:", e);
+      }
+
       // Fetch in-house sales
-      const inhouseSalesRes = await fetch(buildUrl("/finance/inhouse-sales"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const inhouseSalesData = await inhouseSalesRes.json();
-      
+      try {
+        const inhouseSalesRes = await fetch(buildUrl("/finance/inhouse-sales"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        inhouseSalesData = await inhouseSalesRes.json();
+      } catch (e) {
+        console.error("Failed to fetch in-house sales:", e);
+      }
+
       // Fetch customers
-      const customersRes = await fetch(buildUrl("/customers"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const customersData = await customersRes.json();
-      
+      try {
+        const customersRes = await fetch(buildUrl("/customers"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        customersData = await customersRes.json();
+      } catch (e) {
+        console.error("Failed to fetch customers:", e);
+      }
+
       // Fetch recent activities from communications
-      const activitiesRes = await fetch(buildUrl("/communications/history"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const activitiesData = await activitiesRes.json();
+      try {
+        const activitiesRes = await fetch(buildUrl("/communications/history"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        activitiesData = await activitiesRes.json();
+      } catch (e) {
+        console.error("Failed to fetch communications:", e);
+      }
       
       // Update stats from finance data
       if (financeStatsData.success && financeStatsData.stats) {
         setStats(prev => ({
           ...prev,
-          totalRevenue: financeStatsData.stats.totalRevenue || 0,
           totalProfit: financeStatsData.stats.netProfit || 0,
           totalExpenses: financeStatsData.stats.totalExpenses || 0,
         }));
@@ -168,8 +215,8 @@ export default function MainDashboard() {
       }
       
       // Process low stock alerts using reorder_threshold
-      if (productsData.success && productsData.products) {
-        const lowStock = productsData.products
+      if (Array.isArray(productsData) && productsData.length > 0) {
+        const lowStock = productsData
           .filter(p => p.stock_quantity <= (p.reorder_threshold || 5))
           .slice(0, 10)
           .map(p => ({
@@ -178,29 +225,53 @@ export default function MainDashboard() {
             stock: p.stock_quantity,
             reorder: p.reorder_threshold || 5
           }));
-        
+
         setLowStockAlerts(lowStock);
         setStats(prev => ({ ...prev, lowStockCount: lowStock.length }));
       }
       
-      // Process sales channel data
+      // Process sales channel data and total revenue using revenue endpoint data
+      const connectedRevenueTotal = revenueData.success
+        ? revenueData.revenue?.reduce((sum: number, r: any) => sum + parseFloat(r.amount || 0), 0)
+        : 0;
+
+      const todayRevenue = revenueData.success
+        ? revenueData.revenue?.reduce((sum: number, r: any) => {
+            const date = new Date(r.date || r.created_at);
+            const today = new Date();
+            const isToday = date.getFullYear() === today.getFullYear() && date.getMonth() === today.getMonth() && date.getDate() === today.getDate();
+            return isToday ? sum + parseFloat(r.amount || 0) : sum;
+          }, 0)
+        : 0;
+
       if (onlineSalesData.success && inhouseSalesData.success) {
         const onlineTotal = onlineSalesData.onlineSales?.reduce((sum, s) => sum + parseFloat(s.amount || 0), 0) || 0;
         const inhouseTotal = inhouseSalesData.inhouseSales?.reduce((sum, s) => sum + parseFloat(s.amount || 0), 0) || 0;
-        const repairTotal = transactionsData.transactions?.filter(t => t.type === 'payment').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0) || 0;
-        
-        const total = onlineTotal + inhouseTotal + repairTotal;
-        
+        const repairTotal = revenueData.success
+          ? revenueData.revenue?.filter((r: any) => r.source === 'repair').reduce((sum: number, r: any) => sum + parseFloat(r.amount || 0), 0)
+          : 0;
+        const otherRevenue = revenueData.success
+          ? revenueData.revenue?.filter((r: any) => r.source !== 'repair').reduce((sum: number, r: any) => sum + parseFloat(r.amount || 0), 0)
+          : 0;
+
+        const total = onlineTotal + inhouseTotal + repairTotal + otherRevenue;
+
         setSalesChannelData([
           { name: 'Online Sales', value: onlineTotal, color: '#8B5CF6' },
           { name: 'In-House Sales', value: inhouseTotal, color: '#06B6D4' },
           { name: 'Repairs & Services', value: repairTotal, color: '#22C55E' },
         ]);
-        
+
         setStats(prev => ({
           ...prev,
           totalRevenue: total,
-          todaySales: onlineTotal + inhouseTotal
+          todaySales: todayRevenue
+        }));
+      } else if (revenueData.success) {
+        setStats(prev => ({
+          ...prev,
+          totalRevenue: connectedRevenueTotal,
+          todaySales: todayRevenue
         }));
       }
       
@@ -230,51 +301,20 @@ export default function MainDashboard() {
         setRecentActivities(activities);
       }
       
-      // Process business data chart - aggregate transactions by month
-      if (transactionsData.success && transactionsData.transactions) {
-        const monthlyData: Record<string, { revenue: number; profit: number; expenses: number }> = {};
-        
-        transactionsData.transactions.forEach((t: any) => {
-          if (t.type === 'payment' && t.status === 'completed') {
-            const date = new Date(t.created_at);
-            const monthKey = date.toLocaleString('default', { month: 'short' });
-            
-            if (!monthlyData[monthKey]) {
-              monthlyData[monthKey] = { revenue: 0, profit: 0, expenses: 0 };
-            }
-            monthlyData[monthKey].revenue += parseFloat(t.amount || 0);
-            monthlyData[monthKey].profit += parseFloat(t.amount || 0) * 0.7; // Assume 30% margin
-          }
-        });
-        
-        // Convert to array and sort by month
-        const sortedMonths = Object.entries(monthlyData)
-          .map(([name, data]) => ({ name, ...data }))
-          .slice(-6); // Last 6 months
-        
-        setBusinessData(sortedMonths);
-      }
+      // Process business data chart from revenue entries
+      const chartData = buildBusinessOverviewData(revenueData.revenue);
+      setBusinessData(chartData);
       
       // Process inventory value
-      if (productsData.success && productsData.products) {
-        const inventoryValue = productsData.products.reduce((sum, p) => 
+      if (Array.isArray(productsData) && productsData.length > 0) {
+        const inventoryValue = productsData.reduce((sum, p) =>
           sum + (parseFloat(p.price || 0) * (p.stock_quantity || 0)), 0
         );
         setStats(prev => ({ ...prev, totalInventoryValue: inventoryValue }));
-        
-        // Process top selling items (using price as proxy since transactions don't track product IDs)
-        const topItems = productsData.products
-          .sort((a, b) => parseFloat(b.price || 0) - parseFloat(a.price || 0))
-          .slice(0, 4)
-          .map((p, idx) => ({
-            id: idx,
-            name: p.name,
-            sold: p.stock_quantity || 0, // Using stock as proxy for sales
-            revenue: `£${(parseFloat(p.price || 0) * (p.stock_quantity || 0)).toFixed(2)}`,
-            icon: '📱'
-          }));
-        
-        setTopSellingItems(topItems);
+
+        // Top selling items - only show if there are actual sales transactions
+        // For now, hide this section since we don't have sales tracking
+        setTopSellingItems([]);
       }
       
     } catch (e) {
@@ -288,6 +328,15 @@ export default function MainDashboard() {
 
   useEffect(() => {
     fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  useEffect(() => {
+    const handleFinanceRefresh = () => {
+      fetchDashboardData();
+    };
+
+    window.addEventListener("finance-refresh", handleFinanceRefresh);
+    return () => window.removeEventListener("finance-refresh", handleFinanceRefresh);
   }, [fetchDashboardData]);
 
   // Auto-refresh polling
@@ -395,12 +444,12 @@ export default function MainDashboard() {
         </div>
 
         <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
-          <div className="text-slate-400 text-xs mb-1">Today's Sales</div>
+          <div className="text-slate-400 text-xs mb-1">Today's Revenue</div>
           <div className="flex items-center justify-between">
             <div>
               <div className="text-xl font-bold text-white mb-1">£{stats.todaySales.toFixed(2)}</div>
               <div className="text-xs text-emerald-400 flex items-center gap-1">
-                <ArrowUpRight className="h-3 w-3" /> <span className="text-slate-500">Online + In-House</span>
+                <ArrowUpRight className="h-3 w-3" /> <span className="text-slate-500">Invoices + Sales</span>
               </div>
             </div>
             <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
@@ -474,9 +523,13 @@ export default function MainDashboard() {
             </select>
           </div>
           <div className="flex-1 min-h-[220px]">
-            {isLoading || businessData.length === 0 ? (
+            {isLoading ? (
               <div className="flex items-center justify-center h-full text-slate-400">
                 <RefreshCw className="h-6 w-6 animate-spin" />
+              </div>
+            ) : businessData.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+                No revenue data available
               </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">

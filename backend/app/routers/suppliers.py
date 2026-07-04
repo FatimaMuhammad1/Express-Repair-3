@@ -5,7 +5,7 @@ from typing import Optional
 from datetime import datetime
 
 from app.database import get_db
-from app.models import Supplier, User
+from app.models import Supplier, User, PurchaseOrderStatus
 from app.dependencies import require_roles
 from pydantic import BaseModel
 
@@ -14,20 +14,16 @@ router = APIRouter(prefix="/api/suppliers", tags=["Suppliers"])
 
 class SupplierCreate(BaseModel):
     name: str
-    contact: str
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
-    notes: Optional[str] = None
 
 
 class SupplierUpdate(BaseModel):
     name: Optional[str] = None
-    contact: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
-    notes: Optional[str] = None
     is_active: Optional[bool] = None
 
 
@@ -43,11 +39,9 @@ def get_suppliers(
         result.append({
             "id": str(supplier.id),
             "name": supplier.name,
-            "contact": supplier.contact,
             "email": supplier.email,
             "phone": supplier.phone,
             "address": supplier.address,
-            "notes": supplier.notes,
             "is_active": supplier.is_active,
             "created_at": supplier.created_at.isoformat()
         })
@@ -76,11 +70,9 @@ def create_supplier(
         "supplier": {
             "id": str(supplier.id),
             "name": supplier.name,
-            "contact": supplier.contact,
             "email": supplier.email,
             "phone": supplier.phone,
             "address": supplier.address,
-            "notes": supplier.notes,
             "is_active": supplier.is_active
         }
     }
@@ -110,11 +102,9 @@ def update_supplier(
         "supplier": {
             "id": str(supplier.id),
             "name": supplier.name,
-            "contact": supplier.contact,
             "email": supplier.email,
             "phone": supplier.phone,
             "address": supplier.address,
-            "notes": supplier.notes,
             "is_active": supplier.is_active
         }
     }
@@ -126,12 +116,110 @@ def delete_supplier(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
-    """Delete a supplier"""
+    """Delete a supplier (only if no purchase orders exist)"""
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
         raise HTTPException(404, "Supplier not found")
+    
+    # Check if supplier has purchase orders
+    from app.models import PurchaseOrder
+    po_count = db.query(PurchaseOrder).filter(PurchaseOrder.supplier_id == supplier_id).count()
+    if po_count > 0:
+        raise HTTPException(400, f"Cannot delete supplier with {po_count} purchase orders. Archive instead.")
     
     db.delete(supplier)
     db.commit()
     
     return {"success": True, "message": "Supplier deleted successfully"}
+
+
+@router.post("/{supplier_id}/archive")
+def archive_supplier(
+    supplier_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
+):
+    """Archive a supplier (soft delete)"""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(404, "Supplier not found")
+    
+    if supplier.is_archived:
+        raise HTTPException(400, "Supplier is already archived")
+    
+    supplier.is_archived = True
+    supplier.is_active = False
+    supplier.archived_at = datetime.utcnow()
+    supplier.archived_by = current_user.id
+    
+    db.commit()
+    
+    return {"success": True, "message": "Supplier archived successfully"}
+
+
+@router.post("/{supplier_id}/activate")
+def activate_supplier(
+    supplier_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("SUPER_ADMIN"))
+):
+    """Activate an archived supplier"""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(404, "Supplier not found")
+    
+    if not supplier.is_archived:
+        raise HTTPException(400, "Supplier is not archived")
+    
+    supplier.is_archived = False
+    supplier.is_active = True
+    supplier.archived_at = None
+    supplier.archived_by = None
+    
+    db.commit()
+    
+    return {"success": True, "message": "Supplier activated successfully"}
+
+
+@router.get("/{supplier_id}/history")
+def get_supplier_history(
+    supplier_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("SUPER_ADMIN"))
+):
+    """Get purchase order history for a supplier"""
+    supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
+    if not supplier:
+        raise HTTPException(404, "Supplier not found")
+    
+    from app.models import PurchaseOrder
+    orders = db.query(PurchaseOrder).filter(
+        PurchaseOrder.supplier_id == supplier_id
+    ).order_by(PurchaseOrder.created_at.desc()).limit(50).all()
+    
+    result = []
+    for order in orders:
+        result.append({
+            "id": str(order.id),
+            "order_number": order.order_number,
+            "status": order.status.value,
+            "total_amount": float(order.total_amount),
+            "created_at": order.created_at.isoformat(),
+            "items_count": len(order.items)
+        })
+    
+    # Calculate metrics
+    total_orders = db.query(PurchaseOrder).filter(PurchaseOrder.supplier_id == supplier_id).count()
+    total_spend = db.query(PurchaseOrder).filter(
+        PurchaseOrder.supplier_id == supplier_id,
+        PurchaseOrder.status == PurchaseOrderStatus.received
+    ).with_entities(db.func.sum(PurchaseOrder.total_amount)).scalar() or 0
+    
+    return {
+        "success": True,
+        "history": result,
+        "metrics": {
+            "total_orders": total_orders,
+            "total_spend": float(total_spend)
+        }
+    }

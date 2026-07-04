@@ -10,6 +10,7 @@ from app.dependencies import get_current_user
 router = APIRouter(prefix="/api/customers", tags=["Customers"])
 
 
+@router.get("", include_in_schema=False)
 @router.get("/")
 async def get_all_customers(
     db: Session = Depends(get_db),

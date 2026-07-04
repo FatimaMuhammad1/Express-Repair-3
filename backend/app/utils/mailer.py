@@ -1,7 +1,10 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import logging
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def _send_smtp(to: str, subject: str, html: str, text: str):
@@ -12,29 +15,46 @@ def _send_smtp(to: str, subject: str, html: str, text: str):
     msg.attach(MIMEText(text, "plain"))
     msg.attach(MIMEText(html, "html"))
 
-    with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-        server.starttls()
-        server.login(settings.SMTP_USER, settings.SMTP_PASS)
-        server.sendmail(settings.EMAIL_FROM, to, msg.as_string())
+    # Use SMTP_SSL for port 465 (SSL/TLS), SMTP for other ports (STARTTLS)
+    try:
+        if settings.SMTP_PORT == 465:
+            with smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+                server.login(settings.SMTP_USER, settings.SMTP_PASS)
+                server.sendmail(settings.EMAIL_FROM, to, msg.as_string())
+        else:
+            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+                server.starttls()
+                server.login(settings.SMTP_USER, settings.SMTP_PASS)
+                server.sendmail(settings.EMAIL_FROM, to, msg.as_string())
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"[Mailer] SMTP Authentication Error: {e}")
+        raise Exception(f"SMTP authentication failed. Check your username/password. Error: {e}")
+    except smtplib.SMTPConnectError as e:
+        logger.error(f"[Mailer] SMTP Connection Error: {e}")
+        raise Exception(f"Could not connect to SMTP server {settings.SMTP_HOST}:{settings.SMTP_PORT}. Error: {e}")
+    except smtplib.SMTPException as e:
+        logger.error(f"[Mailer] SMTP Error: {e}")
+        raise Exception(f"SMTP error occurred: {e}")
+    except Exception as e:
+        logger.error(f"[Mailer] Unexpected Error: {e}")
+        raise Exception(f"Unexpected error sending email: {e}")
 
 
 def _console_fallback(to: str, subject: str, text: str):
-    print("\n=================== MOCK EMAIL SENT ===================")
-    print(f"To:      {to}")
-    print(f"Subject: {subject}")
-    print(f"Content: {text}")
-    print("=======================================================\n")
+    logger.info(f"[MOCK EMAIL] To: {to}, Subject: {subject}, Content: {text}")
 
 
 def send_mail(to: str, subject: str, html: str, text: str):
+    logger.info(f"[Mailer] SMTP Settings - Host: {settings.SMTP_HOST}, Port: {settings.SMTP_PORT}, User: {settings.SMTP_USER}, Pass: {'***' if settings.SMTP_PASS else 'empty'}")
     if settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASS:
         try:
             _send_smtp(to, subject, html, text)
-            print(f"[Mailer] Email sent to {to}")
+            logger.info(f"[Mailer] Email sent to {to}")
         except Exception as e:
-            print(f"[Mailer] SMTP failed: {e} — falling back to console")
+            logger.warning(f"[Mailer] SMTP failed: {e} — falling back to console")
             _console_fallback(to, subject, text)
     else:
+        logger.warning(f"[Mailer] SMTP settings incomplete, using console fallback")
         _console_fallback(to, subject, text)
 
 

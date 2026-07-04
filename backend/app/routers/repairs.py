@@ -6,6 +6,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 import csv
 import io
+import logging
 
 from app.database import get_db
 from app.models import Repair, User, Appointment
@@ -14,6 +15,9 @@ from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
 from app.worker import send_email_task, send_whatsapp_task
 from app.utils.mailer import send_repair_status_update
+from app.routers.notifications import create_notification
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/repairs", tags=["Repairs"])
 
@@ -58,14 +62,14 @@ def _notify_customer(repair, notification_preference, customer_email, event_type
         elif customer_email:
             send_email_task.apply_async(args=[customer_email, subj, msg], ignore_result=True)
     except Exception as e:
-        print(f"[Notification] Failed to send notification (Redis/Celery may not be running): {e}")
+        logger.warning(f"[Notification] Failed to send notification (Redis/Celery may not be running): {e}")
         
 
 @router.post("/create", status_code=201)
 def create_repair(
     body: RepairCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     for _ in range(5):
         tracking_id = generate_tracking_id()
@@ -91,6 +95,17 @@ def create_repair(
     db.refresh(repair)
     
     _notify_customer(repair, body.notification_preference, body.customer_email, "created")
+
+    # Create notification for assigned technician
+    if body.technician_id:
+        create_notification(
+            db,
+            body.technician_id,
+            "repair_assigned",
+            "New Repair Assigned",
+            f"You have been assigned a new repair: {repair.device_model} for {repair.customer_name}",
+            f"/admin/repairs/{repair.id}"
+        )
 
     return {
         "success": True,
@@ -125,7 +140,7 @@ def update_repair_status(
     tracking_id: str,
     body: RepairStatusUpdate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Choose from: {', '.join(VALID_STATUSES)}")
@@ -134,6 +149,7 @@ def update_repair_status(
     if not repair:
         raise HTTPException(404, "Repair record not found.")
 
+    old_status = repair.status
     repair.status = body.status
     if body.status_notes is not None:
         repair.status_notes = body.status_notes
@@ -146,6 +162,17 @@ def update_repair_status(
 
     db.commit()
     db.refresh(repair)
+
+    # Create notification for technician if assigned
+    if repair.technician_id:
+        create_notification(
+            db,
+            repair.technician_id,
+            "repair_status_update",
+            "Repair Status Updated",
+            f"Repair for {repair.customer_name}'s {repair.device_model} changed from {old_status} to {body.status}",
+            f"/admin/repairs/{repair.id}"
+        )
 
     if body.notify_customer:
         # Get customer email from appointment or user
@@ -166,7 +193,7 @@ def update_repair_status(
                     new_status=body.status
                 )
             except Exception as e:
-                print(f"[Email] Failed to send status update email: {e}")
+                logger.warning(f"[Email] Failed to send status update email: {e}")
         else:
             # Fallback to generic notification via WhatsApp
             _notify_customer(repair, "whatsapp", None, "updated")

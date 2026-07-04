@@ -81,6 +81,17 @@ class TradeRequestStatus(enum.Enum):
     completed = "completed"
 
 
+class PurchaseOrderStatus(enum.Enum):
+    draft = "draft"
+    pending = "pending"
+    ordered = "ordered"
+    in_transit = "in_transit"
+    partially_received = "partially_received"
+    received = "received"
+    cancelled = "cancelled"
+    archived = "archived"
+
+
 class CommunicationType(enum.Enum):
     email = "email"
     sms = "sms"
@@ -130,6 +141,23 @@ class ExpenseCategory(enum.Enum):
     utilities = "utilities"
     supplies = "supplies"
     wages = "wages"
+    parts = "parts"
+    other = "other"
+
+
+class ExpenseStatus(enum.Enum):
+    pending = "pending"
+    approved = "approved"
+    rejected = "rejected"
+    paid = "paid"
+
+
+class PaymentMethod(enum.Enum):
+    cash = "cash"
+    card = "card"
+    bank_transfer = "bank_transfer"
+    check = "check"
+    credit = "credit"
     other = "other"
 
 
@@ -467,7 +495,17 @@ class Supplier(Base):
     email       = Column(String(255), nullable=True)
     phone       = Column(String(20), nullable=True)
     address     = Column(String(500), nullable=True)
+    contact_person = Column(String(255), nullable=True)
+    payment_terms = Column(String(50), nullable=True)  # "Net 30", "Net 60"
+    tax_id      = Column(String(50), nullable=True)  # VAT/EIN number
+    currency    = Column(String(3), default="GBP")  # Default currency for orders
+    lead_time_days = Column(Integer, default=7)  # Average delivery time
+    min_order_amount = Column(Numeric(10, 2), nullable=True)  # Minimum order value
+    rating      = Column(Integer, nullable=True)  # 1-5 performance rating
     is_active   = Column(Boolean, default=True, index=True)
+    is_archived = Column(Boolean, default=False, index=True)
+    archived_at = Column(DateTime(timezone=True), nullable=True)
+    archived_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at  = Column(DateTime(timezone=True), default=utcnow)
     updated_at  = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
@@ -480,22 +518,57 @@ class PurchaseOrder(Base):
     supplier_id     = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True)
     branch_id       = Column(UUID(as_uuid=True), ForeignKey("branches.id", ondelete="SET NULL"), nullable=True, index=True)
     order_number    = Column(String(50), unique=True, nullable=False, index=True)
-    status          = Column(Enum(TradeRequestStatus), default=TradeRequestStatus.pending, nullable=False, index=True)
+    status          = Column(Enum(PurchaseOrderStatus), default=PurchaseOrderStatus.draft, nullable=False, index=True)
     total_amount    = Column(Numeric(10, 2), default=0.00)
     notes           = Column(Text, nullable=True)
     requested_by    = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # User who created the PO
     approved_by     = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # User who approved
     approved_at     = Column(DateTime(timezone=True), nullable=True)  # When approved
     rejection_reason = Column(Text, nullable=True)  # Reason for rejection
+    expected_delivery_date = Column(DateTime(timezone=True), nullable=True)
+    actual_delivery_date   = Column(DateTime(timezone=True), nullable=True)
+    shipping_cost          = Column(Numeric(10, 2), default=0)
+    tax_amount             = Column(Numeric(10, 2), default=0)
+    tracking_number        = Column(String(100), nullable=True)
+    supplier_reference     = Column(String(100), nullable=True)  # Supplier's PO number
     created_at      = Column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at      = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
     requested_by_user = relationship("User", foreign_keys=[requested_by])
     approved_by_user = relationship("User", foreign_keys=[approved_by])
+    supplier = relationship("Supplier", backref="purchase_orders")
+    items = relationship("PurchaseOrderItem", back_populates="purchase_order", cascade="all, delete-orphan")
     
     __table_args__ = (
         Index('idx_purchase_orders_supplier_status', 'supplier_id', 'status'),
         CheckConstraint('total_amount >= 0', name='check_purchase_amount_positive'),
+    )
+
+
+# ── Purchase Order Items ───────────────────────────────────────────────────────
+class PurchaseOrderItem(Base):
+    __tablename__ = "purchase_order_items"
+
+    id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    purchase_order_id = Column(UUID(as_uuid=True), ForeignKey("purchase_orders.id", ondelete="CASCADE"), nullable=False, index=True)
+    product_id      = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True)
+    quantity        = Column(Integer, nullable=False)
+    unit_cost       = Column(Numeric(10, 2), nullable=False)
+    received_quantity = Column(Integer, default=0)
+    line_total      = Column(Numeric(10, 2))  # quantity * unit_cost
+    notes           = Column(Text, nullable=True)
+    created_at      = Column(DateTime(timezone=True), default=utcnow)
+    updated_at      = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    purchase_order = relationship("PurchaseOrder", back_populates="items")
+    product = relationship("Product")
+    stock_movements = relationship("StockMovement", back_populates="purchase_order_item")
+    
+    __table_args__ = (
+        Index('idx_po_items_po_product', 'purchase_order_id', 'product_id'),
+        CheckConstraint('quantity > 0', name='check_po_item_quantity_positive'),
+        CheckConstraint('received_quantity >= 0', name='check_po_item_received_positive'),
+        CheckConstraint('received_quantity <= quantity', name='check_po_item_received_not_exceed'),
     )
 
 
@@ -510,11 +583,15 @@ class StockMovement(Base):
     quantity        = Column(Integer, nullable=False)
     reason          = Column(String(255), nullable=True)
     user_id         = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    purchase_order_item_id = Column(UUID(as_uuid=True), ForeignKey("purchase_order_items.id", ondelete="SET NULL"), nullable=True, index=True)
     created_at      = Column(DateTime(timezone=True), default=utcnow, index=True)
+
+    purchase_order_item = relationship("PurchaseOrderItem", back_populates="stock_movements")
     
     __table_args__ = (
         Index('idx_stock_movements_product_type', 'product_id', 'type'),
         Index('idx_stock_movements_branch_created', 'branch_id', 'created_at'),
+        Index('idx_stock_movements_po_item', 'purchase_order_item_id'),
         CheckConstraint('quantity != 0', name='check_stock_movement_quantity'),
     )
 
@@ -597,14 +674,35 @@ class Expense(Base):
     category        = Column(Enum(ExpenseCategory), nullable=False, index=True)
     description     = Column(String(500), nullable=False)
     amount          = Column(Numeric(10, 2), nullable=False)
+    tax_amount      = Column(Numeric(10, 2), default=0)
+    total_amount    = Column(Numeric(10, 2), nullable=False)  # amount + tax
     date            = Column(Date, nullable=False, index=True)
     branch_id       = Column(UUID(as_uuid=True), ForeignKey("branches.id", ondelete="SET NULL"), nullable=True, index=True)
+    supplier_id     = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True)
+    payment_method  = Column(Enum(PaymentMethod), nullable=True)
+    status          = Column(Enum(ExpenseStatus), default=ExpenseStatus.pending, nullable=False, index=True)
+    receipt_path    = Column(String(500), nullable=True)
+    notes           = Column(Text, nullable=True)
+    source_type     = Column(String(50), nullable=True)  # 'manual', 'purchase_order', 'repair'
+    source_id       = Column(UUID(as_uuid=True), nullable=True)  # Reference to source record
+    created_by      = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_by     = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_at     = Column(DateTime(timezone=True), nullable=True)
     created_at      = Column(DateTime(timezone=True), default=utcnow, index=True)
-    
+    updated_at      = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    supplier = relationship("Supplier", backref="expenses")
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    approved_by_user = relationship("User", foreign_keys=[approved_by])
+
     __table_args__ = (
         Index('idx_expenses_category_date', 'category', 'date'),
         Index('idx_expenses_branch_date', 'branch_id', 'date'),
+        Index('idx_expenses_status_date', 'status', 'date'),
+        Index('idx_expenses_supplier_date', 'supplier_id', 'date'),
         CheckConstraint('amount >= 0', name='check_expense_amount_positive'),
+        CheckConstraint('tax_amount >= 0', name='check_expense_tax_positive'),
+        CheckConstraint('total_amount >= 0', name='check_expense_total_positive'),
     )
 
 
@@ -636,9 +734,26 @@ class WarrantyHistory(Base):
     action      = Column(String(255), nullable=False)
     user_id     = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at  = Column(DateTime(timezone=True), default=utcnow, index=True)
-    
+
     __table_args__ = (
         Index('idx_warranty_history_warranty_created', 'warranty_id', 'created_at'),
+    )
+
+
+# ── Budget History ────────────────────────────────────────────────────────────────
+class ExpenseHistory(Base):
+    __tablename__ = "expense_history"
+
+    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    expense_id  = Column(UUID(as_uuid=True), ForeignKey("expenses.id", ondelete="CASCADE"), nullable=False, index=True)
+    action      = Column(String(50), nullable=False)  # 'created', 'updated', 'approved', 'rejected', 'deleted'
+    user_id     = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    changes     = Column(Text, nullable=True)  # JSON string of changes
+    created_at  = Column(DateTime(timezone=True), default=utcnow, index=True)
+
+    __table_args__ = (
+        Index('idx_expense_history_expense_created', 'expense_id', 'created_at'),
+        Index('idx_expense_history_action_created', 'action', 'created_at'),
     )
 
 

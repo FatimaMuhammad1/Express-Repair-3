@@ -10,7 +10,30 @@ from app.models import Product, Category, TradeRequest, User
 from app.dependencies import get_current_user, require_roles
 from pydantic import BaseModel
 
-router = APIRouter(prefix="/api/products", tags=["Products"])
+router = APIRouter(prefix="/api/products", tags=["Products"], redirect_slashes=False)
+
+
+def normalize_product_payload(payload: dict) -> dict:
+    """Normalize admin-facing payload aliases to backend enum values."""
+    normalized = dict(payload)
+
+    category = normalized.get("category")
+    if isinstance(category, str):
+        category_aliases = {
+            "smartphones": "smartphone",
+            "smartphone": "smartphone",
+            "laptops": "laptop",
+            "laptop": "laptop",
+            "tablets": "tablet",
+            "tablet": "tablet",
+        }
+        normalized["category"] = category_aliases.get(category.strip().lower(), category.strip().lower())
+
+    condition = normalized.get("condition")
+    if isinstance(condition, str):
+        normalized["condition"] = condition.strip().lower()
+
+    return normalized
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -61,11 +84,11 @@ class ProductOut(BaseModel):
             id=str(obj.id),
             name=obj.name,
             description=obj.description,
-            category=obj.category,
+            category=str(obj.category.value) if hasattr(obj.category, 'value') else str(obj.category),
             brand=obj.brand,
             model=obj.model,
-            condition=obj.condition,
-            price=obj.price,
+            condition=str(obj.condition.value) if hasattr(obj.condition, 'value') else str(obj.condition),
+            price=float(obj.price),
             stock_quantity=obj.stock_quantity,
             image_url=obj.image_url,
             is_active=obj.is_active,
@@ -121,6 +144,7 @@ class TradeRequestOut(BaseModel):
 
 # ── Product Endpoints ─────────────────────────────────────────────────────────
 
+@router.get("", response_model=list[ProductOut], include_in_schema=False)
 @router.get("/", response_model=list[ProductOut])
 def get_products(
     category: Optional[str] = None,
@@ -146,6 +170,7 @@ def get_product(product_id: UUID, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Product not found")
     return ProductOut.from_orm(product)
 
+@router.post("", status_code=201, response_model=ProductOut, include_in_schema=False)
 @router.post("/", status_code=201, response_model=ProductOut)
 def create_product(
     body: ProductCreate,
@@ -153,7 +178,13 @@ def create_product(
     _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new product (admin only)"""
-    product = Product(**body.model_dump())
+    from app.models import ProductCategory, ProductCondition
+    
+    product_data = normalize_product_payload(body.model_dump())
+    product_data['category'] = ProductCategory(product_data['category'])
+    product_data['condition'] = ProductCondition(product_data['condition'])
+    
+    product = Product(**product_data)
     db.add(product)
     db.commit()
     db.refresh(product)
@@ -167,11 +198,19 @@ def update_product(
     _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Update a product (admin only)"""
+    from app.models import ProductCategory, ProductCondition
+    
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    for key, value in body.model_dump(exclude_unset=True).items():
+    update_data = normalize_product_payload(body.model_dump(exclude_unset=True))
+    if 'category' in update_data:
+        update_data['category'] = ProductCategory(update_data['category'])
+    if 'condition' in update_data:
+        update_data['condition'] = ProductCondition(update_data['condition'])
+    
+    for key, value in update_data.items():
         setattr(product, key, value)
     
     db.commit()
@@ -189,7 +228,7 @@ def delete_product(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    product.is_active = False
+    db.delete(product)
     db.commit()
     return {"success": True, "message": "Product deleted"}
 
@@ -282,6 +321,8 @@ async def import_products(
     _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Import products from CSV/Excel file"""
+    from app.models import ProductCategory, ProductCondition
+    
     imported_count = 0
     errors = []
     
@@ -299,10 +340,10 @@ async def import_products(
                     product = Product(
                         name=row.get('name', ''),
                         description=row.get('description', ''),
-                        category=row.get('category', 'smartphone'),
+                        category=ProductCategory(row.get('category', 'smartphone')),
                         brand=row.get('brand', ''),
                         model=row.get('model', ''),
-                        condition=row.get('condition', 'new'),
+                        condition=ProductCondition(row.get('condition', 'new')),
                         price=float(row.get('price', 0)),
                         stock_quantity=int(row.get('stock_quantity', 0)),
                         image_url=row.get('image_url', ''),
