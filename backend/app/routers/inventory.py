@@ -11,7 +11,7 @@ except ImportError:
     PANDAS_AVAILABLE = False
 
 from app.database import get_db
-from app.models import Supplier, PurchaseOrder, StockMovement, Product, User
+from app.models import Supplier, PurchaseOrder, StockMovement, Product, User, RepairPartInventory
 from app.dependencies import get_current_user
 from app.routers.notifications import create_notification
 
@@ -288,3 +288,78 @@ async def import_inventory_excel(
         
     except Exception as e:
         raise HTTPException(500, f"Failed to import file: {str(e)}")
+
+
+# ── Inventory Dashboard Statistics ────────────────────────────────────────────────
+
+@router.get("/dashboard-stats")
+async def get_inventory_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get comprehensive inventory dashboard statistics"""
+    
+    # Products statistics
+    total_products = db.query(Product).filter(Product.is_active == True).count()
+    products_in_stock = db.query(Product).filter(
+        Product.is_active == True,
+        Product.stock_quantity > 0
+    ).count()
+    products_low_stock = db.query(Product).filter(
+        Product.is_active == True,
+        Product.stock_quantity > 0,
+        Product.stock_quantity <= Product.reorder_threshold
+    ).count()
+    products_out_of_stock = db.query(Product).filter(
+        Product.is_active == True,
+        Product.stock_quantity <= 0
+    ).count()
+    
+    # Calculate products stock value
+    products_stock_value = db.query(Product).filter(
+        Product.is_active == True
+    ).all()
+    products_value = sum(float(p.stock_quantity or 0) * float(p.price or 0) for p in products_stock_value)
+    
+    # Repair Parts statistics
+    total_repair_parts = db.query(RepairPartInventory).filter(RepairPartInventory.is_active == True).count()
+    repair_parts_in_stock = db.query(RepairPartInventory).filter(
+        RepairPartInventory.is_active == True,
+        RepairPartInventory.stock_quantity > 0
+    ).count()
+    repair_parts_low_stock = db.query(RepairPartInventory).filter(
+        RepairPartInventory.is_active == True,
+        RepairPartInventory.stock_quantity > 0,
+        RepairPartInventory.stock_quantity <= RepairPartInventory.min_stock_level
+    ).count()
+    repair_parts_out_of_stock = db.query(RepairPartInventory).filter(
+        RepairPartInventory.is_active == True,
+        RepairPartInventory.stock_quantity <= 0
+    ).count()
+    
+    # Calculate repair parts stock value
+    repair_parts_stock_value = db.query(RepairPartInventory).filter(
+        RepairPartInventory.is_active == True
+    ).all()
+    repair_parts_value = sum(float(rp.stock_quantity or 0) * float(rp.unit_cost or 0) for rp in repair_parts_stock_value)
+    
+    # Total statistics
+    total_items = total_products + total_repair_parts
+    total_in_stock = products_in_stock + repair_parts_in_stock
+    total_low_stock = products_low_stock + repair_parts_low_stock
+    total_out_of_stock = products_out_of_stock + repair_parts_out_of_stock
+    total_stock_value = products_value + repair_parts_value
+    
+    return {
+        "success": True,
+        "stats": {
+            "total_items": total_items,
+            "in_stock": total_in_stock,
+            "low_stock": total_low_stock,
+            "products_out_of_stock": products_out_of_stock,
+            "repair_parts_out_of_stock": repair_parts_out_of_stock,
+            "products_stock_value": products_value,
+            "repair_parts_stock_value": repair_parts_value,
+            "total_stock_value": total_stock_value
+        }
+    }

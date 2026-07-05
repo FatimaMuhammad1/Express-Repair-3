@@ -3,13 +3,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import csv
 import io
+import json
 import logging
 
 from app.database import get_db
-from app.models import Repair, User, Appointment
+from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus
 from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrackOut
 from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
@@ -209,23 +210,80 @@ def update_repair_status(
 def delete_repair(
     tracking_id: str,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
-    """Delete a repair by tracking ID (admin only)"""
+    """Delete a repair by tracking ID (admin only) - archives to history for 48-hour recovery"""
+    from app.models import DeletedItem, DeletedItemStatus
+    from datetime import datetime, timedelta
+    import json
+    
     repair = db.query(Repair).filter(Repair.tracking_id == tracking_id).first()
     if not repair:
         raise HTTPException(404, "Repair not found.")
     
-    # Delete associated appointment if exists
-    if repair.appointment_id:
-        appointment = db.query(Appointment).filter(Appointment.id == repair.appointment_id).first()
-        if appointment:
-            db.delete(appointment)
-    
-    db.delete(repair)
-    db.commit()
-    
-    return {"success": True, "message": "Repair deleted successfully."}
+    try:
+        # Check if there's already an archived deleted item for this repair
+        existing_deleted = db.query(DeletedItem).filter(
+            DeletedItem.original_table == "repairs",
+            DeletedItem.original_record_id == str(repair.id)
+        ).first()
+        
+        # Archive to deleted_items table
+        record_data = {
+            "id": str(repair.id),
+            "tracking_id": repair.tracking_id,
+            "appointment_id": str(repair.appointment_id) if repair.appointment_id else None,
+            "customer_name": repair.customer_name,
+            "customer_phone": repair.customer_phone,
+            "device_model": repair.device_model,
+            "status": repair.status.value if repair.status else None,
+            "technician_id": str(repair.technician_id) if repair.technician_id else None,
+            "priority": repair.priority,
+            "status_notes": repair.status_notes,
+            "estimated_cost": float(repair.estimated_cost) if repair.estimated_cost else 0,
+            "created_at": repair.created_at.isoformat() if repair.created_at else None,
+            "updated_at": repair.updated_at.isoformat() if repair.updated_at else None,
+        }
+        
+        if existing_deleted:
+            # Update existing archived entry instead of creating new one
+            existing_deleted.record_data = json.dumps(record_data)
+            existing_deleted.item_name = f"Repair - {repair.customer_name} ({repair.device_model})"
+            existing_deleted.deleted_by = current_user.id
+            existing_deleted.deleted_at = datetime.now(timezone.utc)
+            existing_deleted.hide_from_ui_at = datetime.now(timezone.utc) + timedelta(hours=48)
+            existing_deleted.status = DeletedItemStatus.active
+        else:
+            # Create new deleted item entry
+            deleted_item = DeletedItem(
+                original_table="repairs",
+                original_record_id=str(repair.id),
+                record_data=json.dumps(record_data),
+                item_name=f"Repair - {repair.customer_name} ({repair.device_model})",
+                item_type="Repair",
+                deleted_by=current_user.id,
+                deleted_at=datetime.now(timezone.utc),
+                hide_from_ui_at=datetime.now(timezone.utc) + timedelta(hours=48),
+                status=DeletedItemStatus.active
+            )
+            db.add(deleted_item)
+        
+        # Delete associated appointment if exists
+        if repair.appointment_id:
+            appointment = db.query(Appointment).filter(Appointment.id == repair.appointment_id).first()
+            if appointment:
+                db.delete(appointment)
+        
+        # Delete the original repair
+        db.delete(repair)
+        
+        db.commit()
+        
+        return {"success": True, "message": "Repair deleted and archived for recovery"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete repair: {str(e)}")
 
 
 @router.get("/my")

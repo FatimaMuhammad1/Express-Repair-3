@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+import json
 
 from app.database import get_db
-from app.models import Supplier, User, PurchaseOrderStatus
+from app.models import Supplier, User, PurchaseOrderStatus, DeletedItem, DeletedItemStatus
 from app.dependencies import require_roles
 from pydantic import BaseModel
 
@@ -114,23 +115,84 @@ def update_supplier(
 def delete_supplier(
     supplier_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
-    """Delete a supplier (only if no purchase orders exist)"""
+    """Delete a supplier - archives to history for 48-hour recovery"""
+    from app.models import DeletedItem, DeletedItemStatus, PurchaseOrder
+    from datetime import datetime, timedelta
+    import json
+    
     supplier = db.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
         raise HTTPException(404, "Supplier not found")
     
     # Check if supplier has purchase orders
-    from app.models import PurchaseOrder
     po_count = db.query(PurchaseOrder).filter(PurchaseOrder.supplier_id == supplier_id).count()
     if po_count > 0:
         raise HTTPException(400, f"Cannot delete supplier with {po_count} purchase orders. Archive instead.")
     
-    db.delete(supplier)
-    db.commit()
-    
-    return {"success": True, "message": "Supplier deleted successfully"}
+    try:
+        # Check if there's already an archived deleted item for this supplier
+        existing_deleted = db.query(DeletedItem).filter(
+            DeletedItem.original_table == "suppliers",
+            DeletedItem.original_record_id == str(supplier.id)
+        ).first()
+        
+        # Archive to deleted_items table
+        record_data = {
+            "id": str(supplier.id),
+            "name": supplier.name,
+            "email": supplier.email,
+            "phone": supplier.phone,
+            "address": supplier.address,
+            "contact_person": supplier.contact_person,
+            "payment_terms": supplier.payment_terms,
+            "tax_id": supplier.tax_id,
+            "currency": supplier.currency,
+            "lead_time_days": supplier.lead_time_days,
+            "min_order_amount": float(supplier.min_order_amount) if supplier.min_order_amount else None,
+            "rating": supplier.rating,
+            "is_active": supplier.is_active,
+            "is_archived": supplier.is_archived,
+            "archived_at": supplier.archived_at.isoformat() if supplier.archived_at else None,
+            "archived_by": str(supplier.archived_by) if supplier.archived_by else None,
+            "created_at": supplier.created_at.isoformat() if supplier.created_at else None,
+            "updated_at": supplier.updated_at.isoformat() if supplier.updated_at else None,
+        }
+        
+        if existing_deleted:
+            # Update existing archived entry instead of creating new one
+            existing_deleted.record_data = json.dumps(record_data)
+            existing_deleted.item_name = supplier.name
+            existing_deleted.deleted_by = current_user.id
+            existing_deleted.deleted_at = datetime.now(timezone.utc)
+            existing_deleted.hide_from_ui_at = datetime.now(timezone.utc) + timedelta(hours=48)
+            existing_deleted.status = DeletedItemStatus.active
+        else:
+            # Create new deleted item entry
+            deleted_item = DeletedItem(
+                original_table="suppliers",
+                original_record_id=str(supplier.id),
+                record_data=json.dumps(record_data),
+                item_name=supplier.name,
+                item_type="Supplier",
+                deleted_by=current_user.id,
+                deleted_at=datetime.now(timezone.utc),
+                hide_from_ui_at=datetime.now(timezone.utc) + timedelta(hours=48),
+                status=DeletedItemStatus.active
+            )
+            db.add(deleted_item)
+        
+        # Delete the original supplier
+        db.delete(supplier)
+        
+        db.commit()
+        
+        return {"success": True, "message": "Supplier deleted and archived for recovery"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete supplier: {str(e)}")
 
 
 @router.post("/{supplier_id}/archive")

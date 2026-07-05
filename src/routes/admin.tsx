@@ -4,6 +4,72 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 
 import { motion, AnimatePresence } from "framer-motion";
 
+// Date formatting utility
+const formatDate = (date: string | Date | null | undefined): string => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "N/A";
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }) + ', ' + d.toLocaleTimeString('en-GB', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+const formatDateShort = (date: string | Date | null | undefined): string => {
+  if (!date) return "N/A";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "N/A";
+  return d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+};
+
+// Date filtering utility
+const filterByDate = (items: any[], dateFilter: string, dateField: string = 'created_at'): any[] => {
+  if (dateFilter === 'all') return items;
+  
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  return items.filter(item => {
+    if (!item[dateField]) return false;
+    const itemDate = new Date(item[dateField]);
+    if (isNaN(itemDate.getTime())) return false;
+    
+    switch (dateFilter) {
+      case 'today':
+        return itemDate >= today;
+      case 'last_7_days':
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        return itemDate >= sevenDaysAgo;
+      case 'last_30_days':
+        const thirtyDaysAgo = new Date(today);
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        return itemDate >= thirtyDaysAgo;
+      case 'this_month':
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        return itemDate >= startOfMonth;
+      case 'last_month':
+        const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+        return itemDate >= startOfLastMonth && itemDate <= endOfLastMonth;
+      case 'this_year':
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        return itemDate >= startOfYear;
+      default:
+        return true;
+    }
+  });
+};
+
 import {
 
   ShieldCheck,
@@ -66,6 +132,7 @@ import {
   Upload,
   Eye,
   X,
+  MoreHorizontal,
 } from "lucide-react";
 
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -151,6 +218,8 @@ function AdminDashboard({
 }) {
 
   const [repairs, setRepairs] = useState<any[]>([]);
+  const [repairsSearch, setRepairsSearch] = useState("");
+  const [repairsDateFilter, setRepairsDateFilter] = useState("all");
 
   const [stats, setStats] = useState<any>({
     total_repairs: 0,
@@ -312,6 +381,8 @@ function AdminDashboard({
     condition: "new",
     price: "",
     stock_quantity: "",
+    min_stock_level: "5",
+    sku: "",
     image_url: ""
   });
 
@@ -362,6 +433,7 @@ function AdminDashboard({
   const [expenseSearch, setExpenseSearch] = useState("");
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState("all");
   const [expenseStatusFilter, setExpenseStatusFilter] = useState("all");
+  const [expenseDateFilter, setExpenseDateFilter] = useState("all");
   const [expenseAnalytics, setExpenseAnalytics] = useState<any>(null);
   const [expensePage, setExpensePage] = useState(1);
   const [expensePerPage, setExpensePerPage] = useState(25);
@@ -386,8 +458,18 @@ function AdminDashboard({
 
   const [inventoryItems, setInventoryItems] = useState<any[]>([]);
   const [inventoryManagementSearch, setInventoryManagementSearch] = useState("");
+  const [inventoryDateFilter, setInventoryDateFilter] = useState("all");
 
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+  const [stockAlertStats, setStockAlertStats] = useState<any>(null);
+  const [stockAlertSearch, setStockAlertSearch] = useState("");
+
+  const [historyItems, setHistoryItems] = useState<any[]>([]);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyFilter, setHistoryFilter] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
+
+  const [inventoryDashboardStats, setInventoryDashboardStats] = useState<any>(null);
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [supplierSearch, setSupplierSearch] = useState("");
@@ -763,7 +845,7 @@ function AdminDashboard({
 
   // Memoized filtered repairs for performance
   const filteredRepairs = useMemo(() => {
-    return repairs.filter((r) => {
+    let filtered = repairs.filter((r) => {
       const matchSearch =
         r.tracking_id?.toLowerCase().includes(search.toLowerCase()) ||
         r.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -773,7 +855,12 @@ function AdminDashboard({
 
       return matchSearch && matchStatus;
     });
-  }, [repairs, search, statusFilter]);
+    
+    // Apply date filter
+    filtered = filterByDate(filtered, repairsDateFilter, 'created_at');
+    
+    return filtered;
+  }, [repairs, search, statusFilter, repairsDateFilter]);
 
   // Filtered bookings for booking management
   const filteredBookings = useMemo(() => {
@@ -898,7 +985,7 @@ function AdminDashboard({
 
   const repairsOverTime = analyticsRepairs.reduce((acc: any[], r) => {
 
-    const date = new Date(r.created_at).toLocaleDateString();
+    const date = formatDateShort(r.created_at);
 
     const existing = acc.find((item) => item.date === date);
 
@@ -976,7 +1063,7 @@ function AdminDashboard({
 
   // Filtered products for inventory
   const filteredProducts = useMemo(() => {
-    return products.filter(
+    let filtered = products.filter(
       (product) => {
         const matchesSearch =
           product.name?.toLowerCase().includes(inventorySearch.toLowerCase()) ||
@@ -986,7 +1073,12 @@ function AdminDashboard({
         return matchesSearch && matchesCategory;
       }
     );
-  }, [products, inventorySearch, categoryFilter]);
+    
+    // Apply date filter
+    filtered = filterByDate(filtered, inventoryDateFilter, 'created_at');
+    
+    return filtered;
+  }, [products, inventorySearch, categoryFilter, inventoryDateFilter]);
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -1226,7 +1318,7 @@ function AdminDashboard({
       const data = await res.json();
       if (res.ok && data.success) {
         setRoles(data.roles || []);
-        setPermissions(data.roles?.flatMap(r => r.permissions) || []);
+        setPermissions(data.roles?.flatMap((r: any) => r.permissions) || []);
       }
     } catch (e) {
       console.error("Failed to fetch roles:", e);
@@ -1305,6 +1397,7 @@ function AdminDashboard({
       const params = new URLSearchParams();
       if (expenseCategoryFilter !== "all") params.append("category", expenseCategoryFilter);
       if (expenseStatusFilter !== "all") params.append("status", expenseStatusFilter);
+      if (expenseDateFilter !== "all") params.append("date_filter", expenseDateFilter);
       if (expenseSearch) params.append("search", expenseSearch);
       params.append("page", expensePage.toString());
       params.append("per_page", expensePerPage.toString());
@@ -1325,7 +1418,7 @@ function AdminDashboard({
     } finally {
       setIsLoading(false);
     }
-  }, [expenseCategoryFilter, expenseStatusFilter, expenseSearch, expensePage, expensePerPage]);
+  }, [expenseCategoryFilter, expenseStatusFilter, expenseDateFilter, expenseSearch, expensePage, expensePerPage]);
 
   // Fetch expense analytics
   const fetchExpenseAnalytics = useCallback(async () => {
@@ -1483,6 +1576,102 @@ function AdminDashboard({
       setIsLoading(false);
     }
   }, []);
+
+  // Fetch stock alert stats
+  const fetchStockAlertStats = useCallback(async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/inventory/stats"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setStockAlertStats(data.stats);
+      }
+    } catch (e) {
+      console.error("Failed to fetch stock alert stats:", e);
+    }
+  }, []);
+
+  // Fetch low stock items for table
+  const fetchLowStockItems = useCallback(async (search?: string) => {
+    try {
+      const token = getStoredToken();
+      const url = search ? buildUrl(`/inventory/low-stock?search=${encodeURIComponent(search)}`) : buildUrl("/inventory/low-stock");
+      const res = await fetch(url, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setLowStockItems(data.low_stock_items || []);
+      }
+    } catch (e) {
+      console.error("Failed to fetch low stock items:", e);
+    }
+  }, []);
+
+  // Fetch history items
+  const fetchHistoryItems = useCallback(async () => {
+    try {
+      const token = getStoredToken();
+      const url = buildUrl(`/history?search=${encodeURIComponent(historySearch)}&item_type=${historyFilter}&page=${historyPage}&limit=50`);
+      console.log("Fetching history items from:", url);
+      const res = await fetch(url, {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      console.log("History API response:", data);
+      if (res.ok && data.success) {
+        setHistoryItems(data.items || []);
+      } else {
+        console.error("History API error:", data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch history items:", e);
+    }
+  }, [historySearch, historyFilter, historyPage]);
+
+  // Fetch inventory dashboard statistics
+  const fetchInventoryDashboardStats = useCallback(async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/inventory/dashboard-stats"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setInventoryDashboardStats(data.stats);
+      }
+    } catch (e) {
+      console.error("Failed to fetch inventory dashboard stats:", e);
+    }
+  }, []);
+
+  // Restore deleted item
+  const handleRestoreItem = async (deletedItemId: string) => {
+    if (!confirm("Are you sure you want to restore this item?")) return;
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/history/restore"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ deleted_item_id: deletedItemId })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        safeToast.success(data.message);
+        fetchHistoryItems(); // Refresh the history list
+      } else {
+        safeToast.error(data.message || "Failed to restore item");
+      }
+    } catch (e) {
+      console.error("Failed to restore item:", e);
+      safeToast.error("Failed to restore item");
+    }
+  };
 
   // Fetch repair parts inventory
   const fetchRepairPartsInventory = useCallback(async () => {
@@ -1756,6 +1945,8 @@ function AdminDashboard({
           condition: newProduct.condition,
           price: parseFloat(newProduct.price),
           stock_quantity: parseInt(newProduct.stock_quantity),
+          min_stock_level: parseInt(newProduct.min_stock_level),
+          sku: newProduct.sku,
           image_url: newProduct.image_url || null
         })
       });
@@ -1772,6 +1963,8 @@ function AdminDashboard({
           condition: "new",
           price: "",
           stock_quantity: "",
+          min_stock_level: "5",
+          sku: "",
           image_url: ""
         });
         safeToast.success("Product created successfully");
@@ -2305,6 +2498,25 @@ function AdminDashboard({
     }
   }, [activeSection, fetchRepairPartsInventory]);
 
+  useEffect(() => {
+    if (activeSection === "low_stock_alerts") {
+      fetchStockAlertStats();
+      fetchLowStockItems(stockAlertSearch);
+    }
+  }, [activeSection, fetchStockAlertStats, fetchLowStockItems, stockAlertSearch]);
+
+  useEffect(() => {
+    if (activeSection === "inventory_management") {
+      fetchInventoryDashboardStats();
+    }
+  }, [activeSection, fetchInventoryDashboardStats]);
+
+  useEffect(() => {
+    if (activeSection === "history") {
+      fetchHistoryItems();
+    }
+  }, [activeSection, fetchHistoryItems]);
+
   const handleBulkDelete = async () => {
     if (!confirm(`Are you sure you want to delete ${selectedRepairs.size} repairs?`)) return;
     try {
@@ -2365,9 +2577,9 @@ function AdminDashboard({
       icon: Activity,
       items: [
         { id: "repairs", icon: Wrench, label: "Repair Management", badge: repairs.length > 0 ? repairs.length : null, badgeColor: "bg-amber-500" },
-        { id: "walkin", icon: User, label: "Walk-in Intake" },
+        { id: "walkin", icon: User, label: "In-house Repair Bookings" },
         { id: "inhouse_sales", icon: ShoppingCart, label: "In-house Sales" },
-        { id: "bookings", icon: Calendar, label: "Appointment Bookings" },
+        { id: "bookings", icon: Calendar, label: "Online Bookings" },
         { id: "customers", icon: Users, label: "Customer Management" },
         { id: "communication", icon: MessageCircle, label: "Customer Communication" },
         { id: "staff", icon: User, label: "Staff Management" },
@@ -2392,10 +2604,10 @@ function AdminDashboard({
       label: "INVENTORY",
       icon: Database,
       items: [
-        { id: "inventory_management", icon: Database, label: "Inventory Management" },
-        { id: "inventory_products", icon: Package, label: "Inventory Products" },
-        { id: "repair_parts_inventory", icon: Wrench, label: "Repair Parts Inventory" },
-        { id: "low_stock_alerts", icon: AlertCircle, label: "Low Stock Alerts" },
+        { id: "inventory_management", icon: Database, label: "Inventory dashboard" },
+        { id: "inventory_products", icon: Package, label: "Products" },
+        { id: "repair_parts_inventory", icon: Wrench, label: "Repair Parts" },
+        { id: "low_stock_alerts", icon: AlertCircle, label: "Stock Alerts" },
       ]
     },
     {
@@ -2421,6 +2633,7 @@ function AdminDashboard({
       label: "ADMINISTRATION",
       icon: ShieldCheck,
       items: [
+        { id: "history", icon: History, label: "History" },
         { id: "activity", icon: Activity, label: "Activity Log" },
         { id: "audit_logs", icon: History, label: "Audit Logs" },
         { id: "settings", icon: ShieldCheck, label: "Business Settings" },
@@ -2489,7 +2702,7 @@ function AdminDashboard({
 
 
 
-          <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto custom-scrollbar">
+          <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto overflow-x-hidden custom-scrollbar">
 
             <button
               onClick={() => setActiveSection("dashboard")}
@@ -2511,18 +2724,20 @@ function AdminDashboard({
 
                   <button
                     onClick={() => toggleDropdown(group.label)}
-                    className={`flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${hasActiveChild && !isOpen ? "text-white bg-[#1A1D27]" : "text-slate-300 hover:bg-[#1A1D27] hover:text-white"
+                    className={`flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${hasActiveChild && !isOpen ? "text-white bg-[#1A1D27]" : "text-slate-300 hover:bg-[#1A1D27] hover:text-white"
                       }`}
                   >
-                    <div className="flex items-center gap-3">
-                      <group.icon className={`h-4 w-4 ${hasActiveChild ? "text-[#6B46C1]" : "text-slate-400"}`} />
+                    <div className="flex items-center gap-2">
+                      <group.icon className={`h-4 w-4 flex-shrink-0 ${hasActiveChild ? "text-[#6B46C1]" : "text-slate-400"}`} />
                       <span className="text-[11px] font-bold uppercase tracking-wider">{group.label}</span>
                     </div>
-                    {isOpen ? (
-                      <ChevronDown className="h-4 w-4 text-slate-500" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4 text-slate-500" />
-                    )}
+                    <div className="ml-auto">
+                      {isOpen ? (
+                        <ChevronDown className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-slate-500 flex-shrink-0" />
+                      )}
+                    </div>
                   </button>
 
                   <AnimatePresence>
@@ -2655,6 +2870,8 @@ function AdminDashboard({
 
                 {activeSection === "cash_flow" && "Cash Flow"}
 
+                {activeSection === "history" && "History"}
+
                 {activeSection === "expenses" && "Expenses"}
 
                 {activeSection === "online_sales" && "Online Sales"}
@@ -2665,11 +2882,11 @@ function AdminDashboard({
 
                 {activeSection === "payments" && "Payments"}
 
-                {activeSection === "inventory_management" && "Inventory Management"}
+                {activeSection === "inventory_management" && "Inventory dashboard"}
 
-                {activeSection === "repair_parts_inventory" && "Repair Parts Inventory"}
+                {activeSection === "repair_parts_inventory" && "Repair Parts"}
 
-                {activeSection === "low_stock_alerts" && "Low Stock Alerts"}
+                {activeSection === "low_stock_alerts" && "Stock Alerts"}
 
                 {activeSection === "supplier_management" && "Supplier Management"}
 
@@ -2869,7 +3086,7 @@ function AdminDashboard({
 
                     >
 
-                      <option value="all">All Statuses</option>
+                      <option value="all">All Status</option>
 
                       {statuses.map((s) => (
 
@@ -2880,6 +3097,38 @@ function AdminDashboard({
                         </option>
 
                       ))}
+
+                    </select>
+
+                  </div>
+
+                  <div className="flex items-center gap-2">
+
+                    <Calendar className="h-4 w-4 text-slate-600" />
+
+                    <select
+
+                      value={repairsDateFilter}
+
+                      onChange={(e) => setRepairsDateFilter(e.target.value)}
+
+                      className="h-10 rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+
+                    >
+
+                      <option value="all">All Time</option>
+
+                      <option value="today">Today</option>
+
+                      <option value="last_7_days">Last 7 Days</option>
+
+                      <option value="last_30_days">Last 30 Days</option>
+
+                      <option value="this_month">This Month</option>
+
+                      <option value="last_month">Last Month</option>
+
+                      <option value="this_year">This Year</option>
 
                     </select>
 
@@ -3068,12 +3317,9 @@ function AdminDashboard({
                               </td>
 
                               <td className="px-6 py-4 font-mono text-sm text-cyan-600 font-semibold">
-                                <Link
-                                  to={`/admin/repairs/${r.id}`}
-                                  className="hover:underline hover:text-cyan-700"
-                                >
+                                <span className="hover:underline hover:text-cyan-700 cursor-pointer">
                                   {r.tracking_id}
-                                </Link>
+                                </span>
                               </td>
 
                               <td className="px-4 py-3">
@@ -3166,7 +3412,7 @@ function AdminDashboard({
 
                               <td className="px-6 py-4 text-xs text-slate-500">
 
-                                {new Date(r.created_at).toLocaleDateString()}
+                                {formatDateShort(r.created_at)}
 
                               </td>
 
@@ -3335,15 +3581,13 @@ function AdminDashboard({
 
                           <div className="flex-1">
 
-                            <Link to={`/admin/customers/${customer.phone}`} className="hover:underline">
-
+                            <span className="hover:underline cursor-pointer">
                               <h3 className="font-bold text-white text-lg">
 
                                 {customer.name}
 
                               </h3>
-
-                            </Link>
+                            </span>
 
                             <p className="mt-2 text-sm text-slate-600 flex items-center">
 
@@ -3359,7 +3603,7 @@ function AdminDashboard({
 
                               {customer.lastRepair
 
-                                ? new Date(customer.lastRepair).toLocaleDateString()
+                                ? formatDateShort(customer.lastRepair)
 
                                 : "N/A"}
 
@@ -3514,6 +3758,42 @@ function AdminDashboard({
 
                     </select>
 
+                  </div>
+
+                  <div className="flex items-center gap-2">
+
+                    <Calendar className="h-4 w-4 text-slate-600" />
+
+                    <select
+
+                      value={inventoryDateFilter}
+
+                      onChange={(e) => setInventoryDateFilter(e.target.value)}
+
+                      className="h-10 rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+
+                    >
+
+                      <option value="all">All Time</option>
+
+                      <option value="today">Today</option>
+
+                      <option value="last_7_days">Last 7 Days</option>
+
+                      <option value="last_30_days">Last 30 Days</option>
+
+                      <option value="this_month">This Month</option>
+
+                      <option value="last_month">Last Month</option>
+
+                      <option value="this_year">This Year</option>
+
+                    </select>
+
+                  </div>
+
+                  <div className="flex items-center gap-2">
+
                     <Button
                       onClick={() => setShowAddProductModal(true)}
                       className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
@@ -3546,6 +3826,12 @@ function AdminDashboard({
                       <thead>
 
                         <tr className="border-b border-[#1F2235] bg-[#11131E]">
+
+                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            SKU
+
+                          </th>
 
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
@@ -3606,6 +3892,12 @@ function AdminDashboard({
                               className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
 
                             >
+
+                              <td className="px-4 py-3 text-slate-400 text-sm">
+
+                                {product.sku || "N/A"}
+
+                              </td>
 
                               <td className="px-4 py-3">
 
@@ -3789,6 +4081,15 @@ function AdminDashboard({
                               <option value="other">Other</option>
                             </select>
                           </div>
+                          <div>
+                            <Label className="text-slate-300">SKU</Label>
+                            <Input
+                              value={newProduct.sku}
+                              onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="e.g., IPHONE-15-PRO-256GB-BLACK"
+                            />
+                          </div>
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <Label className="text-slate-300">Brand</Label>
@@ -3841,6 +4142,17 @@ function AdminDashboard({
                                 required
                               />
                             </div>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Min Stock Level</Label>
+                            <Input
+                              type="number"
+                              value={newProduct.min_stock_level}
+                              onChange={(e) => setNewProduct({ ...newProduct, min_stock_level: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              min="0"
+                              placeholder="Alert when stock falls below this level"
+                            />
                           </div>
                           <div>
                             <Label className="text-slate-300">Description</Label>
@@ -3911,8 +4223,8 @@ function AdminDashboard({
                             <p className="text-xs text-slate-500 mt-1">Supported formats: CSV, Excel (.xlsx, .xls)</p>
                           </div>
                           <div className="bg-[#1A1D27] rounded-lg p-4 border border-[#1F2235]">
-                            <p className="text-sm text-slate-400 mb-2">Expected CSV columns:</p>
-                            <code className="text-xs text-slate-300 block">name, description, category, brand, model, condition, price, stock_quantity, image_url</code>
+                            <p className="text-sm text-slate-400 mb-2">Expected CSV/Excel columns:</p>
+                            <code className="text-xs text-slate-300 block">name, description, category, brand, model, condition, price, stock_quantity, sku, min_stock_level, image_url</code>
                           </div>
                           <div className="flex gap-3 pt-4">
                             <Button
@@ -4024,16 +4336,13 @@ function AdminDashboard({
                           <thead>
                             <tr className="border-b border-[#1F2235] bg-[#11131E]">
                               <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                SKU
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
                                 Part
                               </th>
                               <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
                                 Type
-                              </th>
-                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                                SKU
-                              </th>
-                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                                Stock
                               </th>
                               <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
                                 Unit Cost
@@ -4058,6 +4367,7 @@ function AdminDashboard({
                               })
                               .map((part) => (
                                 <tr key={part.id} className="border-b border-[#1F2235] hover:bg-[#1A1D27] transition-colors">
+                                  <td className="px-6 py-4 text-slate-300">{part.sku || "-"}</td>
                                   <td className="px-6 py-4">
                                     <div>
                                       <div className="font-medium text-white">{part.name}</div>
@@ -4068,17 +4378,6 @@ function AdminDashboard({
                                     <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-800 capitalize">
                                       {part.part_type}
                                     </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-slate-300">{part.sku || "-"}</td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex items-center gap-2">
-                                      <span className={`font-medium ${part.stock_quantity <= part.min_stock_level ? "text-amber-500" : "text-white"}`}>
-                                        {part.stock_quantity}
-                                      </span>
-                                      {part.stock_quantity <= part.min_stock_level && (
-                                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                                      )}
-                                    </div>
                                   </td>
                                   <td className="px-6 py-4 text-slate-300">£{part.unit_cost ? parseFloat(part.unit_cost).toFixed(2) : "0.00"}</td>
                                   <td className="px-6 py-4 text-slate-300">{part.location || "-"}</td>
@@ -4747,7 +5046,7 @@ function AdminDashboard({
 
                               <td className="px-4 py-3">
 
-                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${staffMember.role === "SUPER_ADMIN" ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" : staffMember.role === "staff" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-slate-100 text-slate-700 bg-[#1A1D27] dark:text-slate-300"}`}>
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${staffMember.role === "SUPER_ADMIN" ? "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400" : staffMember.role === "staff" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-slate-800 text-slate-300"}`}>
 
                                   {staffMember.role}
 
@@ -4773,7 +5072,7 @@ function AdminDashboard({
 
                               <td className="px-6 py-4 text-slate-400">
 
-                                {new Date(staffMember.created_at).toLocaleDateString()}
+                                {formatDateShort(staffMember.created_at)}
 
                               </td>
 
@@ -5161,7 +5460,7 @@ function AdminDashboard({
 
                             <td className="px-6 py-4 text-slate-400">
 
-                              {new Date(msg.sent_at).toLocaleDateString()}
+                              {formatDateShort(msg.sent_at)}
 
                             </td>
 
@@ -5514,6 +5813,38 @@ function AdminDashboard({
 
                   </div>
 
+                  <div className="flex items-center gap-2">
+
+                    <Calendar className="h-4 w-4 text-slate-600" />
+
+                    <select
+
+                      value={expenseDateFilter}
+
+                      onChange={(e) => setExpenseDateFilter(e.target.value)}
+
+                      className="h-10 rounded-xl border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+
+                    >
+
+                      <option value="all">All Time</option>
+
+                      <option value="today">Today</option>
+
+                      <option value="last_7_days">Last 7 Days</option>
+
+                      <option value="last_30_days">Last 30 Days</option>
+
+                      <option value="this_month">This Month</option>
+
+                      <option value="last_month">Last Month</option>
+
+                      <option value="this_year">This Year</option>
+
+                    </select>
+
+                  </div>
+
                 </div>
 
                 {/* Expenses Table */}
@@ -5611,7 +5942,7 @@ function AdminDashboard({
 
                           >
 
-                            <td className="px-4 py-3 text-slate-400">{new Date(expense.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(expense.date)}</td>
 
                             <td className="px-4 py-3 font-medium text-white">{expense.description || "N/A"}</td>
 
@@ -5838,7 +6169,7 @@ function AdminDashboard({
                                     body: JSON.stringify({
                                       ...newExpense,
                                       amount: parseFloat(newExpense.amount),
-                                      tax_amount: parseFloat(newExpense.tax_amount || 0)
+                                      tax_amount: parseFloat(String(newExpense.tax_amount) || "0")
                                     })
                                   });
                                   const data = await res.json();
@@ -5941,7 +6272,7 @@ function AdminDashboard({
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <label className="text-xs text-slate-500 uppercase tracking-wider">Date</label>
-                              <p className="text-sm text-white">{new Date(selectedExpense.date).toLocaleDateString()}</p>
+                              <p className="text-sm text-white">{formatDateShort(selectedExpense.date)}</p>
                             </div>
                             <div>
                               <label className="text-xs text-slate-500 uppercase tracking-wider">Payment Method</label>
@@ -6210,7 +6541,7 @@ function AdminDashboard({
 
                             <td className="px-4 py-3 font-semibold text-emerald-400">£{(revenue.amount || 0).toFixed(2)}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{new Date(revenue.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(revenue.date)}</td>
 
                             <td className="px-4 py-3">
 
@@ -6411,7 +6742,7 @@ function AdminDashboard({
 
                             <td className="px-4 py-3 font-semibold text-violet-400">{customer.repairCount || 0}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{customer.lastRepair ? new Date(customer.lastRepair).toLocaleDateString() : "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{customer.lastRepair ? formatDateShort(customer.lastRepair) : "N/A"}</td>
 
                             <td className="px-4 py-3">
 
@@ -6457,26 +6788,14 @@ function AdminDashboard({
 
               <>
 
-                {/* Low Stock Alerts Section */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-                  <StatCard
-
-                    title="Critical Items"
-
-                    value={lowStockItems?.filter(i => i?.stock <= 0).length ?? 0}
-
-                    icon={AlertCircle}
-
-                    gradient="from-rose-500 to-red-500"
-
-                  />
+                {/* Stock Alerts Section */}
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 
                   <StatCard
 
                     title="Low Stock"
 
-                    value={lowStockItems?.filter(i => i?.stock > 0 && i?.stock <= 5).length ?? 0}
+                    value={stockAlertStats?.low_stock_count ?? 0}
 
                     icon={Package}
 
@@ -6488,7 +6807,7 @@ function AdminDashboard({
 
                     title="Out of Stock"
 
-                    value={lowStockItems?.filter(i => i?.stock <= 0).length ?? 0}
+                    value={stockAlertStats?.out_of_stock_count ?? 0}
 
                     icon={XCircle}
 
@@ -6500,7 +6819,7 @@ function AdminDashboard({
 
                     title="Restock Orders"
 
-                    value={lowStockItems?.filter(i => i?.restockOrdered).length ?? 0}
+                    value={stockAlertStats?.restock_ordered_count ?? 0}
 
                     icon={FileText}
 
@@ -6510,12 +6829,23 @@ function AdminDashboard({
 
                 </div>
 
+                {/* Search Bar */}
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    placeholder="Search products or repair parts..."
+                    value={stockAlertSearch}
+                    onChange={(e) => setStockAlertSearch(e.target.value)}
+                    className="w-full px-4 py-2 bg-[#1A1D27] border border-[#1F2235] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#6B46C1] text-sm"
+                  />
+                </div>
+
                 {/* Low Stock Alerts Table */}
                 <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
 
                   <div className="px-6 py-4 border-b border-[#1F2235]">
 
-                    <h3 className="text-sm font-semibold text-white">Low Stock Alerts</h3>
+                    <h3 className="text-sm font-semibold text-white">Stock Alerts</h3>
 
                   </div>
 
@@ -6529,7 +6859,7 @@ function AdminDashboard({
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
-                            Product
+                            Product/Repair Part
 
                           </th>
 
@@ -6548,12 +6878,6 @@ function AdminDashboard({
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
                             Status
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Action
 
                           </th>
 
@@ -6579,25 +6903,24 @@ function AdminDashboard({
 
                           >
 
-                            <td className="px-4 py-3 font-medium text-white">{item?.name || "N/A"}</td>
-
-                            <td className="px-4 py-3 font-semibold text-rose-400">{item?.stock ?? 0}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{item?.minLevel ?? 5}</td>
-
                             <td className="px-4 py-3">
-
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${(item?.stock ?? 0) <= 0 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : (item?.stock ?? 0) <= 5 ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"}`}>
-
-                                {(item?.stock ?? 0) <= 0 ? "Out of Stock" : (item?.stock ?? 0) <= 5 ? "Low Stock" : "OK"}
-
-                              </span>
-
+                              <div className="flex flex-col">
+                                <span className="font-medium text-white">{item?.name || "N/A"}</span>
+                                <span className="text-xs text-slate-500">{item?.item_type === "product" ? "Product" : "Repair Part"}</span>
+                              </div>
                             </td>
 
+                            <td className="px-4 py-3 font-semibold text-rose-400">{item?.current_stock ?? 0}</td>
+
+                            <td className="px-4 py-3 text-slate-400">{item?.reorder_threshold ?? 5}</td>
+
                             <td className="px-4 py-3">
 
-                              <button className="text-violet-400 hover:text-violet-300 text-xs font-medium">Order Restock</button>
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${(item?.current_stock ?? 0) <= 0 ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
+
+                                {(item?.current_stock ?? 0) <= 0 ? "Out of Stock" : "Low Stock"}
+
+                              </span>
 
                             </td>
 
@@ -6617,7 +6940,7 @@ function AdminDashboard({
 
                       <AlertCircle className="mx-auto mb-3 h-8 w-8 opacity-40" />
 
-                      <p className="text-sm">No low stock alerts</p>
+                      <p className="text-sm">No stock alerts</p>
 
                     </div>
 
@@ -6642,7 +6965,7 @@ function AdminDashboard({
 
                     title="Total Items"
 
-                    value={inventoryItems.length}
+                    value={inventoryDashboardStats?.total_items || 0}
 
                     icon={Package}
 
@@ -6654,7 +6977,7 @@ function AdminDashboard({
 
                     title="In Stock"
 
-                    value={inventoryItems.filter(i => i.stock > 0).length}
+                    value={inventoryDashboardStats?.in_stock || 0}
 
                     icon={CheckCircle2}
 
@@ -6666,7 +6989,7 @@ function AdminDashboard({
 
                     title="Low Stock"
 
-                    value={inventoryItems.filter(i => i.stock > 0 && i.stock <= 5).length}
+                    value={inventoryDashboardStats?.low_stock || 0}
 
                     icon={AlertCircle}
 
@@ -6676,9 +6999,57 @@ function AdminDashboard({
 
                   <StatCard
 
-                    title="Stock Value"
+                    title="Products Out of Stock"
 
-                    value={`£${inventoryItems.reduce((sum, i) => sum + ((i.stock || 0) * (i.price || 0)), 0).toFixed(0)}`}
+                    value={inventoryDashboardStats?.products_out_of_stock || 0}
+
+                    icon={Circle}
+
+                    gradient="from-rose-500 to-pink-500"
+
+                  />
+
+                  <StatCard
+
+                    title="Repair Parts Out of Stock"
+
+                    value={inventoryDashboardStats?.repair_parts_out_of_stock || 0}
+
+                    icon={Circle}
+
+                    gradient="from-rose-500 to-pink-500"
+
+                  />
+
+                  <StatCard
+
+                    title="Products Stock Value"
+
+                    value={`£${(inventoryDashboardStats?.products_stock_value || 0).toFixed(0)}`}
+
+                    icon={DollarSign}
+
+                    gradient="from-violet-500 to-purple-500"
+
+                  />
+
+                  <StatCard
+
+                    title="Repair Parts Stock Value"
+
+                    value={`£${(inventoryDashboardStats?.repair_parts_stock_value || 0).toFixed(0)}`}
+
+                    icon={DollarSign}
+
+                    gradient="from-violet-500 to-purple-500"
+
+                  />
+
+                  <StatCard
+
+                    title="Total Stock Value"
+
+                    value={`£${(inventoryDashboardStats?.total_stock_value || 0).toFixed(0)}`}
 
                     icon={DollarSign}
 
@@ -6730,13 +7101,13 @@ function AdminDashboard({
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
-                            Product
+                            SKU
 
                           </th>
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
-                            SKU
+                            Product
 
                           </th>
 
@@ -6784,9 +7155,9 @@ function AdminDashboard({
 
                           >
 
-                            <td className="px-4 py-3 font-medium text-white">{item.name || "N/A"}</td>
-
                             <td className="px-4 py-3 text-slate-400">{item.sku || "N/A"}</td>
+
+                            <td className="px-4 py-3 font-medium text-white">{item.name || "N/A"}</td>
 
                             <td className="px-4 py-3 font-semibold text-slate-400">{item.stock || 0}</td>
 
@@ -7680,7 +8051,7 @@ function AdminDashboard({
 
                             <td className="px-4 py-3 text-slate-400">{payment.payment_method || "N/A"}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{new Date(payment.created_at).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(payment.created_at)}</td>
 
                           </motion.tr>
 
@@ -7876,7 +8247,7 @@ function AdminDashboard({
 
                             <td className="px-4 py-3 font-semibold text-emerald-400">£{(invoice.amount || 0).toFixed(2)}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{invoice.due_date ? formatDateShort(invoice.due_date) : "N/A"}</td>
 
                             <td className="px-4 py-3">
 
@@ -8154,7 +8525,7 @@ function AdminDashboard({
 
                             <td className="px-4 py-3 text-slate-400">{sale.itemCount || 0}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{new Date(sale.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(sale.date)}</td>
 
                           </motion.tr>
 
@@ -8702,7 +9073,7 @@ function AdminDashboard({
 
                               <td className="px-6 py-4 text-white">
 
-                                <div>{new Date(booking.date).toLocaleDateString()}</div>
+                                <div>{formatDateShort(booking.date)}</div>
 
                                 <div className="text-xs text-slate-500">{booking.time}</div>
 
@@ -8857,6 +9228,106 @@ function AdminDashboard({
 
             {activeSection === "walkin" && (
               <WalkInIntake token={token} />
+            )}
+
+
+
+            {activeSection === "history" && (
+              <>
+                {/* History Section */}
+                <div className="mb-6">
+                  <h2 className="text-2xl font-bold text-white mb-2">History</h2>
+                  <p className="text-slate-400">View and restore deleted items (within 48-hour recovery period)</p>
+                </div>
+
+                {/* Filters */}
+                <div className="mb-6 flex flex-wrap gap-4">
+                  <input
+                    type="text"
+                    placeholder="Search items..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="flex-1 min-w-[200px] px-4 py-2 bg-[#1A1D27] border border-[#1F2235] rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-[#6B46C1] text-sm"
+                  />
+                  <select
+                    value={historyFilter}
+                    onChange={(e) => setHistoryFilter(e.target.value)}
+                    className="px-4 py-2 bg-[#1A1D27] border border-[#1F2235] rounded-lg text-white focus:outline-none focus:border-[#6B46C1] text-sm"
+                  >
+                    <option value="">All Types</option>
+                    <option value="Product">Products</option>
+                    <option value="Repair">Repairs</option>
+                    <option value="Customer">Customers</option>
+                    <option value="Supplier">Suppliers</option>
+                    <option value="Repair Part">Repair Parts</option>
+                  </select>
+                </div>
+
+                {/* History Table */}
+                <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#1F2235] bg-[#11131E]">
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Item Name</th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Type</th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Module</th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Deleted By</th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Deleted At</th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Time Remaining</th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Status</th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyItems && historyItems.length > 0 ? (
+                          historyItems.map((item, idx) => (
+                            <tr key={item.id || idx} className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors">
+                              <td className="px-4 py-3 font-medium text-white">{item.item_name}</td>
+                              <td className="px-4 py-3 text-slate-400">{item.item_type}</td>
+                              <td className="px-4 py-3 text-slate-400 capitalize">{item.original_table}</td>
+                              <td className="px-4 py-3 text-slate-400">{item.deleted_by || "N/A"}</td>
+                              <td className="px-4 py-3 text-slate-400">
+                                {formatDate(item.deleted_at)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs font-medium ${item.time_remaining === "Expired" ? "text-slate-500" : "text-amber-400"}`}>
+                                  {item.time_remaining}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  item.status === "active" 
+                                    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" 
+                                    : "bg-slate-100 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400"
+                                }`}>
+                                  {item.status === "active" ? "Active" : "Archived"}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                {item.status === "active" && (
+                                  <button
+                                    onClick={() => handleRestoreItem(item.id)}
+                                    className="text-violet-400 hover:text-violet-300 text-xs font-medium"
+                                  >
+                                    Restore
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={8} className="px-6 py-16 text-center text-slate-400">
+                              No deleted items found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
             )}
 
 
@@ -9447,7 +9918,7 @@ function AdminDashboard({
 
                               <p className="text-xs text-slate-400 mt-2">
 
-                                {new Date(r.created_at).toLocaleDateString() || "N/A"} {new Date(r.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                                {formatDate(r.created_at)}
 
                               </p>
 
@@ -9679,7 +10150,7 @@ function AdminDashboard({
                             transition={{ delay: idx * 0.03 }}
                             className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
                           >
-                            <td className="px-4 py-3 text-slate-400">{new Date(item?.date).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(item?.date)}</td>
                             <td className="px-4 py-3 font-medium text-white">{item?.description || "N/A"}</td>
                             <td className="px-4 py-3 text-slate-400">{item?.category || "N/A"}</td>
                             <td className="px-4 py-3">
@@ -9808,7 +10279,7 @@ function AdminDashboard({
                                 <span className="text-xs text-slate-400">{progress}%</span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-slate-400">{new Date(repair?.created_at).toLocaleDateString()}</td>
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(repair?.created_at)}</td>
                           </motion.tr>
                           );
                         })}
@@ -9909,7 +10380,7 @@ function AdminDashboard({
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${businessSettings.notifications.emailNotifications ? "bg-violet-600" : "bg-[#2D3142]"}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 trtransform rounded-full bg-white transition-trtransform ${businessSettings.notifications.emailNotifications ? "translate-x-6" : "translate-x-1"}`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessSettings.notifications.emailNotifications ? "translate-x-6" : "translate-x-1"}`}
                           />
                         </button>
                       </div>
@@ -9926,7 +10397,7 @@ function AdminDashboard({
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${businessSettings.notifications.smsNotifications ? "bg-violet-600" : "bg-[#2D3142]"}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 trtransform rounded-full bg-white transition-trtransform ${businessSettings.notifications.smsNotifications ? "translate-x-6" : "translate-x-1"}`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessSettings.notifications.smsNotifications ? "translate-x-6" : "translate-x-1"}`}
                           />
                         </button>
                       </div>
@@ -9943,7 +10414,7 @@ function AdminDashboard({
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${businessSettings.notifications.bookingReminders ? "bg-violet-600" : "bg-[#2D3142]"}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 trtransform rounded-full bg-white transition-trtransform ${businessSettings.notifications.bookingReminders ? "translate-x-6" : "translate-x-1"}`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessSettings.notifications.bookingReminders ? "translate-x-6" : "translate-x-1"}`}
                           />
                         </button>
                       </div>
@@ -9960,7 +10431,7 @@ function AdminDashboard({
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${businessSettings.notifications.statusUpdates ? "bg-violet-600" : "bg-[#2D3142]"}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 trtransform rounded-full bg-white transition-trtransform ${businessSettings.notifications.statusUpdates ? "translate-x-6" : "translate-x-1"}`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessSettings.notifications.statusUpdates ? "translate-x-6" : "translate-x-1"}`}
                           />
                         </button>
                       </div>
@@ -9982,7 +10453,7 @@ function AdminDashboard({
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${businessSettings.display.showPrices ? "bg-violet-600" : "bg-[#2D3142]"}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 trtransform rounded-full bg-white transition-trtransform ${businessSettings.display.showPrices ? "translate-x-6" : "translate-x-1"}`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessSettings.display.showPrices ? "translate-x-6" : "translate-x-1"}`}
                           />
                         </button>
                       </div>
@@ -9999,7 +10470,7 @@ function AdminDashboard({
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${businessSettings.display.showContactInfo ? "bg-violet-600" : "bg-[#2D3142]"}`}
                         >
                           <span
-                            className={`inline-block h-4 w-4 trtransform rounded-full bg-white transition-trtransform ${businessSettings.display.showContactInfo ? "translate-x-6" : "translate-x-1"}`}
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${businessSettings.display.showContactInfo ? "translate-x-6" : "translate-x-1"}`}
                           />
                         </button>
                       </div>
@@ -10026,8 +10497,8 @@ function AdminDashboard({
       <AnimatePresence>
         {selectedRepairForTimeline && (
           <RepairTimeline
-            repairId={selectedRepairForTimeline.id}
-            trackingId={selectedRepairForTimeline.trackingId}
+            repairId={selectedRepairForTimeline!.id}
+            trackingId={selectedRepairForTimeline!.trackingId}
             onClose={() => setSelectedRepairForTimeline(null)}
           />
         )}

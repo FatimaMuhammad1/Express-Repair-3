@@ -149,16 +149,18 @@ class ExpenseStatus(enum.Enum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
-    paid = "paid"
+
+
+class DeletedItemStatus(enum.Enum):
+    active = "active"  # Within 48-hour recovery period
+    archived = "archived"  # After 48 hours, no longer restorable via UI
 
 
 class PaymentMethod(enum.Enum):
     cash = "cash"
     card = "card"
     bank_transfer = "bank_transfer"
-    check = "check"
-    credit = "credit"
-    other = "other"
+    online = "online"
 
 
 class OnlineSaleStatus(enum.Enum):
@@ -245,20 +247,6 @@ class Otp(Base):
     )
 
 
-# ── Services ──────────────────────────────────────────────────────────────────
-
-class Service(Base):
-    __tablename__ = "services"
-
-    id             = Column(Integer, primary_key=True, autoincrement=True)
-    name           = Column(String(100), nullable=False)
-    description    = Column(Text, nullable=False)
-    base_price     = Column(Numeric(10, 2), nullable=False)
-    estimated_time = Column(String(50), nullable=False)
-    icon_name      = Column(String(50), nullable=False)
-    is_active      = Column(Boolean, default=True)
-
-
 # ── Appointments ──────────────────────────────────────────────────────────────
 
 class Appointment(Base):
@@ -335,15 +323,16 @@ class Product(Base):
     __tablename__ = "products"
 
     id             = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    sku            = Column(String(100), unique=True, nullable=True, index=True)  # Stock keeping unit
     name           = Column(String(255), nullable=False, index=True)
-    description    = Column(Text, nullable=True)
     category       = Column(Enum(ProductCategory), nullable=False, index=True)
-    brand          = Column(String(100), nullable=True, index=True)
-    model          = Column(String(100), nullable=True)
-    condition      = Column(Enum(ProductCondition), nullable=False, index=True)
     price          = Column(Numeric(10, 2), nullable=False)
     stock_quantity = Column(Integer, default=0, index=True)
-    reorder_threshold = Column(Integer, default=5)  # Stock level at which to reorder
+    condition      = Column(Enum(ProductCondition), nullable=False, index=True)
+    brand          = Column(String(100), nullable=True, index=True)
+    model          = Column(String(100), nullable=True)
+    description    = Column(Text, nullable=True)
+    reorder_threshold = Column(Integer, default=5)  # Minimum stock quantity
     reorder_quantity = Column(Integer, default=10)  # Default quantity to reorder
     supplier_id    = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True)
     image_url      = Column(String(500), nullable=True)
@@ -359,29 +348,6 @@ class Product(Base):
         Index('idx_products_stock_active', 'stock_quantity', 'is_active'),
         CheckConstraint('price >= 0', name='check_product_price_positive'),
         CheckConstraint('stock_quantity >= 0', name='check_stock_quantity_positive'),
-    )
-
-
-class RepairPart(Base):
-    """Parts used in repairs - links repairs to inventory items"""
-    __tablename__ = "repair_parts"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    repair_id = Column(UUID(as_uuid=True), ForeignKey("repairs.id", ondelete="CASCADE"), nullable=False, index=True)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL"), nullable=True, index=True)
-    part_name = Column(String(255), nullable=False)  # Fallback if product_id is null
-    quantity = Column(Integer, default=1, nullable=False)
-    unit_cost = Column(Numeric(10, 2), default=0.00)  # Cost per unit at time of use
-    total_cost = Column(Numeric(10, 2), default=0.00)  # quantity * unit_cost
-    notes = Column(Text, nullable=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow)
-
-    repair = relationship("Repair", backref="parts")
-    product = relationship("Product")
-
-    __table_args__ = (
-        CheckConstraint('quantity > 0', name='check_repair_part_quantity_positive'),
-        CheckConstraint('unit_cost >= 0', name='check_repair_part_cost_positive'),
     )
 
 
@@ -925,4 +891,29 @@ class InHouseSale(Base):
     
     __table_args__ = (
         CheckConstraint('amount >= 0', name='check_inhouse_sale_amount_positive'),
+    )
+
+
+# ── Deleted Items History ─────────────────────────────────────────────────────────
+class DeletedItem(Base):
+    """Permanent archive of all deleted records across the ERP"""
+    __tablename__ = "deleted_items"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    original_table = Column(String(100), nullable=False, index=True)  # e.g., "products", "repairs", "customers"
+    original_record_id = Column(String(255), nullable=False, index=True)  # Original record ID
+    record_data = Column(Text, nullable=False)  # Complete record data as JSON
+    item_name = Column(String(255), nullable=False, index=True)  # Human-readable name
+    item_type = Column(String(100), nullable=False, index=True)  # e.g., "Product", "Repair", "Customer"
+    deleted_by = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    deleted_at = Column(DateTime(timezone=True), default=utcnow, nullable=False, index=True)
+    hide_from_ui_at = Column(DateTime(timezone=True), nullable=False, index=True)  # deleted_at + 48 hours
+    status = Column(Enum(DeletedItemStatus), default=DeletedItemStatus.active, nullable=False, index=True)
+    
+    # Relationship to user who deleted the item
+    deleted_by_user = relationship("User", foreign_keys=[deleted_by])
+
+    __table_args__ = (
+        Index('idx_deleted_items_table_status', 'original_table', 'status'),
+        Index('idx_deleted_items_hide_date', 'hide_from_ui_at'),
     )

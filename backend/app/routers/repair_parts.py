@@ -3,9 +3,11 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from decimal import Decimal
 from typing import Optional
+import json
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app.models import RepairPart, Repair, Product, User, RepairPartInventory
+from app.models import RepairPart, Repair, Product, User, RepairPartInventory, DeletedItem, DeletedItemStatus
 from app.dependencies import require_roles
 from pydantic import BaseModel
 
@@ -465,20 +467,78 @@ def update_repair_part_inventory(
 def delete_repair_part_inventory(
     part_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
-    """Delete a repair part inventory item (soft delete)"""
+    """Delete a repair part inventory item - archives to history for 48-hour recovery"""
+    from app.models import DeletedItem, DeletedItemStatus
+    from datetime import datetime, timedelta
+    import json
+    
     part = db.query(RepairPartInventory).filter(RepairPartInventory.id == part_id).first()
     if not part:
         raise HTTPException(404, "Repair part inventory item not found")
     
-    part.is_active = False
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": "Repair part inventory item deleted successfully"
-    }
+    try:
+        # Check if there's already an archived deleted item for this repair part
+        existing_deleted = db.query(DeletedItem).filter(
+            DeletedItem.original_table == "repair_parts_inventory",
+            DeletedItem.original_record_id == str(part.id)
+        ).first()
+        
+        # Archive to deleted_items table
+        record_data = {
+            "id": str(part.id),
+            "name": part.name,
+            "sku": part.sku,
+            "brand": part.brand,
+            "model": part.model,
+            "part_type": part.part_type,
+            "stock_quantity": part.stock_quantity,
+            "min_stock_level": part.min_stock_level,
+            "unit_cost": float(part.unit_cost) if part.unit_cost else 0,
+            "location": part.location,
+            "supplier": part.supplier,
+            "is_active": part.is_active,
+            "created_at": part.created_at.isoformat() if part.created_at else None,
+            "updated_at": part.updated_at.isoformat() if part.updated_at else None,
+        }
+        
+        if existing_deleted:
+            # Update existing archived entry instead of creating new one
+            existing_deleted.record_data = json.dumps(record_data)
+            existing_deleted.item_name = part.name
+            existing_deleted.deleted_by = current_user.id
+            existing_deleted.deleted_at = datetime.now(timezone.utc)
+            existing_deleted.hide_from_ui_at = datetime.now(timezone.utc) + timedelta(hours=48)
+            existing_deleted.status = DeletedItemStatus.active
+        else:
+            # Create new deleted item entry
+            deleted_item = DeletedItem(
+                original_table="repair_parts_inventory",
+                original_record_id=str(part.id),
+                record_data=json.dumps(record_data),
+                item_name=part.name,
+                item_type="Repair Part",
+                deleted_by=current_user.id,
+                deleted_at=datetime.now(timezone.utc),
+                hide_from_ui_at=datetime.now(timezone.utc) + timedelta(hours=48),
+                status=DeletedItemStatus.active
+            )
+            db.add(deleted_item)
+        
+        # Delete the original repair part
+        db.delete(part)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "Repair part inventory item deleted and archived for recovery"
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete repair part: {str(e)}")
 
 
 @router.post("/inventory/{part_id}/stock", tags=["Repair Parts Inventory"])

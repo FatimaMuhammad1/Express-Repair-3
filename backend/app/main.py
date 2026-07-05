@@ -3,10 +3,13 @@ import time
 import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from fastapi.staticfiles import StaticFiles
-from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products, users, communications, finance, repair_details, warranty, notifications, branches, inventory, customers, search, dashboard, audit, walkin, roles, financials, repair_parts, reorder, purchase_orders, tax, reminders, invoices, payments_stripe, suppliers, services, settings
+from app.routers import auth, otp, view, bookings, repairs, uploads, payments, products, users, communications, finance, repair_details, warranty, notifications, branches, inventory, customers, search, dashboard, audit, walkin, roles, financials, repair_parts, reorder, purchase_orders, tax, reminders, invoices, payments_stripe, suppliers, settings, history
+from app.models import DeletedItem, DeletedItemStatus
+from datetime import datetime, timezone
 import os
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +36,38 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"[DB] WARNING: Could not connect to database on startup: {e}")
         logger.warning("[DB] Make sure PostgreSQL is running and DATABASE_URL in .env is correct.")
+    
+    # Start background task to clean up expired deleted items
+    async def cleanup_expired_deleted_items():
+        while True:
+            try:
+                db = SessionLocal()
+                try:
+                    now = datetime.now(timezone.utc)
+                    expired_items = db.query(DeletedItem).filter(
+                        DeletedItem.hide_from_ui_at <= now,
+                        DeletedItem.status == DeletedItemStatus.active
+                    ).all()
+                    
+                    for item in expired_items:
+                        item.status = DeletedItemStatus.archived
+                        logger.info(f"[Cleanup] Archived deleted item: {item.item_name} (ID: {item.id})")
+                    
+                    if expired_items:
+                        db.commit()
+                        logger.info(f"[Cleanup] Archived {len(expired_items)} expired deleted items")
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"[Cleanup] Error cleaning up expired deleted items: {e}")
+            
+            # Run every hour
+            await asyncio.sleep(3600)
+    
+    # Start the background task
+    asyncio.create_task(cleanup_expired_deleted_items())
+    logger.info("[Cleanup] Started background task to clean up expired deleted items")
+    
     yield  # app runs here
 
 
@@ -108,8 +143,8 @@ app.include_router(reminders.router)
 app.include_router(invoices.router)
 app.include_router(payments_stripe.router)
 app.include_router(suppliers.router)
-app.include_router(services.router)
 app.include_router(settings.router)
+app.include_router(history.router)
 
 os.makedirs("static/uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")

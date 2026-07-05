@@ -6,7 +6,7 @@ from typing import Optional, List
 from datetime import datetime
 
 from app.database import get_db
-from app.models import Product, Supplier, User
+from app.models import Product, Supplier, User, RepairPartInventory
 from app.dependencies import require_roles
 from pydantic import BaseModel
 
@@ -22,6 +22,7 @@ class LowStockItem(BaseModel):
     supplier_id: Optional[UUID] = None
     supplier_name: Optional[str] = None
     suggested_order_qty: int
+    item_type: str  # "product" or "repair_part"
 
 
 class ReorderSuggestion(BaseModel):
@@ -36,16 +37,26 @@ class ReorderSuggestion(BaseModel):
 
 @router.get("/low-stock")
 def get_low_stock_items(
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("SUPER_ADMIN")),
 ):
-    """Get all items that are at or below their reorder threshold"""
-    products = db.query(Product).filter(
+    """Get all items that are at or below their reorder threshold (products and repair parts)"""
+    low_stock_items = []
+    
+    # Get low stock products
+    products_query = db.query(Product).filter(
         Product.is_active == True,
         Product.stock_quantity <= Product.reorder_threshold
-    ).all()
-
-    low_stock_items = []
+    )
+    
+    if search:
+        products_query = products_query.filter(
+            Product.name.ilike(f"%{search}%")
+        )
+    
+    products = products_query.all()
+    
     for product in products:
         supplier_name = None
         if product.supplier:
@@ -60,6 +71,33 @@ def get_low_stock_items(
             "supplier_id": str(product.supplier_id) if product.supplier_id else None,
             "supplier_name": supplier_name,
             "suggested_order_qty": product.reorder_quantity,
+            "item_type": "product"
+        })
+    
+    # Get low stock repair parts
+    repair_parts_query = db.query(RepairPartInventory).filter(
+        RepairPartInventory.is_active == True,
+        RepairPartInventory.stock_quantity <= RepairPartInventory.min_stock_level
+    )
+    
+    if search:
+        repair_parts_query = repair_parts_query.filter(
+            RepairPartInventory.name.ilike(f"%{search}%")
+        )
+    
+    repair_parts = repair_parts_query.all()
+    
+    for part in repair_parts:
+        low_stock_items.append({
+            "id": str(part.id),
+            "name": part.name,
+            "current_stock": part.stock_quantity,
+            "reorder_threshold": part.min_stock_level,
+            "reorder_quantity": 10,  # Default for repair parts
+            "supplier_id": None,
+            "supplier_name": part.supplier if part.supplier else None,
+            "suggested_order_qty": 10,
+            "item_type": "repair_part"
         })
 
     return {
@@ -145,6 +183,51 @@ def update_reorder_settings(
             "reorder_threshold": product.reorder_threshold,
             "reorder_quantity": product.reorder_quantity,
             "supplier_id": str(product.supplier_id) if product.supplier_id else None,
+        }
+    }
+
+
+@router.get("/stats")
+def get_stock_alert_stats(
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("SUPER_ADMIN")),
+):
+    """Get stock alert statistics for dashboard cards (products and repair parts)"""
+    # Products low stock
+    low_stock_count = db.query(Product).filter(
+        Product.is_active == True,
+        Product.stock_quantity > 0,
+        Product.stock_quantity <= Product.reorder_threshold
+    ).count()
+    
+    # Products out of stock
+    out_of_stock_count = db.query(Product).filter(
+        Product.is_active == True,
+        Product.stock_quantity <= 0
+    ).count()
+    
+    # Repair parts out of stock
+    repair_parts_out_of_stock = db.query(RepairPartInventory).filter(
+        RepairPartInventory.is_active == True,
+        RepairPartInventory.stock_quantity <= 0
+    ).count()
+    
+    # Total out of stock
+    total_out_of_stock = out_of_stock_count + repair_parts_out_of_stock
+    
+    # Items with supplier assigned (products only for now)
+    restock_ordered_count = db.query(Product).filter(
+        Product.is_active == True,
+        Product.stock_quantity <= Product.reorder_threshold,
+        Product.supplier_id.isnot(None)
+    ).count()
+    
+    return {
+        "success": True,
+        "stats": {
+            "low_stock_count": low_stock_count,
+            "out_of_stock_count": total_out_of_stock,
+            "restock_ordered_count": restock_ordered_count
         }
     }
 

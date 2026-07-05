@@ -103,19 +103,6 @@ class OtpVerifyRequest(BaseModel):
     purpose: str
 
 
-# ── Services ──────────────────────────────────────────────────────────────────
-
-class ServiceOut(BaseModel):
-    id: int
-    name: str
-    description: str
-    base_price: Decimal
-    estimated_time: str
-    icon_name: str
-
-    model_config = {"from_attributes": True}
-
-
 # ── Bookings ─────────────────────────────────────────────────────────────────
 
 class BookingCreate(BaseModel):

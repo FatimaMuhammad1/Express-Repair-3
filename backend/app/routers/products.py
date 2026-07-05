@@ -4,9 +4,11 @@ from uuid import UUID
 from typing import Optional
 import csv
 import io
+import json
+from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app.models import Product, Category, TradeRequest, User
+from app.models import Product, Category, TradeRequest, User, DeletedItem, DeletedItemStatus
 from app.dependencies import get_current_user, require_roles
 from pydantic import BaseModel
 
@@ -221,16 +223,79 @@ def update_product(
 def delete_product(
     product_id: UUID,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN"))
+    current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
-    """Delete a product (admin only)"""
+    """Delete a product (admin only) - archives to history for 48-hour recovery"""
+    from app.models import DeletedItem, DeletedItemStatus
+    from datetime import datetime, timedelta
+    import json
+    
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
-    db.delete(product)
-    db.commit()
-    return {"success": True, "message": "Product deleted"}
+    try:
+        # Check if there's already an archived deleted item for this product
+        existing_deleted = db.query(DeletedItem).filter(
+            DeletedItem.original_table == "products",
+            DeletedItem.original_record_id == str(product.id)
+        ).first()
+        
+        # Archive to deleted_items table
+        record_data = {
+            "id": str(product.id),
+            "sku": product.sku,
+            "name": product.name,
+            "description": product.description,
+            "category": product.category.value if product.category else None,
+            "brand": product.brand,
+            "model": product.model,
+            "condition": product.condition.value if product.condition else None,
+            "price": float(product.price) if product.price else 0,
+            "stock_quantity": product.stock_quantity,
+            "reorder_threshold": product.reorder_threshold,
+            "reorder_quantity": product.reorder_quantity,
+            "supplier_id": str(product.supplier_id) if product.supplier_id else None,
+            "image_url": product.image_url,
+            "is_active": product.is_active,
+            "is_for_sale": product.is_for_sale,
+            "created_at": product.created_at.isoformat() if product.created_at else None,
+            "updated_at": product.updated_at.isoformat() if product.updated_at else None,
+        }
+        
+        if existing_deleted:
+            # Update existing archived entry instead of creating new one
+            existing_deleted.record_data = json.dumps(record_data)
+            existing_deleted.item_name = product.name
+            existing_deleted.deleted_by = current_user.id
+            existing_deleted.deleted_at = datetime.now(timezone.utc)
+            existing_deleted.hide_from_ui_at = datetime.now(timezone.utc) + timedelta(hours=48)
+            existing_deleted.status = DeletedItemStatus.active
+        else:
+            # Create new deleted item entry
+            deleted_item = DeletedItem(
+                original_table="products",
+                original_record_id=str(product.id),
+                record_data=json.dumps(record_data),
+                item_name=product.name,
+                item_type="Product",
+                deleted_by=current_user.id,
+                deleted_at=datetime.now(timezone.utc),
+                hide_from_ui_at=datetime.now(timezone.utc) + timedelta(hours=48),
+                status=DeletedItemStatus.active
+            )
+            db.add(deleted_item)
+        
+        # Delete the original product
+        db.delete(product)
+        
+        db.commit()
+        
+        return {"success": True, "message": "Product deleted and archived for recovery"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete product: {str(e)}")
 
 
 # ── Category Endpoints ───────────────────────────────────────────────────────
@@ -355,13 +420,92 @@ async def import_products(
                     errors.append(f"Row error: {str(e)}")
                     continue
         
-        # Handle Excel file (requires openpyxl or pandas)
+        # Handle Excel file
         elif file.filename.endswith(('.xlsx', '.xls')):
-            # For now, return error suggesting CSV format
-            return {
-                "success": False,
-                "detail": "Excel import requires additional dependencies. Please convert to CSV format."
-            }
+            try:
+                import openpyxl
+                # Load Excel file
+                workbook = openpyxl.load_workbook(io.BytesIO(content))
+                sheet = workbook.active
+                
+                # Get header row and normalize to lowercase
+                headers = [str(cell.value).lower().strip() if cell.value else '' for cell in sheet[1]]
+                
+                # Create column mapping for common variations
+                column_map = {
+                    'name': 'name',
+                    'product': 'name',
+                    'product name': 'name',
+                    'description': 'description',
+                    'desc': 'description',
+                    'category': 'category',
+                    'brand': 'brand',
+                    'model': 'model',
+                    'condition': 'condition',
+                    'price': 'price',
+                    'stock': 'stock_quantity',
+                    'stock quantity': 'stock_quantity',
+                    'quantity': 'stock_quantity',
+                    'sku': 'sku',
+                    'min stock': 'min_stock_level',
+                    'min stock level': 'min_stock_level',
+                    'image': 'image_url',
+                    'image url': 'image_url'
+                }
+                
+                # Map Excel headers to our field names
+                header_mapping = {}
+                for i, header in enumerate(headers):
+                    if header in column_map:
+                        header_mapping[i] = column_map[header]
+                    else:
+                        # Try partial match
+                        for key, value in column_map.items():
+                            if key in header or header in key:
+                                header_mapping[i] = value
+                                break
+                
+                # Process rows starting from row 2
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    try:
+                        # Skip empty rows
+                        if not any(row):
+                            continue
+                            
+                        # Map row data using header mapping
+                        row_data = {}
+                        for col_idx, value in enumerate(row):
+                            if col_idx in header_mapping and value is not None:
+                                row_data[header_mapping[col_idx]] = value
+                        
+                        # Skip if no name provided
+                        if not row_data.get('name'):
+                            continue
+                            
+                        product = Product(
+                            name=row_data.get('name', ''),
+                            description=row_data.get('description', ''),
+                            category=ProductCategory(row_data.get('category', 'smartphone')),
+                            brand=row_data.get('brand', ''),
+                            model=row_data.get('model', ''),
+                            condition=ProductCondition(row_data.get('condition', 'new')),
+                            price=float(row_data.get('price', 0) or 0),
+                            stock_quantity=int(row_data.get('stock_quantity', 0) or 0),
+                            min_stock_level=int(row_data.get('min_stock_level', 5) or 5),
+                            sku=row_data.get('sku', ''),
+                            image_url=row_data.get('image_url', ''),
+                            is_for_sale=True
+                        )
+                        db.add(product)
+                        imported_count += 1
+                    except Exception as e:
+                        errors.append(f"Row error: {str(e)}")
+                        continue
+            except ImportError:
+                return {
+                    "success": False,
+                    "detail": "openpyxl library not installed. Please run: pip install openpyxl"
+                }
         else:
             return {
                 "success": False,

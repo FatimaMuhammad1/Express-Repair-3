@@ -3,20 +3,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import Service, Repair, Appointment
-from app.schemas import ServiceOut
+from app.models import Repair, Appointment
 
 router = APIRouter(prefix="/api/view", tags=["Website View"])
-
-
-@router.get("/services")
-def get_services(db: Session = Depends(get_db)):
-    services = db.query(Service).filter(Service.is_active == True).order_by(Service.name).all()
-    return {
-        "success": True,
-        "count": len(services),
-        "data": [ServiceOut.model_validate(s) for s in services],
-    }
 
 
 @router.get("/stats")

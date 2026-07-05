@@ -178,16 +178,17 @@ export default function MainDashboard() {
       if (financeStatsData.success && financeStatsData.stats) {
         setStats(prev => ({
           ...prev,
-          totalProfit: financeStatsData.stats.netProfit || 0,
-          totalExpenses: financeStatsData.stats.totalExpenses || 0,
+          totalProfit: (financeStatsData.stats as any).netProfit || 0,
+          totalExpenses: (financeStatsData.stats as any).totalExpenses || 0,
         }));
       }
       
       // Process repair status data
       if (repairsData.success && repairsData.stats) {
-        const statusCounts = repairsData.stats.status_breakdown || {};
+        const repairStats = repairsData.stats as any;
+        const statusCounts: Record<string, number> = repairStats.status_breakdown || {};
         
-        const statusColors = {
+        const statusColors: Record<string, string> = {
           'received': '#6366F1',
           'diagnosed': '#A855F7',
           'repairing': '#F59E0B',
@@ -204,7 +205,7 @@ export default function MainDashboard() {
         
         // Calculate repairs in progress (excluding collection and completed)
         const inProgressCount = Object.entries(statusCounts).reduce((sum, [status, count]) => {
-          return (status !== 'collection' && status !== 'completed') ? sum + count : sum;
+          return (status !== 'collection' && status !== 'completed') ? sum + (count as number) : sum;
         }, 0);
         
         setStats(prev => ({
@@ -245,8 +246,8 @@ export default function MainDashboard() {
         : 0;
 
       if (onlineSalesData.success && inhouseSalesData.success) {
-        const onlineTotal = onlineSalesData.onlineSales?.reduce((sum, s) => sum + parseFloat(s.amount || 0), 0) || 0;
-        const inhouseTotal = inhouseSalesData.inhouseSales?.reduce((sum, s) => sum + parseFloat(s.amount || 0), 0) || 0;
+        const onlineTotal = onlineSalesData.onlineSales?.reduce((sum: number, s: any) => sum + parseFloat(s.amount || 0), 0) || 0;
+        const inhouseTotal = inhouseSalesData.inhouseSales?.reduce((sum: number, s: any) => sum + parseFloat(s.amount || 0), 0) || 0;
         const repairTotal = revenueData.success
           ? revenueData.revenue?.filter((r: any) => r.source === 'repair').reduce((sum: number, r: any) => sum + parseFloat(r.amount || 0), 0)
           : 0;
