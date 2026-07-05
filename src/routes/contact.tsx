@@ -44,6 +44,7 @@ import { Card } from "@/components/ui/card";
 import { themedCard, CARD_GRID } from "@/lib/theme-card";
 
 import { cn } from "@/lib/utils";
+import { API_BASE } from "@/lib/apiBase";
 
 import { Input } from "@/components/ui/input";
 
@@ -244,8 +245,7 @@ function ContactPage() {
     
     setIsLoading(true);
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
-      const res = await fetch(`${apiUrl}/view/contact`, {
+      const res = await fetch(`${API_BASE}/view/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),

@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { API_BASE } from "@/lib/apiBase";
 
 // Sentry initialization (optional — requires @sentry/react)
 if (typeof window !== "undefined" && import.meta.env.PROD && window.location.hostname !== "localhost") {
@@ -165,8 +166,7 @@ function RootComponent() {
       if (!token) return;
 
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
-        const res = await fetch(`${apiUrl}/auth/me`, {
+        const res = await fetch(`${API_BASE}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();

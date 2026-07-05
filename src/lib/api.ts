@@ -6,9 +6,11 @@
  * to ensure consistency and easy environment management.
  */
 
+import { API_BASE } from "./apiBase";
+
 export const API_CONFIG = {
-  // Base URL for API calls - uses relative path in dev for Vite proxy, absolute in production
-  BASE_URL: import.meta.env.DEV ? "/api" : (import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api"),
+  // Base URL for API calls - uses centralized API_BASE from apiBase.ts
+  BASE_URL: API_BASE,
   
   // API endpoints
   ENDPOINTS: {

@@ -105,8 +105,7 @@ import catTablet from "@/assets/cat-tablet.jpg";
 import catLaptop from "@/assets/cat-laptop.jpg";
 import svcCamera from "@/assets/svc-camera.jpg";
 import svcBattery from "@/assets/svc-battery.jpg";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
+import { API_BASE } from "@/lib/apiBase";
 
 export const Route = createFileRoute("/accessories")({
   head: () => ({
@@ -588,7 +587,7 @@ function AccessoriesPage() {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/products?category=accessories&is_for_sale=true`);
+      const res = await fetch(`${API_BASE}/products?category=accessories&is_for_sale=true`);
       const data = await res.json();
       if (Array.isArray(data)) {
         setProducts(data);

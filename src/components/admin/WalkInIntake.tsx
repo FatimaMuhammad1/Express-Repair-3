@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { User, Phone, Mail, Smartphone, DollarSign, FileText, CheckCircle } from "lucide-react";
+import { API_BASE } from "@/lib/apiBase";
 
 interface WalkInIntakeProps {
   token?: string;
@@ -54,7 +55,6 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
     setError("");
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
       const token = localStorage.getItem("admin_token");
 
       const payload = {
@@ -74,7 +74,7 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
         due_date: formData.create_invoice && formData.due_date ? formData.due_date : null,
       };
 
-      const res = await fetch(`${apiUrl}/walkin/intake`, {
+      const res = await fetch(`${API_BASE}/walkin/intake`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

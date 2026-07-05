@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { CheckCircle2, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { API_BASE } from "@/lib/apiBase";
 
 export const Route = createFileRoute("/book")({
   head: () => ({
@@ -89,11 +90,10 @@ function BookPage() {
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       let imageUrl = "";
-      const apiUrl = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
       if (selectedFile) {
         const fileData = new FormData();
         fileData.append("file", selectedFile);
-        const uploadRes = await fetch(`${apiUrl}/uploads/`, {
+        const uploadRes = await fetch(`${API_BASE}/uploads/`, {
           method: "POST",
           body: fileData
         });
@@ -107,7 +107,7 @@ function BookPage() {
         payload.issue_description += `\n\nImage Attachment: ${imageUrl}`;
       }
 
-      const res = await fetch(`${apiUrl}/bookings/create`, {
+      const res = await fetch(`${API_BASE}/bookings/create`, {
         method: "POST",
         headers,
         body: JSON.stringify(payload),

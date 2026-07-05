@@ -34,6 +34,7 @@ import phoneImage from "@/assets/smart-phone.png";
 import laptopImage from "@/assets/laptop.png";
 import tabletImage from "@/assets/tablet.png";
 import accessoriesImage from "@/assets/accessories.png";
+import { API_BASE } from "@/lib/apiBase";
 
 export const Route = createFileRoute("/buy-and-sell")({
   head: () => ({
@@ -180,11 +181,9 @@ function BuyAndSellPage() {
     }
   }, []);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
-
   const fetchProducts = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/products?is_for_sale=true`);
+      const res = await fetch(`${API_BASE}/products?is_for_sale=true`);
       const data = await res.json();
       if (data.success) {
         setProducts(data);

@@ -26,8 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import workshopImage from "@/assets/workshop.jpg";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
+import { API_BASE } from "@/lib/apiBase";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -63,7 +62,7 @@ function ProfilePage() {
         const authToken = adminToken || token;
         if (!authToken) return;
 
-        const res = await fetch(`${API_BASE_URL}/auth/me`, {
+        const res = await fetch(`${API_BASE}/auth/me`, {
           headers: { "Authorization": `Bearer ${authToken}` }
         });
         const data = await res.json();
@@ -176,7 +175,7 @@ function AuthPanel({
 
   const handleGoogleCredentialResponse = async (response: any) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/google`, {
+      const res = await fetch(`${API_BASE}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: response.credential }),
@@ -220,7 +219,7 @@ function AuthPanel({
     setIsLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -254,7 +253,7 @@ function AuthPanel({
     setIsLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/verify-email`, {
+      const res = await fetch(`${API_BASE}/auth/verify-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp_code: otp }),
@@ -280,7 +279,7 @@ function AuthPanel({
     // Phone validation
     const phoneRegex = /^(\+44|0)[1-9]\d{8,9}$/;
     if (phone && !phoneRegex.test(phone.replace(/\s/g, ""))) {
-      setError("Please enter a valid UK phone number (e.g., 07415 278767 or +447415278767)");
+      setError("Please enter a valid UK phone number (e.g., 123456789)");
       return;
     }
     
@@ -289,7 +288,7 @@ function AuthPanel({
     setSuccessMessage("");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/signup`, {
+      const res = await fetch(`${API_BASE}/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -321,7 +320,7 @@ function AuthPanel({
     setError("");
     setSuccessMessage("");
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+      const res = await fetch(`${API_BASE}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -346,7 +345,7 @@ function AuthPanel({
     setError("");
     setSuccessMessage("");
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+      const res = await fetch(`${API_BASE}/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, otp_code: otp, new_password: password }),
@@ -377,7 +376,7 @@ function AuthPanel({
     setError("");
     setSuccessMessage("");
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/resend-verification`, {
+      const res = await fetch(`${API_BASE}/auth/resend-verification`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
@@ -692,7 +691,7 @@ function AuthPanel({
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+447415278767"
+                  placeholder="+123456788"
                   pattern="^\+[1-9]\d{6,14}$"
                   className={fieldClass}
                 />
@@ -822,7 +821,7 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
       const token = localStorage.getItem("user_token") || localStorage.getItem("admin_token");
       if (!token) return;
       try {
-        const res = await fetch(`${API_BASE_URL}/repairs/my`, {
+        const res = await fetch(`${API_BASE}/repairs/my`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         const data = await res.json();
@@ -845,7 +844,7 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
     setIsLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/repairs/track/${trackingIdInput}`);
+      const res = await fetch(`${API_BASE}/repairs/track/${trackingIdInput}`);
       const data = await res.json();
       if (res.ok && data.success) {
         setRepairData(data.data);
@@ -863,7 +862,7 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
     setIsDeleting(true);
     try {
       const token = localStorage.getItem("user_token") || localStorage.getItem("admin_token");
-      const res = await fetch(`${API_BASE_URL}/auth/me`, {
+      const res = await fetch(`${API_BASE}/auth/me`, {
         method: "DELETE",
         headers: token ? { "Authorization": `Bearer ${token}` } : {}
       });

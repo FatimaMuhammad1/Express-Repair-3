@@ -8,13 +8,13 @@ from pydantic import BaseModel, EmailStr, field_validator, computed_field
 
 
 def _validate_phone(v: str | None) -> str | None:
-    """Ensure phone numbers are in E.164 format: +CountryCodeDigits (e.g. +447415278767)."""
+    """Ensure phone numbers are in E.164 format: +CountryCodeDigits (e.g. +1234567890)."""
     if v is None or v == "":
         return v
     cleaned = re.sub(r"[\s\-\(\)]", "", v)
     if not re.match(r"^\+[1-9]\d{6,14}$", cleaned):
         raise ValueError(
-            "Phone number must be in international format (e.g. +447415278767). "
+            "Phone number must be in international format (e.g. +1234567890). "
             "Include the country code with no spaces or dashes."
         )
     return cleaned
