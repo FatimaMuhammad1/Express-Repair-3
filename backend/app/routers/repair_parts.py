@@ -7,7 +7,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 from app.database import get_db
-from app.models import RepairPart, Repair, Product, User, RepairPartInventory, DeletedItem, DeletedItemStatus
+from app.models import Repair, Product, User, RepairPartInventory, DeletedItem, DeletedItemStatus
 from app.dependencies import require_roles
 from pydantic import BaseModel
 
