@@ -1,22 +1,42 @@
+# Core Framework
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
+python-dotenv>=1.0.1
+
+# Database
 sqlalchemy>=2.0.30
 psycopg2-binary>=2.9.9
 alembic>=1.13.1
-python-dotenv>=1.0.1
+
+# Authentication & Security
 passlib[bcrypt]>=1.7.4
 python-jose[cryptography]>=3.3.0
+
+# Data Validation
 pydantic[email]>=2.7.1
 pydantic-settings>=2.2.1
 python-multipart>=0.0.9
+
+# Email & Messaging
 aiosmtplib>=3.0.1
 emails>=0.6
+
+# Task Queue
 celery>=5.4.0
 redis>=5.0.4
+
+# SMS & Communication
 telnyx
 twilio>=8.0.0
-alembic
+
+# Payments
 stripe
-google-auth
-sentry-sdk>=1.45.0
+
+# File Processing
 openpyxl>=3.1.0
+
+# Monitoring & Error Tracking
+sentry-sdk>=1.45.0
+
+# Google Services
+google-auth
