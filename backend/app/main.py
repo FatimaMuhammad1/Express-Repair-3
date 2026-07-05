@@ -81,10 +81,8 @@ app = FastAPI(
 
 # CORS — allow the local frontend and any configured origins
 allowed_origins = [
-    "http://localhost:8080",
-    "http://127.0.0.1:8080",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    "https://expresstechhub.co.uk",
+    "https://www.expresstechhub.co.uk"
 ]
 configured_origins = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
 for origin in configured_origins:
