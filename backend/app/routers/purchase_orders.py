@@ -14,6 +14,59 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/api/purchase-orders", tags=["Purchase Orders"])
 
 
+class PurchaseOrderApproval(BaseModel):
+    action: str  # "approve" or "reject"
+    rejection_reason: Optional[str] = None
+
+
+class PurchaseOrderItemCreate(BaseModel):
+    product_id: Optional[UUID] = None
+    quantity: int
+    unit_cost: Decimal
+    notes: Optional[str] = None
+
+
+class PurchaseOrderItemUpdate(BaseModel):
+    quantity: Optional[int] = None
+    unit_cost: Optional[Decimal] = None
+    received_quantity: Optional[int] = None
+    notes: Optional[str] = None
+
+
+class PurchaseOrderItemOut(BaseModel):
+    id: UUID
+    purchase_order_id: UUID
+    product_id: Optional[UUID] = None
+    quantity: int
+    unit_cost: Decimal
+    received_quantity: int
+    line_total: Optional[Decimal] = None
+    notes: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+    model_config = {"from_attributes": True}
+
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: Optional[UUID] = None
+    branch_id: Optional[UUID] = None
+    notes: Optional[str] = None
+    expected_delivery_date: Optional[str] = None
+    shipping_cost: Optional[Decimal] = 0
+    tax_amount: Optional[Decimal] = 0
+    items: List[PurchaseOrderItemCreate]
+
+
+class PurchaseOrderUpdate(BaseModel):
+    supplier_id: Optional[UUID] = None
+    branch_id: Optional[UUID] = None
+    notes: Optional[str] = None
+    expected_delivery_date: Optional[str] = None
+    shipping_cost: Optional[Decimal] = None
+    tax_amount: Optional[Decimal] = None
+
+
 @router.post("", status_code=201, include_in_schema=False)
 @router.post("/", status_code=201)
 def create_purchase_order(
