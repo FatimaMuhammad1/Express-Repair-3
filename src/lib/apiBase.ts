@@ -5,5 +5,4 @@
  * - Development: http://localhost:8000/api
  * - Production: /api (relative path for Nginx proxy)
  */
-
-export const API_BASE = import.meta.env.PROD ? "/api";
+export const API_BASE = "/api";
