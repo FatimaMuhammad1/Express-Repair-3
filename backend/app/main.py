@@ -70,13 +70,13 @@ async def lifespan(app: FastAPI):
     
     yield  # app runs here
 
-
 app = FastAPI(
     lifespan=lifespan,
     title="Electronics Repair Shop API",
     description="Full backend for an electronics repair shop — auth, OTP, bookings, and repair tracking.",
     version="2.0.0",
     redirect_slashes=False,
+    root_path="/api"
 )
 
 # CORS — allow the local frontend and any configured origins
