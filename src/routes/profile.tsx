@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import workshopImage from "@/assets/workshop.jpg";
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -845,7 +845,7 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
     setIsLoading(true);
     setError("");
     try {
-      const res = await fetch(`http://localhost:8000/api/repairs/track/${trackingIdInput}`);
+      const res = await fetch(`${API_BASE_URL}/repairs/track/${trackingIdInput}`);
       const data = await res.json();
       if (res.ok && data.success) {
         setRepairData(data.data);

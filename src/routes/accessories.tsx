@@ -106,7 +106,7 @@ import catLaptop from "@/assets/cat-laptop.jpg";
 import svcCamera from "@/assets/svc-camera.jpg";
 import svcBattery from "@/assets/svc-battery.jpg";
 
-const API_BASE_URL = "http://localhost:8000/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
 
 export const Route = createFileRoute("/accessories")({
   head: () => ({

@@ -54,7 +54,7 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
     setError("");
 
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      const apiUrl = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
       const token = localStorage.getItem("admin_token");
 
       const payload = {

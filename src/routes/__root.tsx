@@ -165,7 +165,8 @@ function RootComponent() {
       if (!token) return;
 
       try {
-        const res = await fetch("http://localhost:8000/api/auth/me", {
+        const apiUrl = import.meta.env.VITE_API_URL || "https://expresstechhub.co.uk/api";
+        const res = await fetch(`${apiUrl}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
