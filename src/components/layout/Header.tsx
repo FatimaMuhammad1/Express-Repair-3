@@ -180,7 +180,7 @@ export function Header() {
         </div>
       </motion.div>
 
-      <div className="bg-[#ffffff]/90 backdrop-blur-lg border-b border-border dark:bg-slate-950/95 dark:border-slate-700">
+      <div className="relative z-50 bg-[#ffffff]/90 backdrop-blur-lg border-b border-border dark:bg-slate-950/95 dark:border-slate-700">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <Logo />
           <nav className="hidden lg:flex items-center gap-1">
@@ -192,7 +192,7 @@ export function Header() {
               <Link
                 to="/admin"
                 title="Admin Dashboard"
-                className="flex items-center justify-center h-9 w-9 rounded-lg border border-[#0095ff]/30 bg-[#f0f9ff] text-[#0095ff] transition-colors hover:bg-[#e0f2fe] dark:border-sky-500/30 bg-[#1A1D27] dark:text-sky-400 dark:hover:bg-slate-700"
+                className="flex items-center justify-center h-9 w-9 rounded-lg border border-[#0095ff]/30 bg-[#f0f9ff] text-[#0095ff] transition-colors hover:bg-[#e0f2fe] dark:border-sky-500/30 dark:bg-[#1A1D27] dark:text-sky-400 dark:hover:bg-slate-700"
               >
                 <LayoutDashboard className="h-4 w-4" />
               </Link>
@@ -226,7 +226,7 @@ export function Header() {
             </Button>
           </div>
           <button
-            className="lg:hidden p-2"
+            className="lg:hidden p-2 z-50 cursor-pointer relative"
             onClick={() => setOpen(!open)}
             aria-label="Menu"
           >
@@ -235,7 +235,7 @@ export function Header() {
         </div>
 
         {open && (
-          <div className="lg:hidden border-t border-border bg-[#ffffff]/95 dark:bg-slate-950/95">
+          <div className="absolute top-full left-0 w-full lg:hidden border-b border-border bg-[#ffffff]/95 backdrop-blur-lg dark:bg-slate-950/95 shadow-xl">
             <div className="px-4 py-3 flex flex-col gap-1">
               {navItems.map((item) =>
                 renderLink(item, () => setOpen(false), true),
