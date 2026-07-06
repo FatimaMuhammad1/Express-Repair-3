@@ -58,7 +58,7 @@ const serviceCategories = [
 
 const pricing = [
   { label: "Screen Repair", price: "from £39" },
-  { label: "Battery Replacement", price: "from £29" },
+  { label: "Battery", price: "from £29" },
   { label: "Charging Port", price: "from £25" },
   { label: "Water Damage", price: "from £49" },
   { label: "Software Fix", price: "from £19" },
