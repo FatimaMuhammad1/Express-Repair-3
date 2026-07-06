@@ -193,7 +193,7 @@ function BookPage() {
                         type="tel"
                         value={formData.customer_phone}
                         onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                        placeholder="+447415278767"
+                        placeholder="+123456789"
                         pattern="^\+[1-9]\d{6,14}$"
                         title="International format required (e.g. +447415278767)"
                         className="mt-1.5 rounded-xl border-slate-200"

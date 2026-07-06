@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useLayoutEffect, useState } from "react";
+import { createContext, useContext, useLayoutEffect, useState } from "react";
 
 type Theme = "dark" | "light" | "system";
 
@@ -14,7 +14,7 @@ type ThemeProviderState = {
 };
 
 const initialState: ThemeProviderState = {
-  theme: "system",
+  theme: "dark",
   setTheme: () => null,
 };
 
@@ -40,24 +40,21 @@ function applyTheme(theme: Theme) {
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "dark",
   storageKey = "vite-ui-theme",
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(() => defaultTheme);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    try {
-      const storedTheme = localStorage.getItem(storageKey) as Theme | null;
-      if (storedTheme) {
-        setTheme(storedTheme);
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem(storageKey) as Theme | null;
+        if (stored) return stored;
+      } catch {
+        // Ignore localStorage errors
       }
-    } catch {
-      // Ignore localStorage errors
     }
-  }, [storageKey]);
+    return defaultTheme;
+  });
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") return;

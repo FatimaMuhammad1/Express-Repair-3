@@ -695,7 +695,6 @@ function AuthPanel({
                   pattern="^\+[1-9]\d{6,14}$"
                   className={fieldClass}
                 />
-                <p className="mt-2 text-sm text-slate-500">International format required (e.g. +44...). Optional.</p>
               </div>
             </div>
             <div>

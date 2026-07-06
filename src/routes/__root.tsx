@@ -114,6 +114,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
+      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg?v=3" },
+      { rel: "icon", sizes: "any", href: "/favicon.ico?v=2" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=2" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32x32.png?v=2" },
+      { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png?v=2" },
+      { rel: "manifest", href: "/site.webmanifest?v=2" },
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -136,7 +142,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var k="vite-ui-theme";var t=localStorage.getItem(k)||"system";var r=document.documentElement;r.classList.remove("light","dark");if(t==="system"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}r.classList.add(t)}catch(e){}})();`,
+            __html: `(function(){try{var k="vite-ui-theme";var t=localStorage.getItem(k)||"dark";var r=document.documentElement;r.classList.remove("light","dark");if(t==="system"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"}r.classList.add(t)}catch(e){}})();`,
           }}
         />
       </head>
@@ -162,7 +168,7 @@ function RootComponent() {
       const userToken = localStorage.getItem("user_token");
       const adminToken = localStorage.getItem("admin_token");
       const token = adminToken || userToken;
-      
+
       if (!token) return;
 
       try {
@@ -170,15 +176,15 @@ function RootComponent() {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
-        
+
         if (res.ok && data.success && data.user) {
           // Update the stored user
           const userRole = data.user.role?.toLowerCase();
           if (userRole === "super_admin" || userRole === "staff") {
             localStorage.setItem("admin_user", JSON.stringify(data.user));
             if (!adminToken && userToken) {
-               localStorage.setItem("admin_token", userToken);
-               localStorage.removeItem("user_token");
+              localStorage.setItem("admin_token", userToken);
+              localStorage.removeItem("user_token");
             }
             // Only redirect to admin if not on profile page
             if (window.location.pathname !== "/admin" && window.location.pathname !== "/profile") {
@@ -200,7 +206,7 @@ function RootComponent() {
         console.error("Auth check failed", err);
       }
     }
-    
+
     checkAuth();
   }, [router]);
 
