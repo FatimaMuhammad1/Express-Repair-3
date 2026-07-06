@@ -182,11 +182,13 @@ export function Header() {
 
       <div className="relative z-50 bg-[#ffffff]/90 backdrop-blur-lg border-b border-border dark:bg-slate-950/95 dark:border-slate-700">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <Logo />
-          <nav className="hidden lg:flex items-center gap-1">
+          <div className="relative z-0">
+            <Logo />
+          </div>
+          <nav className="hidden lg:flex items-center gap-1 relative z-10">
             {navItems.map((item) => renderLink(item))}
           </nav>
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2 relative z-10">
             {/* Admin Icon button — only when admin is logged in */}
             {isAdmin && (
               <Link
