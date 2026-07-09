@@ -184,10 +184,9 @@ def create_product(
     _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new product (admin only)"""
-    from app.models import ProductCategory, ProductCondition
+    from app.models import ProductCondition
     
     product_data = normalize_product_payload(body.model_dump())
-    product_data['category'] = ProductCategory(product_data['category'])
     product_data['condition'] = ProductCondition(product_data['condition'])
     
     product = Product(**product_data)
@@ -204,15 +203,13 @@ def update_product(
     _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Update a product (admin only)"""
-    from app.models import ProductCategory, ProductCondition
+    from app.models import ProductCondition
     
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     
     update_data = normalize_product_payload(body.model_dump(exclude_unset=True))
-    if 'category' in update_data:
-        update_data['category'] = ProductCategory(update_data['category'])
     if 'condition' in update_data:
         update_data['condition'] = ProductCondition(update_data['condition'])
     
@@ -390,7 +387,7 @@ async def import_products(
     _: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Import products from CSV/Excel file"""
-    from app.models import ProductCategory, ProductCondition
+    from app.models import ProductCondition
     
     imported_count = 0
     errors = []
