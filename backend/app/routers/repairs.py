@@ -10,7 +10,7 @@ import json
 import logging
 
 from app.database import get_db
-from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus
+from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus, RepairStatus
 from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrackOut
 from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
@@ -367,21 +367,32 @@ def get_repair_stats(
 ):
     """Get repair statistics for admin dashboard"""
     total_repairs = db.query(Repair).count()
-    
+
+    # Map string names to RepairStatus enum members for safe DB filtering
+    status_enum_map = {
+        "pending":    RepairStatus.pending,
+        "received":   RepairStatus.received,
+        "diagnosed":  RepairStatus.diagnosed,
+        "repairing":  RepairStatus.repairing,
+        "testing":    RepairStatus.testing,
+        "collection": RepairStatus.collection,
+        "completed":  RepairStatus.completed,
+    }
+
     status_counts = {}
-    for status in VALID_STATUSES:
-        count = db.query(Repair).filter(Repair.status == status).count()
-        status_counts[status] = count
-    
-    # Calculate total revenue from completed repairs
-    completed_repairs = db.query(Repair).filter(Repair.status == "collection")
+    for status_name, status_enum in status_enum_map.items():
+        count = db.query(Repair).filter(Repair.status == status_enum).count()
+        status_counts[status_name] = count
+
+    # Calculate total revenue from repairs ready for collection
+    completed_repairs = db.query(Repair).filter(Repair.status == RepairStatus.collection)
     completed_repairs_count = completed_repairs.count()
     total_revenue = sum(r.estimated_cost or 0 for r in completed_repairs.all())
-    
+
     # Get repairs from last 30 days
-    thirty_days_ago = datetime.now() - timedelta(days=30)
+    thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
     recent_repairs = db.query(Repair).filter(Repair.created_at >= thirty_days_ago).count()
-    
+
     return {
         "success": True,
         "stats": {
@@ -391,22 +402,4 @@ def get_repair_stats(
             "recent_repairs_30_days": recent_repairs,
             "average_repair_value": float(total_revenue / completed_repairs_count) if completed_repairs_count else 0.0,
         }
-    }
-
-@router.get("/my")
-def my_repairs(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("customer", "SUPER_ADMIN")),
-):
-    # This requires linking repairs to users. Let's see if Repair has a user_id or we match by email/phone.
-    # Currently Repair has customer_phone and maybe appointment_id. Let's match by appointment -> user_id, 
-    # or by phone/email if possible.
-    # For now, let's match by customer_phone == current_user.phone
-    if not current_user.phone:
-        return {"success": True, "count": 0, "repairs": []}
-    repairs = db.query(Repair).filter(Repair.customer_phone == current_user.phone).order_by(Repair.updated_at.desc()).all()
-    return {
-        "success": True,
-        "count": len(repairs),
-        "repairs": [RepairOut.model_validate(r) for r in repairs],
     }

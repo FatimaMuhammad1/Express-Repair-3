@@ -325,7 +325,7 @@ class Product(Base):
     id             = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     sku            = Column(String(100), unique=True, nullable=True, index=True)  # Stock keeping unit
     name           = Column(String(255), nullable=False, index=True)
-    category       = Column(Enum(ProductCategory), nullable=False, index=True)
+    category       = Column(String(100), nullable=False, index=True)  # Changed from Enum to String for flexibility
     price          = Column(Numeric(10, 2), nullable=False)
     stock_quantity = Column(Integer, default=0, index=True)
     condition      = Column(Enum(ProductCondition), nullable=False, index=True)
@@ -458,6 +458,7 @@ class Supplier(Base):
 
     id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name        = Column(String(255), nullable=False, index=True)
+    supplier_code = Column(String(50), nullable=True, unique=True, index=True)  # Unique supplier code
     email       = Column(String(255), nullable=True)
     phone       = Column(String(20), nullable=True)
     address     = Column(String(500), nullable=True)

@@ -114,6 +114,8 @@ import {
 
   User,
 
+  CheckCircle,
+
   Mail,
 
   Send,
@@ -311,7 +313,6 @@ function AdminDashboard({
         'activity': 'communications',
         'low_stock_alerts': 'inventory',
         'customers': 'customers',
-        'online_sales': 'financials',
         'stock_purchases': 'stock_purchases',
         'inventory_management': 'inventory',
         'invoices': 'financials',
@@ -349,6 +350,7 @@ function AdminDashboard({
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importContext, setImportContext] = useState<"products" | "repair_parts">("products");
 
   // Repair Parts Inventory
   const [repairPartsInventory, setRepairPartsInventory] = useState<any[]>([]);
@@ -441,6 +443,12 @@ function AdminDashboard({
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [showExpenseDetailsModal, setShowExpenseDetailsModal] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<any>(null);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [selectedRepairForInvoice, setSelectedRepairForInvoice] = useState<any>(null);
+  const [invoiceForm, setInvoiceForm] = useState({
+    tax_rate_id: "",
+    notes: ""
+  });
   const [newExpense, setNewExpense] = useState({
     category: "",
     description: "",
@@ -450,7 +458,9 @@ function AdminDashboard({
     branch_id: "",
     supplier_id: "",
     payment_method: "",
-    notes: ""
+    notes: "",
+    status: "pending",
+    source: "manual"
   });
 
   const [revenueData, setRevenueData] = useState<any[]>([]);
@@ -476,6 +486,7 @@ function AdminDashboard({
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [newSupplier, setNewSupplier] = useState({
     name: "",
+    supplier_code: "",
     contact: "",
     email: "",
     phone: "",
@@ -484,6 +495,7 @@ function AdminDashboard({
   });
 
   const [newPurchaseOrder, setNewPurchaseOrder] = useState({
+    order_number: "",
     supplier_id: "",
     branch_id: "",
     reference: "",
@@ -501,20 +513,24 @@ function AdminDashboard({
 
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
   const [purchaseOrderSearch, setPurchaseOrderSearch] = useState("");
+  const [poNumberFilter, setPoNumberFilter] = useState("");
+  const [supplierCodeFilter, setSupplierCodeFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
-  const [onlineSales, setOnlineSales] = useState<any[]>([]);
-  const [onlineSaleSearch, setOnlineSaleSearch] = useState("");
 
   const [inhouseSales, setInhouseSales] = useState<any[]>([]);
   const [inhouseSaleSearch, setInhouseSaleSearch] = useState("");
-  const [showAddInhouseSaleModal, setShowAddInhouseSaleModal] = useState(false);
   const [newInhouseSale, setNewInhouseSale] = useState({
     reference: "",
     customer_name: "",
     customer_phone: "",
-    amount: "",
-    item_count: "",
-    payment_method: "cash"
+    customer_email: "",
+    product_id: "",
+    quantity: "1",
+    price_override: "",
+    payment_method: "",
+    payment_status: "paid",
+    payment_amount: ""
   });
 
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -532,9 +548,16 @@ function AdminDashboard({
 
   const [profitLoss, setProfitLoss] = useState<any[]>([]);
   const [profitLossPeriod, setProfitLossPeriod] = useState("month");
+  const [profitLossDateRange, setProfitLossDateRange] = useState<any>(null);
+  const [profitLossSearch, setProfitLossSearch] = useState("");
+  const [profitLossCategoryFilter, setProfitLossCategoryFilter] = useState("all");
 
   const [cashFlow, setCashFlow] = useState<any[]>([]);
   const [cashFlowPeriod, setCashFlowPeriod] = useState("month");
+  const [cashFlowDateRange, setCashFlowDateRange] = useState<any>(null);
+  const [cashFlowSearch, setCashFlowSearch] = useState("");
+  const [cashFlowTypeFilter, setCashFlowTypeFilter] = useState("all");
+  const [cashFlowSummary, setCashFlowSummary] = useState<any>(null);
 
   const [repairTracking, setRepairTracking] = useState<any[]>([]);
   const [repairTrackingSearch, setRepairTrackingSearch] = useState("");
@@ -1339,6 +1362,7 @@ function AdminDashboard({
       const data = await res.json();
       if (res.ok && data.success) {
         setProfitLoss(data.profitLoss || []);
+        setProfitLossDateRange(data.dateRange || null);
       }
     } catch (e) {
       console.error("Failed to fetch profit & loss:", e);
@@ -1359,6 +1383,8 @@ function AdminDashboard({
       const data = await res.json();
       if (res.ok && data.success) {
         setCashFlow(data.cashFlow || []);
+        setCashFlowDateRange(data.dateRange || null);
+        setCashFlowSummary(data.summary || null);
       }
     } catch (e) {
       console.error("Failed to fetch cash flow:", e);
@@ -1367,6 +1393,24 @@ function AdminDashboard({
       setIsLoading(false);
     }
   }, [cashFlowPeriod]);
+
+  // Filtered data for Profit & Loss
+  const filteredProfitLoss = profitLoss.filter((item) => {
+    const matchSearch = 
+      item?.category?.toLowerCase().includes(profitLossSearch.toLowerCase()) ||
+      item?.period?.toLowerCase().includes(profitLossSearch.toLowerCase());
+    const matchCategory = profitLossCategoryFilter === "all" || item?.category === profitLossCategoryFilter;
+    return matchSearch && matchCategory;
+  });
+
+  // Filtered data for Cash Flow
+  const filteredCashFlow = cashFlow.filter((item) => {
+    const matchSearch = 
+      item?.description?.toLowerCase().includes(cashFlowSearch.toLowerCase()) ||
+      item?.category?.toLowerCase().includes(cashFlowSearch.toLowerCase());
+    const matchType = cashFlowTypeFilter === "all" || item?.type === cashFlowTypeFilter;
+    return matchSearch && matchType;
+  });
 
   // Fetch repair tracking
   const fetchRepairTracking = useCallback(async () => {
@@ -1456,26 +1500,6 @@ function AdminDashboard({
     }
   }, []);
 
-  // Fetch online sales
-  const fetchOnlineSales = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl("/finance/online-sales"), {
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setOnlineSales(data.onlineSales || []);
-      }
-    } catch (e) {
-      console.error("Failed to fetch online sales:", e);
-      safeToast.error("Failed to fetch online sales");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
   // Fetch in-house sales
   const fetchInhouseSales = useCallback(async () => {
     setIsLoading(true);
@@ -1493,6 +1517,22 @@ function AdminDashboard({
       safeToast.error("Failed to fetch in-house sales");
     } finally {
       setIsLoading(false);
+    }
+  }, []);
+
+  // Fetch products for retail sales
+  const fetchRetailProducts = useCallback(async () => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/products"), {
+        headers: token ? { "Authorization": `Bearer ${token}` } : {}
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.products)) {
+        setProducts(data.products.filter((p: any) => p.is_for_sale && p.is_active && p.stock_quantity > 0));
+      }
+    } catch (e) {
+      console.error("Failed to fetch products:", e);
     }
   }, []);
 
@@ -1767,6 +1807,7 @@ function AdminDashboard({
         setShowAddSupplierModal(false);
         setNewSupplier({
           name: "",
+          supplier_code: "",
           contact: "",
           email: "",
           phone: "",
@@ -1836,17 +1877,13 @@ function AdminDashboard({
     }
   }, [activeSection, fetchRevenue]);
 
-  useEffect(() => {
-    if (activeSection === "online_sales") {
-      fetchOnlineSales();
-    }
-  }, [activeSection, fetchOnlineSales]);
 
   useEffect(() => {
     if (activeSection === "inhouse_sales") {
       fetchInhouseSales();
+      fetchRetailProducts();
     }
-  }, [activeSection, fetchInhouseSales]);
+  }, [activeSection, fetchInhouseSales, fetchRetailProducts]);
 
   useEffect(() => {
     if (activeSection === "invoices") {
@@ -1888,12 +1925,16 @@ function AdminDashboard({
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
-          reference: newInhouseSale.reference || `SALE-${Date.now()}`,
+          reference: newInhouseSale.reference || null,
           customer_name: newInhouseSale.customer_name,
           customer_phone: newInhouseSale.customer_phone,
-          amount: parseFloat(newInhouseSale.amount),
-          item_count: parseInt(newInhouseSale.item_count),
-          payment_method: newInhouseSale.payment_method
+          customer_email: newInhouseSale.customer_email,
+          product_id: newInhouseSale.product_id,
+          quantity: parseInt(newInhouseSale.quantity),
+          price_override: newInhouseSale.price_override ? parseFloat(newInhouseSale.price_override) : null,
+          payment_method: newInhouseSale.payment_method,
+          payment_status: newInhouseSale.payment_status,
+          payment_amount: newInhouseSale.payment_amount ? parseFloat(newInhouseSale.payment_amount) : null
         })
       });
       const data = await res.json();
@@ -1901,27 +1942,32 @@ function AdminDashboard({
         setInhouseSales(prev => [{
           id: data.sale.id,
           reference: data.sale.reference,
-          customer_name: data.sale.customer_name,
+          customer: data.sale.customer_name,
           amount: data.sale.amount,
-          date: data.sale.created_at,
+          itemCount: data.sale.item_count,
           payment_method: data.sale.payment_method,
-          status: "completed"
+          status: "completed",
+          date: new Date().toISOString()
         }, ...prev]);
-        setShowAddInhouseSaleModal(false);
         setNewInhouseSale({
           reference: "",
           customer_name: "",
           customer_phone: "",
-          amount: "",
-          item_count: "",
-          payment_method: "cash"
+          customer_email: "",
+          product_id: "",
+          quantity: "1",
+          price_override: "",
+          payment_method: "",
+          payment_status: "paid",
+          payment_amount: ""
         });
-        safeToast.success("In-house sale recorded successfully");
+        safeToast.success("Retail sale recorded successfully");
+        fetchRetailProducts(); // Refresh products to update stock
       } else {
         safeToast.error(data.detail || "Failed to record sale");
       }
     } catch (e) {
-      console.error("Failed to create in-house sale:", e);
+      console.error("Failed to create retail sale:", e);
       safeToast.error("Failed to record sale");
     }
   };
@@ -2007,6 +2053,61 @@ function AdminDashboard({
       console.error("Failed to import products:", e);
       safeToast.error("Failed to import products");
     }
+  };
+
+  const handleImportRepairParts = async () => {
+    if (!importFile) {
+      safeToast.error("Please select a file to import");
+      return;
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+
+      const token = getStoredToken();
+      const res = await fetch(buildUrl("/repairs/inventory/import"), {
+        method: "POST",
+        headers: token ? { "Authorization": `Bearer ${token}` } : {},
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        safeToast.success(`Successfully imported ${data.imported_count} repair parts`);
+        fetchRepairPartsInventory();
+        setShowImportModal(false);
+        setImportFile(null);
+      } else {
+        safeToast.error(data.detail || "Failed to import repair parts");
+      }
+    } catch (e) {
+      console.error("Failed to import repair parts:", e);
+      safeToast.error("Failed to import repair parts");
+    }
+  };
+
+  const downloadTemplate = () => {
+    let headers: string[];
+    let filename: string;
+
+    if (importContext === "products") {
+      headers = ["name", "description", "category", "brand", "model", "condition", "price", "stock_quantity", "sku", "min_stock_level", "image_url"];
+      filename = "products_template.csv";
+    } else {
+      headers = ["name", "description", "part_type", "brand", "model", "sku", "supplier", "unit_cost", "stock_quantity", "min_stock_level", "location", "notes"];
+      filename = "repair_parts_template.csv";
+    }
+
+    const csvContent = headers.join(",") + "\n";
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Handler for creating repair part
@@ -2172,6 +2273,7 @@ function AdminDashboard({
           ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
+          order_number: newPurchaseOrder.order_number || null,
           supplier_id: newPurchaseOrder.supplier_id || null,
           branch_id: newPurchaseOrder.branch_id || null,
           total_amount: parseFloat(newPurchaseOrder.total_amount),
@@ -2183,6 +2285,7 @@ function AdminDashboard({
       if (res.ok && data.success) {
         setShowAddPurchaseModal(false);
         setNewPurchaseOrder({
+          order_number: "",
           supplier_id: "",
           branch_id: "",
           reference: "",
@@ -2290,68 +2393,6 @@ function AdminDashboard({
     } catch (e) {
       console.error("Failed to create revenue:", e);
       safeToast.error("Failed to create revenue");
-    }
-  };
-
-  // CRUD Handlers for Online Sales
-  const handleCreateOnlineSale = async (saleData: any) => {
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl("/finance/online-sales"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(saleData)
-      });
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setOnlineSales(prev => [data.onlineSale, ...prev]);
-        safeToast.success("Online sale created successfully");
-      }
-    } catch (e) {
-      console.error("Failed to create online sale:", e);
-      safeToast.error("Failed to create online sale");
-    }
-  };
-
-  const handleUpdateOnlineSale = async (saleId: string, saleData: any) => {
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/online-sales/${saleId}`), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(saleData)
-      });
-      if (res.ok) {
-        setOnlineSales(prev => prev.map(s => s.id === saleId ? { ...s, ...saleData } : s));
-        safeToast.success("Online sale updated successfully");
-      }
-    } catch (e) {
-      console.error("Failed to update online sale:", e);
-      safeToast.error("Failed to update online sale");
-    }
-  };
-
-  const handleDeleteOnlineSale = async (saleId: string) => {
-    if (!confirm("Are you sure you want to delete this online sale?")) return;
-    try {
-      const token = getStoredToken();
-      const res = await fetch(buildUrl(`/finance/online-sales/${saleId}`), {
-        method: "DELETE",
-        headers: token ? { "Authorization": `Bearer ${token}` } : {}
-      });
-      if (res.ok) {
-        setOnlineSales(prev => prev.filter(s => s.id !== saleId));
-        safeToast.success("Online sale deleted successfully");
-      }
-    } catch (e) {
-      console.error("Failed to delete online sale:", e);
-      safeToast.error("Failed to delete online sale");
     }
   };
 
@@ -2573,12 +2614,18 @@ function AdminDashboard({
   // Define sidebar items based on role
   const sidebarGroups = [
     {
+      label: "WALK-IN SERVICES",
+      icon: User,
+      items: [
+        { id: "walkin", icon: Wrench, label: "Walk-in Repair" },
+        { id: "inhouse_sales", icon: ShoppingCart, label: "Retail Sales" },
+      ]
+    },
+    {
       label: "OPERATIONS",
       icon: Activity,
       items: [
         { id: "repairs", icon: Wrench, label: "Repair Management", badge: repairs.length > 0 ? repairs.length : null, badgeColor: "bg-amber-500" },
-        { id: "walkin", icon: User, label: "In-house Repair Bookings" },
-        { id: "inhouse_sales", icon: ShoppingCart, label: "In-house Sales" },
         { id: "bookings", icon: Calendar, label: "Online Bookings" },
         { id: "customers", icon: Users, label: "Customer Management" },
         { id: "communication", icon: MessageCircle, label: "Customer Communication" },
@@ -2594,8 +2641,6 @@ function AdminDashboard({
         { id: "profit_loss", icon: TrendingUp, label: "Profit & Loss" },
         { id: "cash_flow", icon: DollarSign, label: "Cash Flow" },
         { id: "expenses", icon: FileText, label: "Expenses" },
-        { id: "online_sales", icon: ShoppingCart, label: "Online Sales" },
-        { id: "inhouse_sales", icon: ShoppingCart, label: "In-house Sales" },
         { id: "invoices", icon: FileText, label: "Invoices" },
         { id: "payments", icon: DollarSign, label: "Payments" },
       ]
@@ -2638,15 +2683,6 @@ function AdminDashboard({
         { id: "audit_logs", icon: History, label: "Audit Logs" },
         { id: "settings", icon: ShieldCheck, label: "Business Settings" },
       ]
-    },
-    {
-      label: "TOOLS",
-      icon: Wrench,
-      items: [
-        { id: "notifications", icon: Bell, label: "Notification Center" },
-        { id: "search", icon: Search, label: "Global Search" },
-        { id: "backup", icon: RefreshCw, label: "Backup & Restore" },
-      ]
     }
   ];
 
@@ -2655,7 +2691,7 @@ function AdminDashboard({
     ...group,
     items: group.items.filter(item => {
       if (userRole === "staff") {
-        // Staff can only access walk-in bookings and in-house sales (buy & sell)
+        // Staff can only access walk-in repair and retail sales
         return ["walkin", "inhouse_sales"].includes(item.id);
       }
       return true;
@@ -2663,6 +2699,10 @@ function AdminDashboard({
   })).filter(group => group.items.length > 0);
 
 
+
+  function getStatusColor(status: any) {
+    throw new Error("Function not implemented.");
+  }
 
   return (
 
@@ -2852,7 +2892,7 @@ function AdminDashboard({
 
                 {activeSection === "repairs" && "Repair Management"}
 
-                {activeSection === "walkin" && "Walk-in Intake"}
+                {activeSection === "walkin" && "Walk-in Repair"}
 
                 {activeSection === "bookings" && "Appointment Bookings"}
 
@@ -2874,9 +2914,8 @@ function AdminDashboard({
 
                 {activeSection === "expenses" && "Expenses"}
 
-                {activeSection === "online_sales" && "Online Sales"}
 
-                {activeSection === "inhouse_sales" && "In-house Sales"}
+                {activeSection === "inhouse_sales" && "Retail Sales"}
 
                 {activeSection === "invoices" && "Invoices"}
 
@@ -3199,34 +3238,6 @@ function AdminDashboard({
 
                         <tr className="border-b border-[#1F2235] bg-[#11131E]">
 
-                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent w-12">
-
-                            <input
-
-                              type="checkbox"
-
-                              checked={selectedRepairs.size === filteredRepairs.length && filteredRepairs.length > 0}
-
-                              onChange={(e) => {
-
-                                if (e.target.checked) {
-
-                                  setSelectedRepairs(new Set(filteredRepairs.map(r => r.id)));
-
-                                } else {
-
-                                  setSelectedRepairs(new Set());
-
-                                }
-
-                              }}
-
-                              className="rounded border-slate-300"
-
-                            />
-
-                          </th>
-
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent w-24">
 
                             ID
@@ -3251,17 +3262,6 @@ function AdminDashboard({
 
                           </th>
 
-                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Priority
-
-                          </th>
-
-                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Assigned Staff
-
-                          </th>
 
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
@@ -3289,33 +3289,6 @@ function AdminDashboard({
                               transition={{ delay: idx * 0.03 }}
                               className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
                             >
-                              <td className="px-4 py-3">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedRepairs.has(r.id)}
-                                  onChange={(e) => {
-                                    const newSelected = new Set(selectedRepairs);
-
-                                    if (e.target.checked) {
-
-                                      newSelected.add(r.id);
-
-                                    } else {
-
-                                      newSelected.delete(r.id);
-
-                                    }
-
-                                    setSelectedRepairs(newSelected);
-
-                                  }}
-
-                                  className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 focus:ring-offset-0"
-
-                                />
-
-                              </td>
-
                               <td className="px-6 py-4 font-mono text-sm text-cyan-600 font-semibold">
                                 <span className="hover:underline hover:text-cyan-700 cursor-pointer">
                                   {r.tracking_id}
@@ -3378,38 +3351,6 @@ function AdminDashboard({
 
                               </td>
 
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={r.priority || "normal"}
-                                    onChange={(e) => updatePriority(r.tracking_id, e.target.value)}
-                                    className={`text-xs border rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-violet-500 ${getPriorityStyle(r.priority)}`}
-                                  >
-                                    <option value="low">Low</option>
-                                    <option value="normal">Normal</option>
-                                    <option value="high">High</option>
-                                    <option value="urgent">Urgent</option>
-                                  </select>
-                                </div>
-                              </td>
-
-                              <td className="px-4 py-3">
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={r.technician_id || ""}
-                                    onChange={(e) => updateTechnician(r.tracking_id, e.target.value)}
-                                    className="text-xs border border-[#1F2235] rounded-lg px-2 py-1 bg-[#11131E] text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                                  >
-                                    <option value="">Unassigned</option>
-                                    {staff.map((s) => (
-                                      <option key={s.id} value={s.id}>
-                                        {s.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </td>
-
                               <td className="px-6 py-4 text-xs text-slate-500">
 
                                 {formatDateShort(r.created_at)}
@@ -3419,6 +3360,30 @@ function AdminDashboard({
                               <td className="px-4 py-3">
 
                                 <div className="flex items-center gap-1">
+
+                                  {(r.status === "completed" || r.status === "collection") && (
+
+                                    <button
+
+                                      onClick={() => {
+
+                                        setSelectedRepairForInvoice(r);
+
+                                        setShowInvoiceModal(true);
+
+                                      }}
+
+                                      className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 p-2 rounded-lg transition-colors"
+
+                                      title="Generate invoice"
+
+                                    >
+
+                                      <FileText className="h-4 w-4" />
+
+                                    </button>
+
+                                  )}
 
                                   <button
 
@@ -3538,6 +3503,104 @@ function AdminDashboard({
               </>
 
             )}
+
+            {/* Invoice Generation Modal */}
+            <AnimatePresence>
+              {showInvoiceModal && selectedRepairForInvoice && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+                  onClick={() => setShowInvoiceModal(false)}
+                >
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="w-full max-w-lg rounded-2xl border border-[#1F2235] bg-[#11131E] p-6 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 className="mb-4 text-lg font-semibold text-white">Generate Invoice</h3>
+                    <div className="space-y-4">
+                      <div className="bg-[#1A1D27] rounded-lg p-4 mb-4">
+                        <p className="text-sm text-slate-400 mb-2">Repair Details</p>
+                        <p className="text-white font-medium">{selectedRepairForInvoice.customer_name}</p>
+                        <p className="text-sm text-slate-400">{selectedRepairForInvoice.device_model}</p>
+                        <p className="text-sm text-slate-400">Tracking ID: {selectedRepairForInvoice.tracking_id}</p>
+                        <p className="text-sm text-emerald-400 font-semibold mt-2">
+                          Estimated Cost: £{selectedRepairForInvoice.estimated_cost || '0.00'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-300">Tax Rate</label>
+                        <select
+                          value={invoiceForm.tax_rate_id}
+                          onChange={(e) => setInvoiceForm({...invoiceForm, tax_rate_id: e.target.value})}
+                          className="w-full h-10 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                        >
+                          <option value="">Standard VAT (20%)</option>
+                          <option value="custom">Custom Rate</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-300">Notes (Optional)</label>
+                        <textarea
+                          value={invoiceForm.notes}
+                          onChange={(e) => setInvoiceForm({...invoiceForm, notes: e.target.value})}
+                          className="w-full h-20 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none"
+                          placeholder="Additional notes for the invoice..."
+                        />
+                      </div>
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          onClick={() => setShowInvoiceModal(false)}
+                          variant="outline"
+                          className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            try {
+                              const token = getStoredToken();
+                              const res = await fetch(buildUrl("/api/invoices/generate"), {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  "Authorization": `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                  repair_id: selectedRepairForInvoice.id,
+                                  tax_rate_id: invoiceForm.tax_rate_id || null,
+                                  notes: invoiceForm.notes
+                                })
+                              });
+                              const data = await res.json();
+                              if (res.ok) {
+                                safeToast.success("Invoice generated successfully");
+                                setShowInvoiceModal(false);
+                                setInvoiceForm({ tax_rate_id: "", notes: "" });
+                                setSelectedRepairForInvoice(null);
+                                fetchInvoices();
+                              } else {
+                                safeToast.error(data.detail || "Failed to generate invoice");
+                              }
+                            } catch (e) {
+                              console.error(e);
+                              safeToast.error("Failed to generate invoice");
+                            }
+                          }}
+                          className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                        >
+                          Generate Invoice
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
 
 
@@ -3803,7 +3866,10 @@ function AdminDashboard({
                     </Button>
 
                     <Button
-                      onClick={() => setShowImportModal(true)}
+                      onClick={() => {
+                        setImportContext("products");
+                        setShowImportModal(true);
+                      }}
                       variant="outline"
                       className="border-[#1F2235] text-white hover:bg-slate-800"
                     >
@@ -4210,7 +4276,9 @@ function AdminDashboard({
                         className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <h3 className="text-lg font-semibold text-white mb-4">Import Products</h3>
+                        <h3 className="text-lg font-semibold text-white mb-4">
+                          {importContext === "products" ? "Import Products" : "Import Repair Parts"}
+                        </h3>
                         <div className="space-y-4">
                           <div>
                             <Label className="text-slate-300">CSV/Excel File</Label>
@@ -4224,7 +4292,17 @@ function AdminDashboard({
                           </div>
                           <div className="bg-[#1A1D27] rounded-lg p-4 border border-[#1F2235]">
                             <p className="text-sm text-slate-400 mb-2">Expected CSV/Excel columns:</p>
-                            <code className="text-xs text-slate-300 block">name, description, category, brand, model, condition, price, stock_quantity, sku, min_stock_level, image_url</code>
+                            {importContext === "products" ? (
+                              <code className="text-xs text-slate-300 block">name, description, category, brand, model, condition, price, stock_quantity, sku, min_stock_level, image_url</code>
+                            ) : (
+                              <code className="text-xs text-slate-300 block">name, description, part_type, brand, model, sku, supplier, unit_cost, stock_quantity, min_stock_level, location, notes</code>
+                            )}
+                            <button
+                              onClick={downloadTemplate}
+                              className="mt-3 text-xs text-violet-400 hover:text-violet-300 underline"
+                            >
+                              Download template
+                            </button>
                           </div>
                           <div className="flex gap-3 pt-4">
                             <Button
@@ -4235,7 +4313,7 @@ function AdminDashboard({
                               Cancel
                             </Button>
                             <Button
-                              onClick={handleImportProducts}
+                              onClick={importContext === "products" ? handleImportProducts : handleImportRepairParts}
                               className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
                             >
                               Import
@@ -4254,21 +4332,6 @@ function AdminDashboard({
             {/* Repair Parts Inventory Section */}
             {activeSection === "repair_parts_inventory" && (
               <>
-                    {/* CTA Section */}
-                    <div className="mb-6 bg-gradient-to-r from-violet-600 to-purple-600 rounded-xl p-6 flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-white mb-1">Repair Parts Inventory</h3>
-                        <p className="text-sm text-violet-100">Manage your repair parts stock efficiently</p>
-                      </div>
-                      <Button
-                        onClick={() => setShowAddRepairPartModal(true)}
-                        className="bg-white text-violet-600 hover:bg-violet-50 font-medium"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add New Part
-                      </Button>
-                    </div>
-
                     <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                       <StatCard
                         title="Total Parts"
@@ -4326,6 +4389,17 @@ function AdminDashboard({
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Part
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setImportContext("repair_parts");
+                            setShowImportModal(true);
+                          }}
+                          variant="outline"
+                          className="border-[#1F2235] text-white hover:bg-slate-800"
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Import CSV/Excel
                         </Button>
                       </div>
                     </div>
@@ -6080,6 +6154,14 @@ function AdminDashboard({
                               <option value="parts">Parts</option>
                               <option value="other">Other</option>
                             </select>
+                            {newExpense.category === "other" && (
+                              <Input
+                                value={newExpense.otherCategory || ""}
+                                onChange={(e) => setNewExpense({...newExpense, otherCategory: e.target.value})}
+                                className="mt-2 h-10 border border-[#1F2235] bg-[#1A1D27] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
+                                placeholder="Specify category..."
+                              />
+                            )}
                           </div>
                           <div>
                             <label className="mb-1 block text-sm font-medium text-slate-300">Description</label>
@@ -6124,22 +6206,6 @@ function AdminDashboard({
                             />
                           </div>
                           <div>
-                            <label className="mb-1 block text-sm font-medium text-slate-300">Payment Method</label>
-                            <select
-                              value={newExpense.payment_method}
-                              onChange={(e) => setNewExpense({...newExpense, payment_method: e.target.value})}
-                              className="w-full h-10 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                            >
-                              <option value="">Select payment method</option>
-                              <option value="cash">Cash</option>
-                              <option value="card">Card</option>
-                              <option value="bank_transfer">Bank Transfer</option>
-                              <option value="check">Check</option>
-                              <option value="credit">Credit</option>
-                              <option value="other">Other</option>
-                            </select>
-                          </div>
-                          <div>
                             <label className="mb-1 block text-sm font-medium text-slate-300">Notes</label>
                             <textarea
                               value={newExpense.notes}
@@ -6147,6 +6213,32 @@ function AdminDashboard({
                               className="w-full h-20 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500 resize-none"
                               placeholder="Additional notes..."
                             />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-300">Source</label>
+                            <select
+                              value={newExpense.source}
+                              onChange={(e) => setNewExpense({...newExpense, source: e.target.value})}
+                              className="w-full h-10 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="manual">Manual Entry</option>
+                              <option value="repair">Repair Job</option>
+                              <option value="purchase">Purchase Order</option>
+                              <option value="other">Other</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm font-medium text-slate-300">Status</label>
+                            <select
+                              value={newExpense.status}
+                              onChange={(e) => setNewExpense({...newExpense, status: e.target.value})}
+                              className="w-full h-10 rounded-xl border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="approved">Approved</option>
+                              <option value="rejected">Rejected</option>
+                              <option value="paid">Paid</option>
+                            </select>
                           </div>
                           <div className="flex gap-3 pt-4">
                             <Button
@@ -6185,7 +6277,10 @@ function AdminDashboard({
                                       branch_id: "",
                                       supplier_id: "",
                                       payment_method: "",
-                                      notes: ""
+                                      notes: "",
+                                      status: "pending",
+                                      source: "manual",
+                                      otherCategory: ""
                                     });
                                     fetchExpenses();
                                   } else {
@@ -6481,6 +6576,12 @@ function AdminDashboard({
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
+                            Date
+
+                          </th>
+
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
                             Source
 
                           </th>
@@ -6494,12 +6595,6 @@ function AdminDashboard({
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
                             Amount
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Date
 
                           </th>
 
@@ -6535,13 +6630,13 @@ function AdminDashboard({
 
                           >
 
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(revenue.date)}</td>
+
                             <td className="px-4 py-3 font-medium text-white">{revenue.source || "N/A"}</td>
 
                             <td className="px-4 py-3 text-slate-400">{revenue.description || "N/A"}</td>
 
                             <td className="px-4 py-3 font-semibold text-emerald-400">£{(revenue.amount || 0).toFixed(2)}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{formatDateShort(revenue.date)}</td>
 
                             <td className="px-4 py-3">
 
@@ -7316,31 +7411,19 @@ function AdminDashboard({
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
+                            Supplier Code
+
+                          </th>
+
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
                             Contact
 
                           </th>
 
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
-                            Location
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
                             Status
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Orders
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Total Spend
 
                           </th>
 
@@ -7378,9 +7461,9 @@ function AdminDashboard({
 
                             <td className="px-4 py-3 font-medium text-white">{supplier.name || "N/A"}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{supplier.contact || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{supplier.supplier_code || "N/A"}</td>
 
-                            <td className="px-4 py-3 text-slate-400">{supplier.location || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{supplier.contact || "N/A"}</td>
 
                             <td className="px-4 py-3">
 
@@ -7391,10 +7474,6 @@ function AdminDashboard({
                               </span>
 
                             </td>
-
-                            <td className="px-4 py-3 font-semibold text-slate-400">{supplier.totalOrders || 0}</td>
-
-                            <td className="px-4 py-3 font-semibold text-emerald-400">£{supplier.totalSpend ? supplier.totalSpend.toFixed(2) : "0.00"}</td>
 
                             <td className="px-4 py-3">
                               <button
@@ -7455,6 +7534,15 @@ function AdminDashboard({
                               onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
                               className="border-[#1F2235] bg-[#1A1D27] text-white"
                               required
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Supplier Code</Label>
+                            <Input
+                              value={newSupplier.supplier_code}
+                              onChange={(e) => setNewSupplier({ ...newSupplier, supplier_code: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="e.g., SUP001"
                             />
                           </div>
                           <div>
@@ -7548,35 +7636,11 @@ function AdminDashboard({
 
                   <StatCard
 
-                    title="Pending"
+                    title="Total Purchase Value"
 
-                    value={purchaseOrders.filter(o => o.status === "pending").length}
+                    value={`£${purchaseOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0).toFixed(2)}`}
 
-                    icon={Clock}
-
-                    gradient="from-amber-500 to-orange-500"
-
-                  />
-
-                  <StatCard
-
-                    title="In Transit"
-
-                    value={purchaseOrders.filter(o => o.status === "in_transit").length}
-
-                    icon={Truck}
-
-                    gradient="from-violet-500 to-purple-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Received"
-
-                    value={purchaseOrders.filter(o => o.status === "received").length}
-
-                    icon={CheckCircle2}
+                    icon={DollarSign}
 
                     gradient="from-emerald-500 to-green-500"
 
@@ -7587,22 +7651,42 @@ function AdminDashboard({
                 {/* Filters */}
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
 
-                  <div className="relative flex-1">
+                  <div className="flex gap-2 flex-1">
+                    <div className="relative flex-1">
 
-                    <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                      <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
 
+                      <Input
+
+                        placeholder="Search by order ID or supplier"
+
+                        value={purchaseOrderSearch}
+
+                        onChange={(e) => setPurchaseOrderSearch(e.target.value)}
+
+                        className="h-10 border border-[#1F2235] bg-[#11131E] pl-10 text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
+
+                      />
+
+                    </div>
                     <Input
-
-                      placeholder="Search by order ID or supplier"
-
-                      value={purchaseOrderSearch}
-
-                      onChange={(e) => setPurchaseOrderSearch(e.target.value)}
-
-                      className="h-10 border border-[#1F2235] bg-[#11131E] pl-10 text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
-
+                      placeholder="PO Number"
+                      value={poNumberFilter}
+                      onChange={(e) => setPoNumberFilter(e.target.value)}
+                      className="h-10 border border-[#1F2235] bg-[#11131E] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl w-40"
                     />
-
+                    <Input
+                      placeholder="Supplier Code"
+                      value={supplierCodeFilter}
+                      onChange={(e) => setSupplierCodeFilter(e.target.value)}
+                      className="h-10 border border-[#1F2235] bg-[#11131E] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl w-40"
+                    />
+                    <Input
+                      type="date"
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="h-10 border border-[#1F2235] bg-[#11131E] text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl w-40"
+                    />
                   </div>
 
                   <Button
@@ -7677,7 +7761,10 @@ function AdminDashboard({
                         {purchaseOrders.filter(o => {
                           const matchSearch = o.orderId?.toLowerCase().includes(purchaseOrderSearch.toLowerCase()) ||
                             o.supplier?.toLowerCase().includes(purchaseOrderSearch.toLowerCase());
-                          return matchSearch;
+                          const matchPoNumber = !poNumberFilter || o.orderId?.toLowerCase().includes(poNumberFilter.toLowerCase());
+                          const matchSupplierCode = !supplierCodeFilter || o.supplier?.toLowerCase().includes(supplierCodeFilter.toLowerCase());
+                          const matchDate = !dateFilter || o.date?.includes(dateFilter);
+                          return matchSearch && matchPoNumber && matchSupplierCode && matchDate;
                         }).map((order, idx) => (
 
                           <motion.tr
@@ -7778,6 +7865,15 @@ function AdminDashboard({
                                 <option key={s.id} value={s.id}>{s.name}</option>
                               ))}
                             </select>
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Purchase Order Number</Label>
+                            <Input
+                              value={newPurchaseOrder.order_number}
+                              onChange={(e) => setNewPurchaseOrder({ ...newPurchaseOrder, order_number: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
+                              placeholder="PO-001 or leave blank for auto"
+                            />
                           </div>
                           <div>
                             <Label className="text-slate-300">Reference (optional)</Label>
@@ -8360,7 +8456,7 @@ function AdminDashboard({
 
               <>
 
-                {/* In-House Sales Section */}
+                {/* Retail Sales Section */}
                 <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
                   <StatCard
@@ -8413,6 +8509,177 @@ function AdminDashboard({
 
                 </div>
 
+                {/* Retail Sales Form */}
+                <div className="mb-6 bg-[#11131E] rounded-lg border border-[#1F2235] p-6">
+                  <h3 className="text-lg font-semibold text-white mb-6">Record Retail Sale</h3>
+                  
+                  {/* Customer Information */}
+                  <div className="bg-[#11131E] rounded-lg border border-[#1F2235] p-6 mb-4">
+                    <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Customer Information
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="retail_customer_name" className="text-slate-300">Customer Name *</Label>
+                        <Input
+                          id="retail_customer_name"
+                          value={newInhouseSale.customer_name}
+                          onChange={(e) => setNewInhouseSale({ ...newInhouseSale, customer_name: e.target.value })}
+                          required
+                          placeholder="John Doe"
+                          className="border-[#1F2235] bg-[#1A1D27] text-white"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="retail_customer_phone" className="text-slate-300">Phone Number</Label>
+                          <Input
+                            id="retail_customer_phone"
+                            value={newInhouseSale.customer_phone}
+                            onChange={(e) => setNewInhouseSale({ ...newInhouseSale, customer_phone: e.target.value })}
+                            placeholder="+1234567890"
+                            className="border-[#1F2235] bg-[#1A1D27] text-white"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="retail_customer_email" className="text-slate-300">Email</Label>
+                          <Input
+                            id="retail_customer_email"
+                            type="email"
+                            value={newInhouseSale.customer_email}
+                            onChange={(e) => setNewInhouseSale({ ...newInhouseSale, customer_email: e.target.value })}
+                            placeholder="customer@example.com"
+                            className="border-[#1F2235] bg-[#1A1D27] text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Product Selection */}
+                  <div className="bg-[#11131E] rounded-lg border border-[#1F2235] p-6 mb-4">
+                    <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Product Information
+                    </h3>
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="retail_product_id" className="text-slate-300">Select Product *</Label>
+                        <select
+                          id="retail_product_id"
+                          value={newInhouseSale.product_id}
+                          onChange={(e) => {
+                            const selectedProduct = products.find(p => p.id === e.target.value);
+                            setNewInhouseSale({ 
+                              ...newInhouseSale, 
+                              product_id: e.target.value,
+                              price_override: selectedProduct ? selectedProduct.price.toString() : ""
+                            });
+                          }}
+                          className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                          required
+                        >
+                          <option value="">Select a product</option>
+                          {products.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} - £{p.price} (Stock: {p.stock_quantity})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="retail_quantity" className="text-slate-300">Quantity *</Label>
+                          <Input
+                            id="retail_quantity"
+                            type="number"
+                            min="1"
+                            value={newInhouseSale.quantity}
+                            onChange={(e) => setNewInhouseSale({ ...newInhouseSale, quantity: e.target.value })}
+                            className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="retail_price_override" className="text-slate-300">Price Override (£)</Label>
+                          <Input
+                            id="retail_price_override"
+                            type="number"
+                            step="0.01"
+                            value={newInhouseSale.price_override}
+                            onChange={(e) => setNewInhouseSale({ ...newInhouseSale, price_override: e.target.value })}
+                            placeholder="Leave blank for default price"
+                            className="border-[#1F2235] bg-[#1A1D27] text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Information */}
+                  <div className="bg-[#11131E] rounded-lg border border-[#1F2235] p-6 mb-4">
+                    <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                      <DollarSign className="w-4 h-4" />
+                      Payment Information
+                    </h3>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="retail_payment_method" className="text-slate-300">Payment Method *</Label>
+                          <select
+                            id="retail_payment_method"
+                            value={newInhouseSale.payment_method}
+                            onChange={(e) => setNewInhouseSale({ ...newInhouseSale, payment_method: e.target.value })}
+                            className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            required
+                          >
+                            <option value="">Select method</option>
+                            <option value="cash">Cash</option>
+                            <option value="card">Card</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                          </select>
+                        </div>
+                        <div>
+                          <Label htmlFor="retail_payment_status" className="text-slate-300">Payment Status *</Label>
+                          <select
+                            id="retail_payment_status"
+                            value={newInhouseSale.payment_status}
+                            onChange={(e) => setNewInhouseSale({ ...newInhouseSale, payment_status: e.target.value })}
+                            className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            required
+                          >
+                            <option value="paid">Paid</option>
+                            <option value="partial">Partially Paid</option>
+                            <option value="pending">Pending/Credit</option>
+                          </select>
+                        </div>
+                      </div>
+                      {(newInhouseSale.payment_status === "partial" || newInhouseSale.payment_status === "paid") && (
+                        <div>
+                          <Label htmlFor="retail_payment_amount" className="text-slate-300">Payment Amount (£) *</Label>
+                          <Input
+                            id="retail_payment_amount"
+                            type="number"
+                            step="0.01"
+                            value={newInhouseSale.payment_amount}
+                            onChange={(e) => setNewInhouseSale({ ...newInhouseSale, payment_amount: e.target.value })}
+                            className="border-[#1F2235] bg-[#1A1D27] text-white"
+                            required
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleCreateInhouseSale}
+                    className="w-full bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
+                  >
+                    Record Sale
+                  </Button>
+                </div>
+
                 {/* Filters */}
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
 
@@ -8434,22 +8701,14 @@ function AdminDashboard({
 
                   </div>
 
-                  <Button
-                    onClick={() => setShowAddInhouseSaleModal(true)}
-                    className="bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Sale
-                  </Button>
-
                 </div>
 
-                {/* In-House Sales Table */}
+                {/* Retail Sales Table */}
                 <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
 
                   <div className="px-6 py-4 border-b border-[#1F2235]">
 
-                    <h3 className="text-sm font-semibold text-white">In-House Transactions</h3>
+                    <h3 className="text-sm font-semibold text-white">Recent Sales</h3>
 
                   </div>
 
@@ -8551,310 +8810,12 @@ function AdminDashboard({
 
                 </div>
 
-                {/* Add In-House Sale Modal */}
-                <AnimatePresence>
-                  {showAddInhouseSaleModal && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-                      onClick={() => setShowAddInhouseSaleModal(false)}
-                    >
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        className="bg-[#11131E] border border-[#1F2235] rounded-xl p-6 w-full max-w-md"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <h3 className="text-lg font-semibold text-white mb-4">Record In-House Sale</h3>
-                        <div className="space-y-4">
-                          <div>
-                            <Label className="text-slate-300">Reference</Label>
-                            <Input
-                              value={newInhouseSale.reference}
-                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, reference: e.target.value })}
-                              className="border-[#1F2235] bg-[#1A1D27] text-white"
-                              placeholder="SALE-001 or leave blank for auto"
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-slate-300">Customer Name *</Label>
-                            <Input
-                              value={newInhouseSale.customer_name}
-                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, customer_name: e.target.value })}
-                              className="border-[#1F2235] bg-[#1A1D27] text-white"
-                              required
-                            />
-                          </div>
-                          <div>
-                            <Label className="text-slate-300">Customer Phone</Label>
-                            <Input
-                              value={newInhouseSale.customer_phone}
-                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, customer_phone: e.target.value })}
-                              className="border-[#1F2235] bg-[#1A1D27] text-white"
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label className="text-slate-300">Amount (£) *</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={newInhouseSale.amount}
-                                onChange={(e) => setNewInhouseSale({ ...newInhouseSale, amount: e.target.value })}
-                                className="border-[#1F2235] bg-[#1A1D27] text-white"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label className="text-slate-300">Items Count</Label>
-                              <Input
-                                type="number"
-                                value={newInhouseSale.item_count}
-                                onChange={(e) => setNewInhouseSale({ ...newInhouseSale, item_count: e.target.value })}
-                                className="border-[#1F2235] bg-[#1A1D27] text-white"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <Label className="text-slate-300">Payment Method</Label>
-                            <select
-                              value={newInhouseSale.payment_method}
-                              onChange={(e) => setNewInhouseSale({ ...newInhouseSale, payment_method: e.target.value })}
-                              className="w-full h-10 rounded-lg border border-[#1F2235] bg-[#1A1D27] px-3 py-2 text-sm text-slate-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
-                            >
-                              <option value="cash">Cash</option>
-                              <option value="card">Card</option>
-                              <option value="bank_transfer">Bank Transfer</option>
-                            </select>
-                          </div>
-                          <div className="flex gap-3 pt-4">
-                            <Button
-                              onClick={() => setShowAddInhouseSaleModal(false)}
-                              variant="outline"
-                              className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              onClick={handleCreateInhouseSale}
-                              className="flex-1 bg-[#6B46C1] hover:bg-[#5B3A9E] text-white"
-                            >
-                              Record Sale
-                            </Button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
               </>
 
             )}
 
 
 
-            {activeSection === "online_sales" && (
-
-              <>
-
-                {/* Online Sales Section */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-                  <StatCard
-
-                    title="Total Orders"
-
-                    value={onlineSales.length}
-
-                    icon={ShoppingCart}
-
-                    gradient="from-blue-500 to-cyan-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Revenue"
-
-                    value={`£${onlineSales.reduce((sum, s) => sum + (s.amount || 0), 0).toFixed(0)}`}
-
-                    icon={DollarSign}
-
-                    gradient="from-emerald-500 to-green-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Pending"
-
-                    value={onlineSales.filter(s => s.status === "pending").length}
-
-                    icon={Clock}
-
-                    gradient="from-amber-500 to-orange-500"
-
-                  />
-
-                  <StatCard
-
-                    title="Completed"
-
-                    value={onlineSales.filter(s => s.status === "completed").length}
-
-                    icon={CheckCircle2}
-
-                    gradient="from-violet-500 to-purple-500"
-
-                  />
-
-                </div>
-
-                {/* Filters */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
-
-                  <div className="relative flex-1">
-
-                    <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
-
-                    <Input
-
-                      placeholder="Search by order ID or customer"
-
-                      value={onlineSaleSearch}
-
-                      onChange={(e) => setOnlineSaleSearch(e.target.value)}
-
-                      className="h-10 border border-[#1F2235] bg-[#11131E] pl-10 text-white placeholder:text-slate-500 focus-visible:ring-violet-500 rounded-xl"
-
-                    />
-
-                  </div>
-
-                </div>
-
-                {/* Online Sales Table */}
-                <div className="overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
-
-                  <div className="px-6 py-4 border-b border-[#1F2235]">
-
-                    <h3 className="text-sm font-semibold text-white">Online Orders</h3>
-
-                  </div>
-
-                  <div className="overflow-x-auto">
-
-                    <table className="w-full text-sm">
-
-                      <thead>
-
-                        <tr className="border-b border-[#1F2235] bg-[#11131E]">
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Order ID
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Customer
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Amount
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Items
-
-                          </th>
-
-                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Status
-
-                          </th>
-
-                        </tr>
-
-                      </thead>
-
-                      <tbody>
-
-                        {onlineSales.filter(s => {
-                          const matchSearch = s.orderId?.toLowerCase().includes(onlineSaleSearch.toLowerCase()) ||
-                            s.customer?.toLowerCase().includes(onlineSaleSearch.toLowerCase());
-                          return matchSearch;
-                        }).map((sale, idx) => (
-
-                          <motion.tr
-
-                            key={sale.id}
-
-                            initial={{ opacity: 0, y: 8 }}
-
-                            animate={{ opacity: 1, y: 0 }}
-
-                            transition={{ delay: idx * 0.03 }}
-
-                            className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
-
-                          >
-
-                            <td className="px-4 py-3 font-medium text-white">{sale.orderId || "N/A"}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{sale.customer || "N/A"}</td>
-
-                            <td className="px-4 py-3 font-semibold text-emerald-400">£{(sale.amount || 0).toFixed(2)}</td>
-
-                            <td className="px-4 py-3 text-slate-400">{sale.itemCount || 0}</td>
-
-                            <td className="px-4 py-3">
-
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${sale.status === "completed" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
-
-                                {sale.status || "pending"}
-
-                              </span>
-
-                            </td>
-
-                          </motion.tr>
-
-                        ))}
-
-                      </tbody>
-
-                    </table>
-
-                  </div>
-
-                  {onlineSales.length === 0 && (
-
-                    <div className="px-6 py-16 text-center text-slate-400">
-
-                      <ShoppingCart className="mx-auto mb-3 h-8 w-8 opacity-40" />
-
-                      <p className="text-sm">No online orders yet</p>
-
-                    </div>
-
-                  )}
-
-                </div>
-
-              </>
-
-            )}
 
 
 
@@ -8997,6 +8958,12 @@ function AdminDashboard({
 
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
+                            Date & Time
+
+                          </th>
+
+                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
                             Customer
 
                           </th>
@@ -9004,12 +8971,6 @@ function AdminDashboard({
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
                             Service
-
-                          </th>
-
-                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Date & Time
 
                           </th>
 
@@ -9049,6 +9010,14 @@ function AdminDashboard({
 
                             >
 
+                              <td className="px-6 py-4 text-white">
+
+                                <div>{formatDateShort(booking.date)}</div>
+
+                                <div className="text-xs text-slate-500">{booking.time}</div>
+
+                              </td>
+
                               <td className="px-4 py-3">
 
                                 <div className="font-medium text-white">
@@ -9068,14 +9037,6 @@ function AdminDashboard({
                               <td className="px-6 py-4 text-slate-400">
 
                                 {booking.service}
-
-                              </td>
-
-                              <td className="px-6 py-4 text-white">
-
-                                <div>{formatDateShort(booking.date)}</div>
-
-                                <div className="text-xs text-slate-500">{booking.time}</div>
 
                               </td>
 
@@ -9227,7 +9188,97 @@ function AdminDashboard({
 
 
             {activeSection === "walkin" && (
-              <WalkInIntake token={token} />
+              <>
+                {/* Walk-in Repair Stat Cards */}
+                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <StatCard
+                    title="Today's Repairs"
+                    value={repairs.filter(r => new Date(r.created_at).toDateString() === new Date().toDateString()).length}
+                    icon={Wrench}
+                    gradient="from-emerald-500 to-green-500"
+                  />
+                  <StatCard
+                    title="Active Repairs"
+                    value={repairs.filter(r => r.status !== "completed" && r.status !== "cancelled").length}
+                    icon={Clock}
+                    gradient="from-blue-500 to-cyan-500"
+                  />
+                  <StatCard
+                    title="Completed Today"
+                    value={repairs.filter(r => r.status === "completed" && new Date(r.updated_at).toDateString() === new Date().toDateString()).length}
+                    icon={CheckCircle}
+                    gradient="from-violet-500 to-purple-500"
+                  />
+                  <StatCard
+                    title="Avg. Repair Cost"
+                    value={`£${repairs.length > 0 ? (repairs.reduce((sum, r) => sum + (r.estimated_cost || 0), 0) / repairs.length).toFixed(0) : "0"}`}
+                    icon={DollarSign}
+                    gradient="from-amber-500 to-orange-500"
+                  />
+                </div>
+                <WalkInIntake token={token} />
+
+                {/* Walk-in Repair Table */}
+                <div className="mt-6 overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
+                  <div className="px-6 py-4 border-b border-[#1F2235]">
+                    <h3 className="text-sm font-semibold text-white">Recent Repairs</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[#1F2235] bg-[#11131E]">
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                            Tracking ID
+                          </th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                            Customer
+                          </th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                            Device
+                          </th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                            Status
+                          </th>
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                            Date
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repairs.filter(r => {
+                          const matchSearch = r.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
+                            r.tracking_id?.toLowerCase().includes(search.toLowerCase());
+                          return matchSearch;
+                        }).map((repair, idx) => (
+                          <motion.tr
+                            key={repair.tracking_id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: idx * 0.03 }}
+                            className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
+                          >
+                            <td className="px-4 py-3 font-medium text-white">{repair.tracking_id || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{repair.customer_name || "N/A"}</td>
+                            <td className="px-4 py-3 text-slate-400">{repair.device_model || "N/A"}</td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(repair.status)}`}>
+                                {repair.status || "N/A"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-slate-400">{formatDateShort(repair.created_at)}</td>
+                          </motion.tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {repairs.length === 0 && (
+                    <div className="px-6 py-16 text-center text-slate-400">
+                      <Wrench className="mx-auto mb-3 h-8 w-8 opacity-40" />
+                      <p className="text-sm">No repairs yet</p>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
 
 
@@ -9981,7 +10032,7 @@ function AdminDashboard({
                 </div>
 
                 {/* Period Filter */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
                   <div className="flex gap-2">
                     <button
                       onClick={() => setProfitLossPeriod("month")}
@@ -10002,6 +10053,41 @@ function AdminDashboard({
                       This Year
                     </button>
                   </div>
+                  {profitLossDateRange && (
+                    <div className="text-sm text-slate-400">
+                      <Calendar className="inline h-4 w-4 mr-1" />
+                      {new Date(profitLossDateRange.startDate).toLocaleDateString()} - {new Date(profitLossDateRange.endDate).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Search and Filter */}
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search categories..."
+                      value={profitLossSearch}
+                      onChange={(e) => setProfitLossSearch(e.target.value)}
+                      className="border-[#1F2235] bg-[#1A1D27] pl-10"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-slate-600" />
+                    <select
+                      value={profitLossCategoryFilter}
+                      onChange={(e) => setProfitLossCategoryFilter(e.target.value)}
+                      className="rounded-lg border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-white"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="Sales">Sales</option>
+                      <option value="Operations">Operations</option>
+                      <option value="Marketing">Marketing</option>
+                      <option value="Rent">Rent</option>
+                      <option value="Utilities">Utilities</option>
+                      <option value="Salaries">Salaries</option>
+                    </select>
+                  </div>
                 </div>
 
                 {/* P&L Table */}
@@ -10013,6 +10099,9 @@ function AdminDashboard({
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b border-[#1F2235] bg-[#11131E]">
+                          <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                            Date
+                          </th>
                           <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
                             Category
                           </th>
@@ -10031,7 +10120,7 @@ function AdminDashboard({
                         </tr>
                       </thead>
                       <tbody>
-                        {profitLoss.map((item, idx) => (
+                        {filteredProfitLoss.map((item, idx) => (
                           <motion.tr
                             key={item?.id || idx}
                             initial={{ opacity: 0, y: 8 }}
@@ -10039,6 +10128,7 @@ function AdminDashboard({
                             transition={{ delay: idx * 0.03 }}
                             className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
                           >
+                            <td className="px-4 py-3 text-slate-400">{item?.id && item?.id.match(/^\d{4}-\d{2}-\d{2}/) ? new Date(item.id).toLocaleDateString() : "N/A"}</td>
                             <td className="px-4 py-3 font-medium text-white">{item?.category || "N/A"}</td>
                             <td className="px-4 py-3 font-semibold text-emerald-400">£{(item?.revenue || 0).toFixed(2)}</td>
                             <td className="px-4 py-3 font-semibold text-rose-400">£{(item?.expenses || 0).toFixed(2)}</td>
@@ -10085,14 +10175,14 @@ function AdminDashboard({
                   />
                   <StatCard
                     title="Cash Balance"
-                    value={`£${(cashFlow.filter(c => c?.type === "in").reduce((sum, c) => sum + (c?.amount || 0), 0) - cashFlow.filter(c => c?.type === "out").reduce((sum, c) => sum + (c?.amount || 0), 0)).toFixed(0)}`}
+                    value={`£${(cashFlowSummary?.cashBalance || 0).toFixed(0)}`}
                     icon={Activity}
                     gradient="from-violet-500 to-purple-500"
                   />
                 </div>
 
                 {/* Period Filter */}
-                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
                   <div className="flex gap-2">
                     <button
                       onClick={() => setCashFlowPeriod("month")}
@@ -10112,6 +10202,37 @@ function AdminDashboard({
                     >
                       This Year
                     </button>
+                  </div>
+                  {cashFlowDateRange && (
+                    <div className="text-sm text-slate-400">
+                      <Calendar className="inline h-4 w-4 mr-1" />
+                      {new Date(cashFlowDateRange.startDate).toLocaleDateString()} - {new Date(cashFlowDateRange.endDate).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Search and Filter */}
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={cashFlowSearch}
+                      onChange={(e) => setCashFlowSearch(e.target.value)}
+                      className="border-[#1F2235] bg-[#1A1D27] pl-10"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-4 w-4 text-slate-600" />
+                    <select
+                      value={cashFlowTypeFilter}
+                      onChange={(e) => setCashFlowTypeFilter(e.target.value)}
+                      className="rounded-lg border border-[#1F2235] bg-[#11131E] px-3 py-2 text-sm text-white"
+                    >
+                      <option value="all">All Types</option>
+                      <option value="in">Inflow</option>
+                      <option value="out">Outflow</option>
+                    </select>
                   </div>
                 </div>
 
@@ -10142,7 +10263,7 @@ function AdminDashboard({
                         </tr>
                       </thead>
                       <tbody>
-                        {cashFlow.map((item, idx) => (
+                        {filteredCashFlow.map((item, idx) => (
                           <motion.tr
                             key={item?.id || idx}
                             initial={{ opacity: 0, y: 8 }}

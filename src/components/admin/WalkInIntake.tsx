@@ -28,12 +28,8 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
     issue_description: "",
     estimated_cost: "",
     notification_preference: "email",
-    create_invoice: false,
-    invoice_amount: "",
-    tax_rate: "0",
     deposit_amount: "",
     payment_method: "",
-    due_date: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -42,11 +38,6 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
 
   const handleSelectChange = (name: string, value: string) => {
     setFormData({ ...formData, [name]: value });
-  };
-
-  const handleCheckboxChange = (checked: boolean | string) => {
-    const isChecked = checked === true;
-    setFormData({ ...formData, create_invoice: isChecked });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,12 +57,8 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
         issue_description: formData.issue_description,
         estimated_cost: formData.estimated_cost ? parseFloat(formData.estimated_cost) : 0,
         notification_preference: formData.notification_preference,
-        create_invoice: formData.create_invoice,
-        invoice_amount: formData.create_invoice && formData.invoice_amount ? parseFloat(formData.invoice_amount) : null,
-        tax_rate: formData.create_invoice && formData.tax_rate ? parseFloat(formData.tax_rate) / 100 : 0,
-        deposit_amount: formData.create_invoice && formData.deposit_amount ? parseFloat(formData.deposit_amount) : null,
-        payment_method: (formData.create_invoice && formData.deposit_amount && formData.payment_method) ? formData.payment_method : undefined,
-        due_date: formData.create_invoice && formData.due_date ? formData.due_date : null,
+        deposit_amount: formData.deposit_amount ? parseFloat(formData.deposit_amount) : null,
+        payment_method: (formData.deposit_amount && formData.payment_method) ? formData.payment_method : undefined,
       };
 
       const res = await fetch(`${API_BASE}/walkin/intake`, {
@@ -103,12 +90,8 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
           issue_description: "",
           estimated_cost: "",
           notification_preference: "email",
-          create_invoice: false,
-          invoice_amount: "",
-          tax_rate: "0",
           deposit_amount: "",
           payment_method: "",
-          due_date: "",
         });
       } else {
         console.error("Walk-in intake error:", data);
@@ -294,100 +277,50 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
           </div>
         </div>
 
-        {/* Invoice Section */}
+        {/* Deposit Payment Section */}
         <div className="bg-[#11131E] rounded-lg border border-[#1F2235] p-6">
-          <div className="flex items-center space-x-2 mb-4">
-            <input
-              type="checkbox"
-              id="create_invoice"
-              checked={formData.create_invoice}
-              onChange={(e) => handleCheckboxChange(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary cursor-pointer"
-            />
-            <Label htmlFor="create_invoice" className="font-semibold text-white flex items-center gap-2 cursor-pointer">
-              <FileText className="w-4 h-4" />
-              Create Invoice
-            </Label>
-          </div>
-
-          {formData.create_invoice && (
-            <div className="space-y-3 pl-6 border-l-2 border-[#1F2235]">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="invoice_amount" className="text-slate-300">Invoice Amount ($)</Label>
-                  <Input
-                    id="invoice_amount"
-                    name="invoice_amount"
-                    type="number"
-                    step="0.01"
-                    value={formData.invoice_amount}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    className="border-[#1F2235] bg-[#1A1D27] text-white"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="tax_rate" className="text-slate-300">Tax Rate (%)</Label>
-                  <Input
-                    id="tax_rate"
-                    name="tax_rate"
-                    type="number"
-                    step="0.1"
-                    value={formData.tax_rate}
-                    onChange={handleChange}
-                    placeholder="0"
-                    className="border-[#1F2235] bg-[#1A1D27] text-white"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="deposit_amount" className="text-slate-300">Deposit Amount ($)</Label>
-                  <Input
-                    id="deposit_amount"
-                    name="deposit_amount"
-                    type="number"
-                    step="0.01"
-                    value={formData.deposit_amount}
-                    onChange={handleChange}
-                    placeholder="0.00"
-                    className="border-[#1F2235] bg-[#1A1D27] text-white"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="payment_method" className="text-slate-300">Payment Method</Label>
-                  <Select
-                    value={formData.payment_method}
-                    onValueChange={(value) => handleSelectChange("payment_method", value)}
-                    disabled={!formData.deposit_amount}
-                  >
-                    <SelectTrigger className="border-[#1F2235] bg-[#1A1D27] text-white">
-                      <SelectValue placeholder="Select method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="card">Card</SelectItem>
-                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+          <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+            <DollarSign className="w-4 h-4" />
+            Optional Deposit Payment
+          </h3>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="due_date" className="text-slate-300">Due Date</Label>
+                <Label htmlFor="deposit_amount" className="text-slate-300">Deposit Amount (£)</Label>
                 <Input
-                  id="due_date"
-                  name="due_date"
-                  type="date"
-                  value={formData.due_date}
+                  id="deposit_amount"
+                  name="deposit_amount"
+                  type="number"
+                  step="0.01"
+                  value={formData.deposit_amount}
                   onChange={handleChange}
+                  placeholder="0.00"
                   className="border-[#1F2235] bg-[#1A1D27] text-white"
                 />
               </div>
+              <div>
+                <Label htmlFor="payment_method" className="text-slate-300">Payment Method</Label>
+                <Select
+                  value={formData.payment_method}
+                  onValueChange={(value) => handleSelectChange("payment_method", value)}
+                  disabled={!formData.deposit_amount}
+                >
+                  <SelectTrigger className="border-[#1F2235] bg-[#1A1D27] text-white">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          )}
+            <p className="text-xs text-slate-500">Deposit will be applied to the final invoice when repair is completed.</p>
+          </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="w-full bg-[#6B46C1] hover:bg-[#5B3A9E] text-white" disabled={isLoading}>
           {isLoading ? "Processing..." : "Submit Walk-in Intake"}
         </Button>
       </form>

@@ -6,10 +6,10 @@ from typing import Optional
 import csv
 from io import StringIO
 from uuid import UUID
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.database import get_db
-from app.models import Transaction, Invoice, Expense, User, Branch, OnlineSale, InHouseSale, InvoiceStatus, TransactionStatus, ExpenseStatus
+from app.models import Transaction, Invoice, Expense, User, Branch, OnlineSale, InHouseSale, InvoiceStatus, TransactionStatus, TransactionType, ExpenseStatus, Product, PaymentMethod
 from app.dependencies import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/finance", tags=["Finance"])
@@ -103,12 +103,23 @@ class OnlineSaleUpdate(BaseModel):
 
 
 class InHouseSaleCreate(BaseModel):
-    reference: str
+    reference: Optional[str] = None
     customer_name: str
-    customer_phone: str = None
-    amount: float
-    item_count: int = 0
-    payment_method: str = None
+    customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
+    product_id: str
+    quantity: Optional[int] = 1
+    price_override: Optional[float] = None
+    payment_method: Optional[str] = None
+    payment_status: Optional[str] = "paid"  # paid, partial, pending
+    payment_amount: Optional[float] = None
+
+    @field_validator('payment_amount')
+    @classmethod
+    def validate_payment_amount(cls, v, info):
+        if info.data.get('payment_status') == "partial" and v is None:
+            raise ValueError("payment_amount is required when payment_status is 'partial'")
+        return v
 
 
 class InHouseSaleUpdate(BaseModel):
@@ -148,23 +159,58 @@ async def get_finance_stats(
     if branch_id and branch_id != "all":
         invoice_filters.append(Invoice.branch_id == branch_id)
     
-    # Total Revenue (from invoices with paid or partial status)
-    total_revenue = db.query(func.sum(Invoice.amount)).filter(
+    # Total Revenue (from invoices, online sales, in-house sales, and revenue transactions)
+    invoice_revenue = db.query(func.sum(Invoice.amount)).filter(
         and_(
             Invoice.status.in_([InvoiceStatus.paid, InvoiceStatus.partial]),
             *invoice_filters
         )
     ).scalar() or 0
     
-    # Monthly Revenue (from invoices with paid or partial status)
-    monthly_revenue = db.query(func.sum(Invoice.amount
-    )).filter(
+    online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
+        OnlineSale.status == "completed"
+    ).scalar() or 0
+    
+    inhouse_sales_revenue = db.query(func.sum(InHouseSale.amount)).scalar() or 0
+    
+    transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
+        and_(
+            Transaction.type == "revenue",
+            Transaction.status == "completed"
+        )
+    ).scalar() or 0
+    
+    total_revenue = invoice_revenue + online_sales_revenue + inhouse_sales_revenue + transaction_revenue
+    
+    # Monthly Revenue (from all revenue sources in last 30 days)
+    monthly_invoice_revenue = db.query(func.sum(Invoice.amount)).filter(
         and_(
             Invoice.status.in_([InvoiceStatus.paid, InvoiceStatus.partial]),
             Invoice.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time()),
             *invoice_filters
         )
     ).scalar() or 0
+    
+    monthly_online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
+        and_(
+            OnlineSale.status == "completed",
+            OnlineSale.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
+        )
+    ).scalar() or 0
+    
+    monthly_inhouse_sales_revenue = db.query(func.sum(InHouseSale.amount)).filter(
+        InHouseSale.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
+    ).scalar() or 0
+    
+    monthly_transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
+        and_(
+            Transaction.type == "revenue",
+            Transaction.status == "completed",
+            Transaction.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
+        )
+    ).scalar() or 0
+    
+    monthly_revenue = monthly_invoice_revenue + monthly_online_sales_revenue + monthly_inhouse_sales_revenue + monthly_transaction_revenue
     
     # Outstanding Payments
     outstanding_payments = db.query(func.sum(Invoice.amount - Invoice.deposit_paid)).filter(
@@ -221,16 +267,35 @@ async def get_finance_stats(
 
 @router.get("/transactions")
 async def get_transactions(
+    period: str = "all",
     branch_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all financial transactions"""
+    """Get all financial transactions with optional time period filtering"""
+    
+    # Calculate date range based on period
+    now = datetime.utcnow()
+    if period == "daily":
+        start_date = now.date()
+    elif period == "weekly":
+        start_date = (now - timedelta(days=7)).date()
+    elif period == "monthly":
+        start_date = (now - timedelta(days=30)).date()
+    elif period == "quarterly":
+        start_date = (now - timedelta(days=90)).date()
+    elif period == "yearly":
+        start_date = (now - timedelta(days=365)).date()
+    else:  # all time
+        start_date = date.min
     
     query = db.query(Transaction)
     
     if branch_id and branch_id != "all":
         query = query.filter(Transaction.branch_id == branch_id)
+    
+    if period != "all":
+        query = query.filter(Transaction.created_at >= datetime.combine(start_date, datetime.min.time()))
     
     transactions = query.order_by(Transaction.created_at.desc()).limit(100).all()
     
@@ -344,29 +409,114 @@ async def create_inhouse_sale(
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
 ):
-    """Create a new in-house sale (accessories, etc) - Staff can use this for manual accessory book-in"""
+    """Create a retail sale with product selection, immediate invoice creation, and payment tracking"""
+
+    # Validate required fields
+    if not body.product_id or not body.product_id.strip():
+        raise HTTPException(400, "product_id is required")
+    if not body.customer_name or not body.customer_name.strip():
+        raise HTTPException(400, "customer_name is required")
+
+    # Safe UUID parse
+    try:
+        product_uuid = UUID(body.product_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(400, f"Invalid product_id: '{body.product_id}'")
+
+    # Get product from inventory
+    product = db.query(Product).filter(Product.id == product_uuid).first()
+    if not product:
+        raise HTTPException(404, "Product not found")
+
+    qty = body.quantity or 1
+    if product.stock_quantity < qty:
+        raise HTTPException(400, f"Insufficient stock. Available: {product.stock_quantity}, Requested: {qty}")
+
+    # Calculate price (use override if provided, otherwise product price)
+    unit_price = body.price_override if body.price_override is not None else float(product.price)
+    total_amount = unit_price * qty
+
+    # Generate a unique reference if not provided
+    import uuid as _uuid
+    reference = body.reference or f"SALE-{datetime.now().strftime('%Y%m%d')}-{str(_uuid.uuid4())[:8].upper()}"
+    
+    # Resolve payment_method enum safely
+    payment_method_enum = None
+    if body.payment_method:
+        try:
+            payment_method_enum = PaymentMethod(body.payment_method)
+        except ValueError:
+            raise HTTPException(400, f"Invalid payment_method '{body.payment_method}'. Must be one of: cash, card, bank_transfer, online")
+
+    # Create sale record (InHouseSale has no customer_email column)
     sale = InHouseSale(
-        reference=body.reference,
+        reference=reference,
         customer_name=body.customer_name,
         customer_phone=body.customer_phone,
-        amount=body.amount,
-        item_count=body.item_count,
-        payment_method=body.payment_method
+        amount=total_amount,
+        item_count=qty,
+        payment_method=payment_method_enum,
     )
     db.add(sale)
     db.commit()
     db.refresh(sale)
-    
+
+    # Generate invoice number
+    invoice_num = f"INV-{datetime.now().strftime('%Y%m%d')}-{str(sale.id)[:8].upper()}"
+
+    # Map payment_status string to InvoiceStatus enum
+    if body.payment_status == "paid":
+        invoice_status = InvoiceStatus.paid
+    elif body.payment_status == "partial":
+        invoice_status = InvoiceStatus.partial
+    else:
+        invoice_status = InvoiceStatus.pending
+
+    # Create invoice immediately
+    invoice = Invoice(
+        invoice_number=invoice_num,
+        customer_name=body.customer_name,
+        customer_email=body.customer_email,
+        customer_phone=body.customer_phone,
+        amount=total_amount,
+        tax_amount=0,
+        deposit_paid=0,
+        status=invoice_status,
+        due_date=datetime.now().date() if body.payment_status == "pending" else None,
+    )
+    db.add(invoice)
+    db.commit()
+    db.refresh(invoice)
+
+    # Create payment transaction if payment was made
+    if body.payment_status in ["paid", "partial"] and body.payment_amount and payment_method_enum:
+        transaction = Transaction(
+            type=TransactionType.payment,
+            amount=body.payment_amount,
+            description=f"Payment for retail sale {reference}",
+            customer_name=body.customer_name,
+            invoice_number=invoice_num,
+            status=TransactionStatus.completed,
+            payment_method=payment_method_enum,
+        )
+        db.add(transaction)
+        db.commit()
+
+    # Deduct from inventory
+    product.stock_quantity -= body.quantity
+    db.commit()
+
     return {
         "success": True,
-        "message": "In-house sale recorded successfully",
+        "message": "Retail sale recorded successfully",
         "sale": {
             "id": str(sale.id),
             "reference": sale.reference,
             "customer_name": sale.customer_name,
             "amount": float(sale.amount),
             "item_count": sale.item_count,
-            "payment_method": sale.payment_method,
+            "payment_method": sale.payment_method.value if sale.payment_method else None,
+            "invoice_number": invoice_num,
             "created_at": sale.created_at.isoformat()
         }
     }
@@ -815,16 +965,17 @@ async def get_revenue(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all revenue entries (from invoices and transactions)"""
+    """Get all revenue entries (from invoices, online sales, in-house sales, and transactions)"""
     
-    # Get revenue from invoices
+    result = []
+    
+    # Get revenue from invoices (repairs)
     invoice_query = db.query(Invoice)
     if branch_id and branch_id != "all":
         invoice_query = invoice_query.filter(Invoice.branch_id == branch_id)
     
     invoices = invoice_query.filter(Invoice.status.in_([InvoiceStatus.paid, InvoiceStatus.partial])).all()
     
-    result = []
     for inv in invoices:
         invoice_status = "received" if inv.status == InvoiceStatus.paid else inv.status.value
         result.append({
@@ -835,6 +986,34 @@ async def get_revenue(
             "date": inv.created_at.date().isoformat(),
             "created_at": inv.created_at.isoformat(),
             "status": invoice_status,
+        })
+    
+    # Get revenue from online sales
+    online_sales = db.query(OnlineSale).filter(OnlineSale.status == "completed").all()
+    
+    for sale in online_sales:
+        result.append({
+            "id": str(sale.id),
+            "source": "online",
+            "description": f"Online Order {sale.order_id}",
+            "amount": float(sale.amount),
+            "date": sale.created_at.date().isoformat(),
+            "created_at": sale.created_at.isoformat(),
+            "status": "received",
+        })
+    
+    # Get revenue from in-house sales
+    inhouse_sales = db.query(InHouseSale).all()
+    
+    for sale in inhouse_sales:
+        result.append({
+            "id": str(sale.id),
+            "source": "retail",
+            "description": f"In-House Sale {sale.reference or sale.id}",
+            "amount": float(sale.amount),
+            "date": sale.created_at.date().isoformat(),
+            "created_at": sale.created_at.isoformat(),
+            "status": "received",
         })
     
     # Add revenue from non-invoice payments only to avoid double-counting invoice-linked payments

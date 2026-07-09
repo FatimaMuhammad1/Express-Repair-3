@@ -49,6 +49,7 @@ class PurchaseOrderItemOut(BaseModel):
 
 
 class PurchaseOrderCreate(BaseModel):
+    order_number: Optional[str] = None
     supplier_id: Optional[UUID] = None
     branch_id: Optional[UUID] = None
     notes: Optional[str] = None
@@ -75,8 +76,8 @@ def create_purchase_order(
     current_user: User = Depends(require_roles("SUPER_ADMIN"))
 ):
     """Create a new purchase order with line items"""
-    # Generate order number
-    order_number = f"PO-{datetime.now().strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
+    # Use provided order number or generate one
+    order_number = body.order_number if body.order_number else f"PO-{datetime.now().strftime('%Y%m%d')}-{str(uuid4())[:8].upper()}"
     
     # Calculate total amount from items
     items_total = sum(item.quantity * item.unit_cost for item in body.items)
@@ -166,6 +167,7 @@ class PurchaseOrderItemOut(BaseModel):
 
 
 class PurchaseOrderCreate(BaseModel):
+    order_number: Optional[str] = None
     supplier_id: Optional[UUID] = None
     branch_id: Optional[UUID] = None
     notes: Optional[str] = None

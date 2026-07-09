@@ -82,6 +82,11 @@ def get_profit_loss(
     return {
         "success": True,
         "profitLoss": result,
+        "dateRange": {
+            "startDate": start_date.isoformat(),
+            "endDate": now.isoformat(),
+            "period": period
+        },
         "summary": {
             "totalRevenue": float(revenue),
             "totalExpenses": float(expenses),
@@ -146,14 +151,36 @@ def get_cash_flow(
     total_in = sum(r["amount"] for r in result if r["type"] == "in")
     total_out = sum(r["amount"] for r in result if r["type"] == "out")
     
+    # Calculate all-time cash balance (cumulative from all time)
+    all_time_in = db.query(
+        func.sum(Transaction.amount)
+    ).filter(
+        Transaction.type == "payment",
+        Transaction.status == "completed"
+    ).scalar() or 0
+    
+    all_time_out = db.query(
+        func.sum(Transaction.amount)
+    ).filter(
+        Transaction.type.in_(["expense", "refund"]),
+        Transaction.status == "completed"
+    ).scalar() or 0
+    
+    cash_balance = all_time_in - all_time_out
+    
     return {
         "success": True,
         "cashFlow": sorted(result, key=lambda x: x["date"], reverse=True),
+        "dateRange": {
+            "startDate": start_date.isoformat(),
+            "endDate": now.isoformat(),
+            "period": period
+        },
         "summary": {
             "cashIn": total_in,
             "cashOut": total_out,
             "netCashFlow": total_in - total_out,
-            "cashBalance": total_in - total_out
+            "cashBalance": cash_balance
         }
     }
 

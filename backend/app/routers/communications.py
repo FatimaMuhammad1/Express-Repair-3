@@ -65,24 +65,23 @@ def send_email(body: SendMessageRequest, db: Session = Depends(get_db), _: User 
 
 @router.post("/sms")
 def send_sms(body: SendMessageRequest, db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN"))):
-    # Send SMS via Twilio
+    # Send SMS via Telnyx
     try:
-        if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN or not settings.TWILIO_FROM_NUMBER:
-            # Log as failed if Twilio not configured
+        if not settings.TELNYX_API_KEY or not settings.TELNYX_FROM_NUMBER:
+            # Log as failed if Telnyx not configured
             comm = Communication(type="sms", recipient=body.recipient, subject="SMS", body=body.body, status="failed")
             db.add(comm)
             db.commit()
-            raise HTTPException(500, "Twilio not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_FROM_NUMBER environment variables.")
+            raise HTTPException(500, "Telnyx not configured. Set TELNYX_API_KEY and TELNYX_FROM_NUMBER environment variables.")
         
-        from twilio.rest import Client
-        
-        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        import telnyx
+        telnyx.api_key = settings.TELNYX_API_KEY
         
         # Send the SMS
-        message = client.messages.create(
-            body=body.body,
-            from_=settings.TWILIO_FROM_NUMBER,
-            to=body.recipient
+        message = telnyx.Message.create(
+            from_phone=settings.TELNYX_FROM_NUMBER,
+            to_phone=body.recipient,
+            text=body.body
         )
         
         # Log successful send
@@ -92,12 +91,12 @@ def send_sms(body: SendMessageRequest, db: Session = Depends(get_db), _: User = 
             subject="SMS",
             body=body.body,
             status="sent",
-            message_id=message.sid
+            message_id=message.id
         )
         db.add(comm)
         db.commit()
         
-        return {"success": True, "message": "SMS sent successfully", "message_id": message.sid}
+        return {"success": True, "message": "SMS sent successfully", "message_id": message.id}
     except Exception as e:
         # Log failed attempt
         comm = Communication(type="sms", recipient=body.recipient, subject="SMS", body=body.body, status="failed")

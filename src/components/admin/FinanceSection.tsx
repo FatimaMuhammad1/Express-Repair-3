@@ -66,7 +66,7 @@ export function FinanceSection({ token }: FinanceSectionProps) {
     try {
       const [statsRes, transRes, invRes, expRes] = await Promise.all([
         fetch(buildUrl(`/finance/stats?period=${timePeriod}`), { headers: getAuthHeaders(token) }),
-        fetch(buildUrl("/finance/transactions"), { headers: getAuthHeaders(token) }),
+        fetch(buildUrl(`/finance/transactions?period=${timePeriod}`), { headers: getAuthHeaders(token) }),
         fetch(buildUrl("/finance/invoices"), { headers: getAuthHeaders(token) }),
         fetch(buildUrl("/finance/expenses"), { headers: getAuthHeaders(token) }),
       ]);
@@ -108,6 +108,14 @@ export function FinanceSection({ token }: FinanceSectionProps) {
       i.customer_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       i.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = statusFilter === "all" || i.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  const filteredExpenses = expenses.filter((e) => {
+    const matchSearch = 
+      e.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.category?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = statusFilter === "all" || e.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
@@ -412,10 +420,38 @@ export function FinanceSection({ token }: FinanceSectionProps) {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => window.open(buildUrl(`/finance/invoices/${inv.id}/pdf`), '_blank')}
+                          title="View Invoice"
+                        >
                           <FileText className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={async () => {
+                            try {
+                              const res = await fetch(buildUrl(`/finance/invoices/${inv.id}/pdf`), {
+                                headers: getAuthHeaders(token)
+                              });
+                              if (res.ok) {
+                                const blob = await res.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement("a");
+                                a.href = url;
+                                a.download = `invoice_${inv.invoice_number}.pdf`;
+                                a.click();
+                                window.URL.revokeObjectURL(url);
+                                toast.success("Invoice downloaded successfully");
+                              }
+                            } catch (error) {
+                              toast.error("Failed to download invoice");
+                            }
+                          }}
+                          title="Download Invoice"
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                       </div>
@@ -459,8 +495,8 @@ export function FinanceSection({ token }: FinanceSectionProps) {
               </tr>
             </thead>
             <tbody>
-              {expenses.length > 0 ? (
-                expenses.map((exp, idx) => (
+              {filteredExpenses.length > 0 ? (
+                filteredExpenses.map((exp, idx) => (
                   <motion.tr
                     key={exp.id}
                     initial={{ opacity: 0, y: 8 }}
@@ -486,7 +522,7 @@ export function FinanceSection({ token }: FinanceSectionProps) {
                 <tr>
                   <td colSpan={4} className="px-6 py-16 text-center text-slate-400 dark:text-slate-500">
                     <AlertCircle className="mx-auto mb-3 h-8 w-8 opacity-40" />
-                    <p className="text-sm">No expenses recorded</p>
+                    <p className="text-sm">No expenses found</p>
                   </td>
                 </tr>
               )}

@@ -15,6 +15,7 @@ router = APIRouter(prefix="/api/suppliers", tags=["Suppliers"])
 
 class SupplierCreate(BaseModel):
     name: str
+    supplier_code: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
@@ -22,6 +23,7 @@ class SupplierCreate(BaseModel):
 
 class SupplierUpdate(BaseModel):
     name: Optional[str] = None
+    supplier_code: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
@@ -40,6 +42,7 @@ def get_suppliers(
         result.append({
             "id": str(supplier.id),
             "name": supplier.name,
+            "supplier_code": supplier.supplier_code,
             "email": supplier.email,
             "phone": supplier.phone,
             "address": supplier.address,
@@ -71,6 +74,7 @@ def create_supplier(
         "supplier": {
             "id": str(supplier.id),
             "name": supplier.name,
+            "supplier_code": supplier.supplier_code,
             "email": supplier.email,
             "phone": supplier.phone,
             "address": supplier.address,

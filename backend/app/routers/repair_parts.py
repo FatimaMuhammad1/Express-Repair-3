@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from uuid import UUID
 from decimal import Decimal
 from typing import Optional
+import csv
+import io
 import json
 from datetime import datetime, timedelta, timezone
 
@@ -310,6 +312,7 @@ def delete_repair_part(
 def get_repair_parts_inventory(
     part_type: Optional[str] = None,
     search: Optional[str] = None,
+    supplier_code: Optional[str] = None,
     low_stock_only: bool = False,
     db: Session = Depends(get_db),
     _: User = Depends(require_roles("SUPER_ADMIN")),
@@ -326,6 +329,9 @@ def get_repair_parts_inventory(
             (RepairPartInventory.sku.ilike(f"%{search}%")) |
             (RepairPartInventory.brand.ilike(f"%{search}%"))
         )
+    
+    if supplier_code:
+        query = query.filter(RepairPartInventory.supplier.ilike(f"%{supplier_code}%"))
     
     if low_stock_only:
         query = query.filter(RepairPartInventory.stock_quantity <= RepairPartInventory.min_stock_level)
@@ -575,4 +581,155 @@ def adjust_repair_part_stock(
             "stock_quantity": part.stock_quantity,
         }
     }
+
+
+@router.post("/inventory/import", status_code=201, tags=["Repair Parts Inventory"])
+async def import_repair_parts_inventory(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("SUPER_ADMIN"))
+):
+    """Import repair parts inventory from CSV/Excel file"""
+    
+    imported_count = 0
+    errors = []
+    
+    try:
+        # Read file content
+        content = await file.read()
+        
+        # Handle CSV file
+        if file.filename.endswith('.csv'):
+            csv_file = io.StringIO(content.decode('utf-8'))
+            csv_reader = csv.DictReader(csv_file)
+            
+            for row in csv_reader:
+                try:
+                    part = RepairPartInventory(
+                        name=row.get('name', ''),
+                        description=row.get('description', ''),
+                        part_type=row.get('part_type', 'other'),
+                        brand=row.get('brand', ''),
+                        model=row.get('model', ''),
+                        sku=row.get('sku', ''),
+                        supplier=row.get('supplier', ''),
+                        unit_cost=Decimal(str(row.get('unit_cost', 0))),
+                        stock_quantity=int(row.get('stock_quantity', 0)),
+                        min_stock_level=int(row.get('min_stock_level', 5)),
+                        location=row.get('location', ''),
+                        notes=row.get('notes', ''),
+                        is_active=True
+                    )
+                    db.add(part)
+                    imported_count += 1
+                except Exception as e:
+                    errors.append(f"Row error: {str(e)}")
+                    continue
+        
+        # Handle Excel file
+        elif file.filename.endswith(('.xlsx', '.xls')):
+            try:
+                import openpyxl
+                # Load Excel file
+                workbook = openpyxl.load_workbook(io.BytesIO(content))
+                sheet = workbook.active
+                
+                # Get header row and normalize to lowercase
+                headers = [str(cell.value).lower().strip() if cell.value else '' for cell in sheet[1]]
+                
+                # Create column mapping for common variations
+                column_map = {
+                    'name': 'name',
+                    'part': 'name',
+                    'part name': 'name',
+                    'description': 'description',
+                    'desc': 'description',
+                    'part type': 'part_type',
+                    'type': 'part_type',
+                    'brand': 'brand',
+                    'model': 'model',
+                    'sku': 'sku',
+                    'supplier': 'supplier',
+                    'unit cost': 'unit_cost',
+                    'cost': 'unit_cost',
+                    'stock': 'stock_quantity',
+                    'stock quantity': 'stock_quantity',
+                    'quantity': 'stock_quantity',
+                    'min stock': 'min_stock_level',
+                    'min stock level': 'min_stock_level',
+                    'location': 'location',
+                    'notes': 'notes'
+                }
+                
+                # Map Excel headers to our field names
+                header_mapping = {}
+                for i, header in enumerate(headers):
+                    if header in column_map:
+                        header_mapping[i] = column_map[header]
+                    else:
+                        # Try partial match
+                        for key, value in column_map.items():
+                            if key in header or header in key:
+                                header_mapping[i] = value
+                                break
+                
+                # Process rows starting from row 2
+                for row in sheet.iter_rows(min_row=2, values_only=True):
+                    try:
+                        # Skip empty rows
+                        if not any(row):
+                            continue
+                            
+                        # Map row data using header mapping
+                        row_data = {}
+                        for col_idx, value in enumerate(row):
+                            if col_idx in header_mapping and value is not None:
+                                row_data[header_mapping[col_idx]] = value
+                        
+                        # Skip if no name provided
+                        if not row_data.get('name'):
+                            continue
+                            
+                        part = RepairPartInventory(
+                            name=row_data.get('name', ''),
+                            description=row_data.get('description', ''),
+                            part_type=row_data.get('part_type', 'other'),
+                            brand=row_data.get('brand', ''),
+                            model=row_data.get('model', ''),
+                            sku=row_data.get('sku', ''),
+                            supplier=row_data.get('supplier', ''),
+                            unit_cost=Decimal(str(row_data.get('unit_cost', 0) or 0)),
+                            stock_quantity=int(row_data.get('stock_quantity', 0) or 0),
+                            min_stock_level=int(row_data.get('min_stock_level', 5) or 5),
+                            location=row_data.get('location', ''),
+                            notes=row_data.get('notes', ''),
+                            is_active=True
+                        )
+                        db.add(part)
+                        imported_count += 1
+                    except Exception as e:
+                        errors.append(f"Row error: {str(e)}")
+                        continue
+            except ImportError:
+                return {
+                    "success": False,
+                    "detail": "openpyxl library not installed. Please run: pip install openpyxl"
+                }
+        else:
+            return {
+                "success": False,
+                "detail": "Unsupported file format. Please use CSV."
+            }
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "imported_count": imported_count,
+            "errors": errors[:10]  # Return first 10 errors if any
+        }
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to import repair parts: {str(e)}")
 

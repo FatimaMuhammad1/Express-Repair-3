@@ -151,6 +151,7 @@ class TradeRequestOut(BaseModel):
 def get_products(
     category: Optional[str] = None,
     is_for_sale: Optional[bool] = None,
+    supplier_code: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Get all products with optional filtering"""
@@ -160,6 +161,9 @@ def get_products(
         query = query.filter(Product.category == category)
     if is_for_sale is not None:
         query = query.filter(Product.is_for_sale == is_for_sale)
+    if supplier_code:
+        from app.models import Supplier
+        query = query.join(Supplier, Product.supplier_id == Supplier.id).filter(Supplier.supplier_code == supplier_code)
     
     products = query.order_by(Product.created_at.desc()).all()
     return [ProductOut.from_orm(p) for p in products]
@@ -247,10 +251,10 @@ def delete_product(
             "sku": product.sku,
             "name": product.name,
             "description": product.description,
-            "category": product.category.value if product.category else None,
+            "category": product.category.value if hasattr(product.category, 'value') else product.category,
             "brand": product.brand,
             "model": product.model,
-            "condition": product.condition.value if product.condition else None,
+            "condition": product.condition.value if hasattr(product.condition, 'value') else str(product.condition) if product.condition else None,
             "price": float(product.price) if product.price else 0,
             "stock_quantity": product.stock_quantity,
             "reorder_threshold": product.reorder_threshold,
@@ -402,22 +406,34 @@ async def import_products(
             
             for row in csv_reader:
                 try:
+                    # Validate required fields
+                    if not row.get('name'):
+                        errors.append(f"Row error: Missing required field 'name'")
+                        continue
+                    
+                    # Validate condition
+                    condition_value = row.get('condition', 'new').strip().lower()
+                    valid_conditions = ['new', 'refurbished', 'used']
+                    if condition_value not in valid_conditions:
+                        errors.append(f"Row error: Invalid condition '{condition_value}'. Must be one of: {valid_conditions}")
+                        continue
+                    
                     product = Product(
                         name=row.get('name', ''),
                         description=row.get('description', ''),
-                        category=ProductCategory(row.get('category', 'smartphone')),
+                        category=row.get('category', 'smartphone').strip(),
                         brand=row.get('brand', ''),
                         model=row.get('model', ''),
-                        condition=ProductCondition(row.get('condition', 'new')),
-                        price=float(row.get('price', 0)),
-                        stock_quantity=int(row.get('stock_quantity', 0)),
+                        condition=ProductCondition(condition_value),
+                        price=float(row.get('price', 0) or 0),
+                        stock_quantity=int(row.get('stock_quantity', 0) or 0),
                         image_url=row.get('image_url', ''),
                         is_for_sale=True
                     )
                     db.add(product)
                     imported_count += 1
                 except Exception as e:
-                    errors.append(f"Row error: {str(e)}")
+                    errors.append(f"Row error: {str(e)} - Row data: {row}")
                     continue
         
         # Handle Excel file
@@ -485,10 +501,10 @@ async def import_products(
                         product = Product(
                             name=row_data.get('name', ''),
                             description=row_data.get('description', ''),
-                            category=ProductCategory(row_data.get('category', 'smartphone')),
+                            category=row_data.get('category', 'smartphone').strip(),
                             brand=row_data.get('brand', ''),
                             model=row_data.get('model', ''),
-                            condition=ProductCondition(row_data.get('condition', 'new')),
+                            condition=ProductCondition(row_data.get('condition', 'new').strip().lower()),
                             price=float(row_data.get('price', 0) or 0),
                             stock_quantity=int(row_data.get('stock_quantity', 0) or 0),
                             min_stock_level=int(row_data.get('min_stock_level', 5) or 5),

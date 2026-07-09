@@ -180,7 +180,43 @@ export default function MainDashboard() {
           ...prev,
           totalProfit: (financeStatsData.stats as any).netProfit || 0,
           totalExpenses: (financeStatsData.stats as any).totalExpenses || 0,
+          outstandingReceivables: (financeStatsData.stats as any).outstandingPayments || 0,
         }));
+      }
+      
+      // Calculate total sales orders from online and in-house sales
+      if (onlineSalesData.success && inhouseSalesData.success) {
+        const totalSalesOrders = (onlineSalesData.onlineSales?.length || 0) + (inhouseSalesData.inhouseSales?.length || 0);
+        setStats(prev => ({ ...prev, totalSalesOrders }));
+      }
+      
+      // Fetch purchase orders count
+      try {
+        const purchaseOrdersRes = await fetch(buildUrl("/purchase-orders"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        const purchaseOrdersData = await purchaseOrdersRes.json();
+        if (purchaseOrdersData.success && Array.isArray(purchaseOrdersData.purchase_orders)) {
+          setStats(prev => ({ ...prev, totalPurchases: purchaseOrdersData.purchase_orders.length }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch purchase orders:", e);
+      }
+      
+      // Fetch pending expenses for outstanding payables
+      try {
+        const expensesRes = await fetch(buildUrl("/finance/expenses"), {
+          headers: token ? { "Authorization": `Bearer ${token}` } : {}
+        });
+        const expensesData = await expensesRes.json();
+        if (expensesData.success && Array.isArray(expensesData.expenses)) {
+          const pendingExpenses = expensesData.expenses
+            .filter((e: any) => e.status === 'pending' || e.status === 'approved')
+            .reduce((sum: number, e: any) => sum + parseFloat(e.total_amount || e.amount || 0), 0);
+          setStats(prev => ({ ...prev, outstandingPayables: pendingExpenses }));
+        }
+      } catch (e) {
+        console.error("Failed to fetch expenses:", e);
       }
       
       // Process repair status data
@@ -505,6 +541,101 @@ export default function MainDashboard() {
         </div>
       </div>
 
+      {/* Secondary Stat Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+        
+        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-violet-500/50 transition-colors" onClick={() => handleViewAll('customers')}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded bg-violet-500/20 text-violet-400 flex items-center justify-center">
+              <User className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400">Total Customers</div>
+              <div className="text-lg font-bold text-white">{stats.totalCustomers}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-emerald-400 flex items-center gap-1">
+            <ArrowUpRight className="h-2 w-2" /> <span className="text-slate-500">Registered users</span>
+          </div>
+        </div>
+
+        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-blue-500/50 transition-colors" onClick={() => handleViewAll('online_sales')}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded bg-blue-500/20 text-blue-400 flex items-center justify-center">
+              <ShoppingCart className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400">Total Sales Orders</div>
+              <div className="text-lg font-bold text-white">{stats.totalSalesOrders}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500">
+            Online + In-House
+          </div>
+        </div>
+
+        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500/50 transition-colors" onClick={() => handleViewAll('stock_purchases')}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded bg-amber-500/20 text-amber-500 flex items-center justify-center">
+              <Package className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400">Total Purchases</div>
+              <div className="text-lg font-bold text-white">{stats.totalPurchases}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500">
+            Stock orders
+          </div>
+        </div>
+
+        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-emerald-500/50 transition-colors" onClick={() => handleViewAll('inventory_management')}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <Package className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400">Total Inventory Value</div>
+              <div className="text-lg font-bold text-white">£{stats.totalInventoryValue.toFixed(0)}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-emerald-400 flex items-center gap-1">
+            <ArrowUpRight className="h-2 w-2" /> <span className="text-slate-500">Current value</span>
+          </div>
+        </div>
+
+        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-rose-500/50 transition-colors" onClick={() => handleViewAll('invoices')}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded bg-rose-500/20 text-rose-400 flex items-center justify-center">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400">Outstanding Receivables</div>
+              <div className="text-lg font-bold text-white">£{stats.outstandingReceivables.toFixed(0)}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500">
+            Pending payments
+          </div>
+        </div>
+
+        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-purple-500/50 transition-colors" onClick={() => handleViewAll('expenses')}>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-8 w-8 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center">
+              <FileText className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="text-[10px] text-slate-400">Outstanding Payables</div>
+              <div className="text-lg font-bold text-white">£{stats.outstandingPayables.toFixed(0)}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-slate-500">
+            Pending bills
+          </div>
+        </div>
+
+      </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-6">
         
@@ -791,101 +922,6 @@ export default function MainDashboard() {
                 All items in stock
               </div>
             )}
-          </div>
-        </div>
-
-      </div>
-
-      {/* Footer Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-        
-        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-violet-500/50 transition-colors" onClick={() => handleViewAll('customers')}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-8 w-8 rounded bg-violet-500/20 text-violet-400 flex items-center justify-center">
-              <User className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400">Total Customers</div>
-              <div className="text-lg font-bold text-white">{stats.totalCustomers}</div>
-            </div>
-          </div>
-          <div className="text-[10px] text-emerald-400 flex items-center gap-1">
-            <ArrowUpRight className="h-2 w-2" /> <span className="text-slate-500">Registered users</span>
-          </div>
-        </div>
-
-        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-blue-500/50 transition-colors" onClick={() => handleViewAll('online_sales')}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-8 w-8 rounded bg-blue-500/20 text-blue-400 flex items-center justify-center">
-              <ShoppingCart className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400">Total Sales Orders</div>
-              <div className="text-lg font-bold text-white">{stats.totalSalesOrders}</div>
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500">
-            Online + In-House
-          </div>
-        </div>
-
-        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-amber-500/50 transition-colors" onClick={() => handleViewAll('stock_purchases')}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-8 w-8 rounded bg-amber-500/20 text-amber-500 flex items-center justify-center">
-              <Package className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400">Total Purchases</div>
-              <div className="text-lg font-bold text-white">{stats.totalPurchases}</div>
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500">
-            Stock orders
-          </div>
-        </div>
-
-        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-emerald-500/50 transition-colors" onClick={() => handleViewAll('inventory_management')}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-8 w-8 rounded bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-              <Package className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400">Total Inventory Value</div>
-              <div className="text-lg font-bold text-white">£{stats.totalInventoryValue.toFixed(0)}</div>
-            </div>
-          </div>
-          <div className="text-[10px] text-emerald-400 flex items-center gap-1">
-            <ArrowUpRight className="h-2 w-2" /> <span className="text-slate-500">Current value</span>
-          </div>
-        </div>
-
-        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-rose-500/50 transition-colors" onClick={() => handleViewAll('invoices')}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-8 w-8 rounded bg-rose-500/20 text-rose-400 flex items-center justify-center">
-              <FileText className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400">Outstanding Receivables</div>
-              <div className="text-lg font-bold text-white">£{stats.outstandingReceivables.toFixed(0)}</div>
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500">
-            Pending payments
-          </div>
-        </div>
-
-        <div className="bg-[#1A1D27] border border-slate-800 rounded-xl p-4 flex flex-col justify-between cursor-pointer hover:border-purple-500/50 transition-colors" onClick={() => handleViewAll('expenses')}>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="h-8 w-8 rounded bg-purple-500/20 text-purple-400 flex items-center justify-center">
-              <FileText className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-[10px] text-slate-400">Outstanding Payables</div>
-              <div className="text-lg font-bold text-white">${stats.outstandingPayables.toFixed(0)}</div>
-            </div>
-          </div>
-          <div className="text-[10px] text-slate-500">
-            Pending bills
           </div>
         </div>
 

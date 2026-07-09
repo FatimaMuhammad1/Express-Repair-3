@@ -20,8 +20,8 @@ def walk_in_intake(
     _: User = Depends(require_roles("staff", "SUPER_ADMIN"))
 ):
     """
-    Unified walk-in intake: creates customer (via repair record), repair, and optional invoice
-    in a single form submission with automatic linking.
+    Walk-in intake: creates repair record and optional deposit payment.
+    Invoice will be created when repair is completed.
     """
     
     # Generate unique tracking ID
@@ -46,57 +46,25 @@ def walk_in_intake(
     db.commit()
     db.refresh(repair)
     
-    # Create invoice if requested
-    invoice_number = None
-    invoice_id = None
-    
-    if body.create_invoice and body.invoice_amount:
-        # Generate invoice number
-        invoice_num = f"INV-{datetime.now().strftime('%Y%m%d')}-{str(repair.id)[:8].upper()}"
-        
-        # Calculate tax
-        tax_amount = body.invoice_amount * (body.tax_rate or Decimal("0.00"))
-        total_amount = body.invoice_amount + tax_amount
-        
-        # Create invoice
-        invoice = Invoice(
-            invoice_number=invoice_num,
-            repair_id=repair.id,
+    # Create deposit payment if provided
+    if body.deposit_amount and body.deposit_amount > 0 and body.payment_method:
+        transaction = Transaction(
+            type="payment",
+            amount=body.deposit_amount,
+            description=f"Deposit payment for repair {tracking_id}",
             customer_name=body.customer_name,
-            customer_email=body.customer_email,
-            customer_phone=body.customer_phone,
-            amount=total_amount,
-            tax_amount=tax_amount,
-            deposit_paid=body.deposit_amount or Decimal("0.00"),
-            status="partial" if body.deposit_amount and body.deposit_amount > 0 else "pending",
-            due_date=body.due_date or (datetime.now() + timedelta(days=7)).date(),
+            repair_tracking_id=tracking_id,
+            status="completed",
+            payment_method=body.payment_method,
         )
-        db.add(invoice)
+        db.add(transaction)
         db.commit()
-        db.refresh(invoice)
-        
-        invoice_number = invoice.invoice_number
-        invoice_id = invoice.id
-        
-        # Create transaction if deposit was paid
-        if body.deposit_amount and body.deposit_amount > 0 and body.payment_method:
-            transaction = Transaction(
-                type="payment",
-                amount=body.deposit_amount,
-                description=f"Deposit payment for {invoice_num}",
-                customer_name=body.customer_name,
-                invoice_number=invoice_num,
-                status="completed",
-                payment_method=body.payment_method,
-            )
-            db.add(transaction)
-            db.commit()
     
     return WalkInIntakeResponse(
         success=True,
         message="Walk-in intake completed successfully",
         tracking_id=tracking_id,
         repair_id=repair.id,
-        invoice_number=invoice_number,
-        invoice_id=invoice_id,
+        invoice_number=None,
+        invoice_id=None,
     )

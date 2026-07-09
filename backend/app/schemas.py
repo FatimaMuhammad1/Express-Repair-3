@@ -240,12 +240,8 @@ class WalkInIntakeRequest(BaseModel):
     issue_description: str
     estimated_cost: Optional[Decimal] = Decimal("0.00")
     notification_preference: Optional[str] = "email"  # email or whatsapp
-    create_invoice: bool = False
-    invoice_amount: Optional[Decimal] = None
-    tax_rate: Optional[Decimal] = Decimal("0.00")  # e.g., 0.10 for 10%
     deposit_amount: Optional[Decimal] = Decimal("0.00")
     payment_method: Optional[str] = None  # cash, card, bank_transfer
-    due_date: Optional[date] = None
 
 
 class WalkInIntakeResponse(BaseModel):
