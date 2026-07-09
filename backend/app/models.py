@@ -114,6 +114,7 @@ class TransactionType(enum.Enum):
     payment = "payment"
     refund = "refund"
     expense = "expense"
+    revenue = "revenue"
 
 
 class TransactionStatus(enum.Enum):
