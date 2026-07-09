@@ -88,7 +88,7 @@ class ProductOut(BaseModel):
             id=str(obj.id),
             name=obj.name,
             description=obj.description,
-            category=str(obj.category.value) if hasattr(obj.category, 'value') else str(obj.category),
+            category=str(obj.category),
             brand=obj.brand,
             model=obj.model,
             condition=str(obj.condition.value) if hasattr(obj.condition, 'value') else str(obj.condition),
