@@ -4843,6 +4843,15 @@ function AdminDashboard({
                               />
                             </div>
                             <div>
+                              <Label className="text-sm text-slate-300">SKU</Label>
+                              <Input
+                                value={editingProduct.sku || ""}
+                                onChange={(e) => setEditingProduct({ ...editingProduct, sku: e.target.value })}
+                                className="mt-1"
+                                placeholder="e.g., IPHONE-15-PRO-256GB-BLACK"
+                              />
+                            </div>
+                            <div>
                               <Label className="text-sm text-slate-300">Price (£)</Label>
                               <Input
                                 type="number"
