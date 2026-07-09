@@ -75,6 +75,8 @@ class ProductOut(BaseModel):
     condition: str
     price: float
     stock_quantity: int
+    sku: Optional[str]
+    min_stock_level: Optional[int]
     image_url: Optional[str]
     is_active: bool
     is_for_sale: bool
@@ -92,6 +94,8 @@ class ProductOut(BaseModel):
             condition=str(obj.condition.value) if hasattr(obj.condition, 'value') else str(obj.condition),
             price=float(obj.price),
             stock_quantity=obj.stock_quantity,
+            sku=obj.sku,
+            min_stock_level=obj.reorder_threshold,
             image_url=obj.image_url,
             is_active=obj.is_active,
             is_for_sale=obj.is_for_sale,
