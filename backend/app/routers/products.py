@@ -35,6 +35,10 @@ def normalize_product_payload(payload: dict) -> dict:
     if isinstance(condition, str):
         normalized["condition"] = condition.strip().lower()
 
+    # Map frontend field names to database field names
+    if "min_stock_level" in normalized:
+        normalized["reorder_threshold"] = normalized.pop("min_stock_level")
+
     return normalized
 
 
@@ -61,6 +65,8 @@ class ProductUpdate(BaseModel):
     condition: Optional[str] = None
     price: Optional[float] = None
     stock_quantity: Optional[int] = None
+    sku: Optional[str] = None
+    min_stock_level: Optional[int] = None
     image_url: Optional[str] = None
     is_active: Optional[bool] = None
     is_for_sale: Optional[bool] = None
