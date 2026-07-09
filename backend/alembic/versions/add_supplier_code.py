@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_supplier_code'
-down_revision = '0905d8939edf'  # Latest revision
+down_revision = 'upgrade_expense_management'
 branch_labels = None
 depends_on = None
 
