@@ -10,7 +10,7 @@ import json
 import logging
 
 from app.database import get_db
-from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus, RepairStatus
+from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus, RepairStatus, Invoice, InvoiceStatus
 from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrackOut
 from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
@@ -163,6 +163,46 @@ def update_repair_status(
 
     db.commit()
     db.refresh(repair)
+
+    # Create invoice when repair is marked as completed
+    if body.status == "completed" and old_status != "completed":
+        # Check if invoice already exists for this repair
+        existing_invoice = db.query(Invoice).filter(Invoice.repair_id == repair.id).first()
+        if not existing_invoice:
+            # Generate invoice number
+            invoice_num = f"INV-{datetime.now().strftime('%Y%m%d')}-{repair.tracking_id}"
+            
+            # Calculate tax (20% VAT)
+            subtotal = float(repair.estimated_cost) if repair.estimated_cost else 0
+            tax_amount = subtotal * 0.20
+            total = subtotal + tax_amount
+            
+            # Apply deposit if exists
+            deposit_amount = float(repair.deposit_paid) if repair.deposit_paid else 0
+            
+            # Determine invoice status based on deposit
+            if deposit_amount >= total:
+                invoice_status = InvoiceStatus.paid
+            elif deposit_amount > 0:
+                invoice_status = InvoiceStatus.partial
+            else:
+                invoice_status = InvoiceStatus.pending
+            
+            # Create invoice
+            invoice = Invoice(
+                invoice_number=invoice_num,
+                repair_id=repair.id,
+                customer_name=repair.customer_name,
+                customer_email=repair.customer_email,
+                customer_phone=repair.customer_phone,
+                amount=total,
+                tax_amount=tax_amount,
+                deposit_paid=deposit_amount,
+                status=invoice_status,
+                due_date=datetime.now(timezone.utc).date() + timedelta(days=7),  # Due in 7 days
+            )
+            db.add(invoice)
+            db.commit()
 
     # Create notification for technician if assigned
     if repair.technician_id:

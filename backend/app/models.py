@@ -291,6 +291,7 @@ class Repair(Base):
     priority       = Column(String(20), default="normal", nullable=True, index=True)
     status_notes   = Column(Text, nullable=True)
     estimated_cost = Column(Numeric(10, 2), default=0.00)
+    deposit_paid   = Column(Numeric(10, 2), default=0.00)
     created_at     = Column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at     = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 

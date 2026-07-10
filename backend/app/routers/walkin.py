@@ -41,6 +41,7 @@ def walk_in_intake(
         status="received",
         status_notes=body.issue_description,
         estimated_cost=body.estimated_cost or Decimal("0.00"),
+        deposit_paid=body.deposit_amount or Decimal("0.00"),
     )
     db.add(repair)
     db.commit()
