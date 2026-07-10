@@ -1072,6 +1072,22 @@ async def create_revenue(
     }
 
 
+@router.delete("/revenue/{revenue_id}")
+async def delete_revenue(
+    revenue_id: UUID,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("SUPER_ADMIN"))
+):
+    """Delete a revenue entry (transaction)"""
+    transaction = db.query(Transaction).filter(Transaction.id == revenue_id).first()
+    if not transaction:
+        raise HTTPException(404, "Revenue entry not found")
+    
+    db.delete(transaction)
+    db.commit()
+    return {"success": True, "message": "Revenue entry deleted"}
+
+
 @router.get("/online-sales")
 async def get_online_sales(
     db: Session = Depends(get_db),

@@ -2418,6 +2418,25 @@ function AdminDashboard({
     }
   };
 
+  const handleDeleteRevenue = async (revenueId: string) => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/finance/revenue/${revenueId}`), {
+        method: "DELETE",
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        }
+      });
+      if (res.ok) {
+        setRevenueData(prev => prev.filter(r => r.id !== revenueId));
+        safeToast.success("Revenue entry deleted successfully");
+      }
+    } catch (e) {
+      console.error("Failed to delete revenue:", e);
+      safeToast.error("Failed to delete revenue");
+    }
+  };
+
   const handleUpdateInhouseSale = async (saleId: string, saleData: any) => {
     try {
       const token = getStoredToken();
@@ -6635,6 +6654,12 @@ function AdminDashboard({
 
                           </th>
 
+                          <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
+                            Actions
+
+                          </th>
+
                         </tr>
 
                       </thead>
@@ -6677,6 +6702,15 @@ function AdminDashboard({
 
                               </span>
 
+                            </td>
+
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                onClick={() => handleDeleteRevenue(revenue.id)}
+                                className="text-red-400 hover:text-red-300 text-xs"
+                              >
+                                Delete
+                              </button>
                             </td>
 
                           </motion.tr>
