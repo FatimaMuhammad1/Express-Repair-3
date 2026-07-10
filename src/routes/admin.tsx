@@ -740,10 +740,17 @@ function AdminDashboard({
       fetchStats();
     };
     
+    // Listen for sale success events to refresh stats
+    const handleSaleSuccess = () => {
+      fetchStats();
+    };
+    
     window.addEventListener("walkin-success", handleWalkInSuccess);
+    window.addEventListener("sale-success", handleSaleSuccess);
     
     return () => {
       window.removeEventListener("walkin-success", handleWalkInSuccess);
+      window.removeEventListener("sale-success", handleSaleSuccess);
     };
   }, []);
 
@@ -1975,6 +1982,9 @@ function AdminDashboard({
         });
         safeToast.success("Retail sale recorded successfully");
         fetchRetailProducts(); // Refresh products to update stock
+        
+        // Notify parent to refresh stats
+        window.dispatchEvent(new CustomEvent("sale-success", { detail: data }));
       } else {
         safeToast.error(data.detail || "Failed to record sale");
       }
