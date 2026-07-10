@@ -733,6 +733,18 @@ function AdminDashboard({
     fetchRepairs();
     fetchStats();
     fetchStaff();
+    
+    // Listen for walk-in success events to refresh repairs
+    const handleWalkInSuccess = () => {
+      fetchRepairs();
+      fetchStats();
+    };
+    
+    window.addEventListener("walkin-success", handleWalkInSuccess);
+    
+    return () => {
+      window.removeEventListener("walkin-success", handleWalkInSuccess);
+    };
   }, []);
 
   const updateStatus = async (trackingId: string, newStatus: string) => {

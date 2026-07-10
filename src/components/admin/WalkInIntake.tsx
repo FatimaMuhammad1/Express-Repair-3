@@ -77,6 +77,9 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
         setResult(data);
         if (onSuccess) onSuccess(data);
         
+        // Notify parent to refresh repairs list
+        window.dispatchEvent(new CustomEvent("walkin-success", { detail: data }));
+        
         // Notify finance section to refresh
         window.dispatchEvent(new CustomEvent("finance-refresh", { detail: { type: "invoice-created" } }));
         
