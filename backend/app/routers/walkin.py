@@ -53,7 +53,6 @@ def walk_in_intake(
             amount=body.deposit_amount,
             description=f"Deposit payment for repair {tracking_id}",
             customer_name=body.customer_name,
-            repair_tracking_id=tracking_id,
             status="completed",
             payment_method=body.payment_method,
         )
