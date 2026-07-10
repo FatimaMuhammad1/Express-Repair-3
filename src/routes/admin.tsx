@@ -9291,7 +9291,7 @@ function AdminDashboard({
                   />
                   <StatCard
                     title="Avg. Repair Cost"
-                    value={`£${repairs.length > 0 ? (repairs.reduce((sum, r) => sum + (r.estimated_cost || 0), 0) / repairs.length).toFixed(0) : "0"}`}
+                    value={`£${repairs.length > 0 ? (repairs.reduce((sum, r) => sum + (parseFloat(r.estimated_cost) || 0), 0) / repairs.length).toFixed(0) : "0"}`}
                     icon={DollarSign}
                     gradient="from-amber-500 to-orange-500"
                   />
