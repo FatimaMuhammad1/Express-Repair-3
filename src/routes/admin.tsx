@@ -1548,7 +1548,7 @@ function AdminDashboard({
       });
       const data = await res.json();
       if (data.success && Array.isArray(data.products)) {
-        setProducts(data.products.filter((p: any) => p.is_for_sale && p.is_active && p.stock_quantity > 0));
+        setProducts(data.products.filter((p: any) => p.is_for_sale && p.is_active));
       }
     } catch (e) {
       console.error("Failed to fetch products:", e);
