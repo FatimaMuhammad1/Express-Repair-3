@@ -20,9 +20,9 @@ def seed_database():
         
         # Create branches
         branches_data = [
-            {"name": "Nuneaton Main", "address": "123 High Street, Nuneaton", "phone": "07415 278767", "email": "nuneaton@fixora.co.uk"},
-            {"name": "Coventry", "address": "456 City Centre, Coventry", "phone": "07415 278768", "email": "coventry@fixora.co.uk"},
-            {"name": "Leicester", "address": "789 Market Street, Leicester", "phone": "07415 278769", "email": "leicester@fixora.co.uk"},
+            {"name": "Nuneaton Main", "address": "123 High Street, Nuneaton", "phone": "07415 278767", "email": "nuneaton@expressrepair.com"},
+            {"name": "Coventry", "address": "456 City Centre, Coventry", "phone": "07415 278768", "email": "coventry@expressrepair.com"},
+            {"name": "Leicester", "address": "789 Market Street, Leicester", "phone": "07415 278769", "email": "leicester@expressrepair.com"},
         ]
         
         branches = []
@@ -39,11 +39,11 @@ def seed_database():
         
         # Create staff users
         staff_data = [
-            {"name": "John Smith", "email": "john@fixora.co.uk", "phone": "07700 900001", "role": "technician"},
-            {"name": "Sarah Johnson", "email": "sarah@fixora.co.uk", "phone": "07700 900002", "role": "admin"},
-            {"name": "Mike Williams", "email": "mike@fixora.co.uk", "phone": "07700 900003", "role": "technician"},
-            {"name": "Emma Davis", "email": "emma@fixora.co.uk", "phone": "07700 900004", "role": "staff"},
-            {"name": "David Brown", "email": "david@fixora.co.uk", "phone": "07700 900005", "role": "technician"},
+            {"name": "John Smith", "email": "john@expressrepair.com", "phone": "07700 900001", "role": "technician"},
+            {"name": "Sarah Johnson", "email": "sarah@expressrepair.com", "phone": "07700 900002", "role": "admin"},
+            {"name": "Mike Williams", "email": "mike@expressrepair.com", "phone": "07700 900003", "role": "technician"},
+            {"name": "Emma Davis", "email": "emma@expressrepair.com", "phone": "07700 900004", "role": "staff"},
+            {"name": "David Brown", "email": "david@expressrepair.com", "phone": "07700 900005", "role": "technician"},
         ]
         
         staff_users = []

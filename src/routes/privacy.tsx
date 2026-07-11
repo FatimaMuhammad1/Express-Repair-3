@@ -102,7 +102,7 @@ function Privacy() {
           <p className="mt-2">
             <strong>Express Phone & Laptop Repair</strong><br />
             6 Harefield Road, Nuneaton, CV11 4HD<br />
-            Email: <a href="mailto:noreply@fixora.com" className="text-blue-600 hover:underline">noreply@fixora.com</a><br />
+            Email: <a href="mailto:info@expressrepair.com" className="text-blue-600 hover:underline">info@expressrepair.com</a><br />
             Phone: <a href="tel:07415278767" className="text-blue-600 hover:underline">07415 278767</a>
           </p>
         </div>

@@ -31,7 +31,7 @@ import { API_BASE } from "@/lib/apiBase";
 export const Route = createFileRoute("/profile")({
   head: () => ({
     meta: [
-      { title: "My Account - Fixora Repair" },
+      { title: "My Account - Express Repair" },
       {
         name: "description",
         content: "Track your repairs and manage your account.",

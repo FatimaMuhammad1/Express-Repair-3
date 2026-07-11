@@ -48,7 +48,7 @@ async def enable_2fa(
     totp = pyotp.TOTP(secret)
     provisioning_uri = totp.provisioning_uri(
         name=user.email,
-        issuer_name="Fixora Repair"
+        issuer_name="Express Mobile & Laptop Repair"
     )
     
     qr = qrcode.QRCode(version=1, box_size=10, border=5)

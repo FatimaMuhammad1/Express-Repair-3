@@ -178,7 +178,7 @@ export function ChatWidget() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-[15px] text-white leading-tight">
-                      Fixora Support
+                      Express Repair Support
                     </h3>
                     <p className="text-[12px] text-blue-200/80 flex items-center gap-1.5 mt-0.5">
                       <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shrink-0" />

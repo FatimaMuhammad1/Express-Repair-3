@@ -19,7 +19,7 @@ export function InvoiceGenerator({ repair, businessSettings }: InvoiceGeneratorP
   const generateQRCode = () => {
     // In a real implementation, you'd use a QR code library like qrcode.react
     // For now, we'll return a placeholder
-    return `https://fixora.com/track/${repair.tracking_id}`;
+    return `https://expressrepair.com/track/${repair.tracking_id}`;
   };
 
   const handlePrintInvoice = () => {
@@ -227,7 +227,7 @@ export function InvoiceGenerator({ repair, businessSettings }: InvoiceGeneratorP
       <body>
         <div class="invoice-container">
           <div class="header">
-            <div class="logo">${businessSettings.businessName || 'Fixora Repair Shop'}</div>
+            <div class="logo">${businessSettings.businessName || 'Express Mobile & Laptop Repair'}</div>
             <div class="invoice-number">
               Invoice #<strong>${invoiceNumber}</strong>
             </div>
@@ -355,9 +355,9 @@ export function InvoiceGenerator({ repair, businessSettings }: InvoiceGeneratorP
           </div>
 
           <div class="footer">
-            <p>${businessSettings.businessName || 'Fixora Repair Shop'}</p>
+            <p>${businessSettings.businessName || 'Express Mobile & Laptop Repair'}</p>
             <p>${businessSettings.address || '123 High Street, Nuneaton, CV11 6AA'}</p>
-            <p>${businessSettings.phone || '+44 123 456 7890'} | ${businessSettings.email || 'info@fixora.com'}</p>
+            <p>${businessSettings.phone || '+44 123 456 7890'} | ${businessSettings.email || 'info@expressrepair.com'}</p>
             <p style="margin-top: 10px;">Thank you for your business!</p>
           </div>
         </div>

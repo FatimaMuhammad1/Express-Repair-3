@@ -99,13 +99,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Fixora — Smart Device Repair in Luton & Nuneaton" },
+      { title: "Express Mobile & Laptop Repair — Smart Device Repair in Luton & Nuneaton" },
       {
         name: "description",
         content:
           "Fast, reliable repairs for phones, laptops, tablets and more in Luton and Nuneaton. Free diagnostics, 90-day warranty, same-day service.",
       },
-      { property: "og:title", content: "Fixora — Smart Device Repair in Luton & Nuneaton" },
+      { property: "og:title", content: "Express Mobile & Laptop Repair — Smart Device Repair in Luton & Nuneaton" },
       {
         property: "og:description",
         content: "Fast, reliable repairs for phones, laptops, tablets and more in Luton and Nuneaton. 90-day warranty.",

@@ -564,9 +564,9 @@ function AdminDashboard({
 
   const [businessSettings, setBusinessSettings] = useState({
 
-    businessName: "Fixora Repair Shop",
+    businessName: "Express Mobile & Laptop Repair",
 
-    email: "info@fixora.com",
+    email: "info@expressrepair.com",
 
     phone: "+44 123 456 7890",
 
@@ -2790,7 +2790,7 @@ function AdminDashboard({
 
             <span className="text-sm font-bold tracking-wide text-white">
 
-              Fixora Admin
+              Express Repair Admin
 
             </span>
 
@@ -10721,7 +10721,7 @@ function AdminDashboard({
 
 export const Route = createFileRoute("/admin")({
 
-  head: () => ({ meta: [{ title: "Admin Dashboard ? Fixora" }] }),
+  head: () => ({ meta: [{ title: "Admin Dashboard - Express Repair" }] }),
 
   component: AdminPage,
 
@@ -10959,7 +10959,7 @@ function AdminPage() {
 
                 onChange={(e) => setEmail(e.target.value)}
 
-                placeholder="admin@fixora.com"
+                placeholder="admin@expressrepair.com"
 
                 className="h-12 border-[#2D3142] bg-[#1A1D27] text-white placeholder:text-slate-400 focus-visible:ring-violet-500"
 

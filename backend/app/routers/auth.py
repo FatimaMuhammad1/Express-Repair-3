@@ -179,8 +179,8 @@ def google_login(body: GoogleLoginRequest, db: Session = Depends(get_db)):
         
         user = db.query(User).filter(User.email == email).first()
         if not user:
-            # Check if email domain matches staff domain (e.g., @fixora.co.uk)
-            if email.endswith("@fixora.co.uk"):
+            # Check if email domain matches staff domain (e.g., @expressrepair.com)
+            if email.endswith("@expressrepair.com"):
                 role = "staff"
             else:
                 role = "customer"
