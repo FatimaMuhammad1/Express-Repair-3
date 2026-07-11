@@ -3,12 +3,16 @@ from sqlalchemy.orm import Session
 from datetime import datetime, date, timedelta
 from decimal import Decimal
 from uuid import UUID
+import logging
 
 from app.database import get_db
 from app.models import Repair, Invoice, Transaction, User
 from app.schemas import WalkInIntakeRequest, WalkInIntakeResponse
 from app.dependencies import require_roles
 from app.utils.helpers import generate_tracking_id
+from app.worker import send_email_task, send_whatsapp_task
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/walkin", tags=["Walk-in Intake"])
 
@@ -59,6 +63,20 @@ def walk_in_intake(
         )
         db.add(transaction)
         db.commit()
+    
+    # Send notification to customer
+    tracking_link = f"https://expressrepair.com/track/{tracking_id}"
+    msg = f"Hello {body.customer_name}, your repair ticket for {body.device_model} has been created. Your tracking ID is {tracking_id}. Track it here: {tracking_link}"
+    subj = f"Repair Ticket Created - Tracking ID {tracking_id}"
+    
+    # Fire and forget - don't wait for Celery
+    try:
+        if body.notification_preference == "whatsapp" and body.customer_phone:
+            send_whatsapp_task.apply_async(args=[body.customer_phone, msg], ignore_result=True)
+        elif body.customer_email:
+            send_email_task.apply_async(args=[body.customer_email, subj, msg], ignore_result=True)
+    except Exception as e:
+        logger.warning(f"[Notification] Failed to send notification (Redis/Celery may not be running): {e}")
     
     return WalkInIntakeResponse(
         success=True,
