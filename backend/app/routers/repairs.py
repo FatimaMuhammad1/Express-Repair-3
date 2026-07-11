@@ -14,7 +14,7 @@ from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus
 from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrackOut
 from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
-from app.worker import send_email_task, send_whatsapp_task
+from app.worker import send_email_sync, send_whatsapp_sync
 from app.utils.mailer import send_repair_status_update
 from app.routers.notifications import create_notification
 
@@ -56,14 +56,14 @@ def _notify_customer(repair, notification_preference, customer_email, event_type
         msg = f"Hello {repair.customer_name}, your repair ticket for {repair.device_model} status has been updated to '{repair.status}'. Track it here: {tracking_link}"
         subj = f"Repair Status Update - {repair.tracking_id}"
 
-    # Fire and forget - don't wait for Celery
+    # Send synchronously (no Celery/Redis needed)
     try:
         if notification_preference == "whatsapp" and repair.customer_phone:
-            send_whatsapp_task.apply_async(args=[repair.customer_phone, msg], ignore_result=True)
+            send_whatsapp_sync(repair.customer_phone, msg)
         elif customer_email:
-            send_email_task.apply_async(args=[customer_email, subj, msg], ignore_result=True)
+            send_email_sync(customer_email, subj, msg)
     except Exception as e:
-        logger.warning(f"[Notification] Failed to send notification (Redis/Celery may not be running): {e}")
+        logger.warning(f"[Notification] Failed to send notification: {e}")
         
 
 @router.post("/create", status_code=201)

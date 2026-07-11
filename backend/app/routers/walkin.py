@@ -10,7 +10,7 @@ from app.models import Repair, Invoice, Transaction, User
 from app.schemas import WalkInIntakeRequest, WalkInIntakeResponse
 from app.dependencies import require_roles
 from app.utils.helpers import generate_tracking_id
-from app.worker import send_email_task, send_whatsapp_task
+from app.worker import send_email_sync, send_whatsapp_sync
 
 logger = logging.getLogger(__name__)
 
@@ -69,14 +69,14 @@ def walk_in_intake(
     msg = f"Hello {body.customer_name}, your repair ticket for {body.device_model} has been created. Your tracking ID is {tracking_id}. Track it here: {tracking_link}"
     subj = f"Repair Ticket Created - Tracking ID {tracking_id}"
     
-    # Fire and forget - don't wait for Celery
+    # Send synchronously (no Celery/Redis needed)
     try:
         if body.notification_preference == "whatsapp" and body.customer_phone:
-            send_whatsapp_task.apply_async(args=[body.customer_phone, msg], ignore_result=True)
+            send_whatsapp_sync(body.customer_phone, msg)
         elif body.customer_email:
-            send_email_task.apply_async(args=[body.customer_email, subj, msg], ignore_result=True)
+            send_email_sync(body.customer_email, subj, msg)
     except Exception as e:
-        logger.warning(f"[Notification] Failed to send notification (Redis/Celery may not be running): {e}")
+        logger.warning(f"[Notification] Failed to send notification: {e}")
     
     return WalkInIntakeResponse(
         success=True,

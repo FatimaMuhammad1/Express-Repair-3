@@ -85,3 +85,50 @@ def send_whatsapp_task(to_phone: str, body: str):
     except Exception as e:
         logger.error(f"[Worker] Failed to send WhatsApp to {to_phone}: {e}")
         return False
+
+
+# Synchronous versions (for use without Celery/Redis)
+def send_email_sync(to_email: str, subject: str, body: str):
+    """Send email synchronously without Celery."""
+    if not settings.SMTP_HOST or not settings.SMTP_USER:
+        logger.info(f"[Sync] SMTP not configured. Would send email to {to_email}: {subject}")
+        return False
+        
+    msg = EmailMessage()
+    msg.set_content(body)
+    msg["Subject"] = subject
+    msg["From"] = settings.EMAIL_FROM
+    msg["To"] = to_email
+
+    try:
+        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+        server.starttls()
+        server.login(settings.SMTP_USER, settings.SMTP_PASS)
+        server.send_message(msg)
+        server.quit()
+        logger.info(f"[Sync] Email sent to {to_email}")
+        return True
+    except Exception as e:
+        logger.error(f"[Sync] Failed to send email to {to_email}: {e}")
+        return False
+
+
+def send_whatsapp_sync(to_phone: str, body: str):
+    """Send WhatsApp synchronously without Celery."""
+    if not settings.TELNYX_API_KEY:
+        logger.info(f"[Sync] Telnyx not configured. Would send WhatsApp to {to_phone}: {body}")
+        return False
+        
+    try:
+        telnyx.api_key = settings.TELNYX_API_KEY
+        message = telnyx.Message.create(
+            from_=settings.TELNYX_FROM_NUMBER,
+            to=to_phone,
+            text=body,
+            messaging_profile_id=None,  # Set this if you have a WhatsApp messaging profile
+        )
+        logger.info(f"[Sync] WhatsApp sent to {to_phone} via Telnyx, ID: {message.id}")
+        return True
+    except Exception as e:
+        logger.error(f"[Sync] Failed to send WhatsApp to {to_phone}: {e}")
+        return False
