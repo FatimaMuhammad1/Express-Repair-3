@@ -14,7 +14,7 @@ from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus
 from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrackOut
 from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
-from app.worker import send_email_sync, send_whatsapp_sync
+from app.worker import send_email_task, send_whatsapp_task
 from app.utils.mailer import send_repair_status_update
 from app.routers.notifications import create_notification
 
@@ -56,14 +56,14 @@ def _notify_customer(repair, notification_preference, customer_email, event_type
         msg = f"Hello {repair.customer_name}, your repair ticket for {repair.device_model} status has been updated to '{repair.status}'. Track it here: {tracking_link}"
         subj = f"Repair Status Update - {repair.tracking_id}"
 
-    # Send synchronously (no Celery/Redis needed)
+    # Fire and forget - don't wait for Celery
     try:
         if notification_preference == "whatsapp" and repair.customer_phone:
-            send_whatsapp_sync(repair.customer_phone, msg)
+            send_whatsapp_task.apply_async(args=[repair.customer_phone, msg], ignore_result=True)
         elif customer_email:
-            send_email_sync(customer_email, subj, msg)
+            send_email_task.apply_async(args=[customer_email, subj, msg], ignore_result=True)
     except Exception as e:
-        logger.warning(f"[Notification] Failed to send notification: {e}")
+        logger.warning(f"[Notification] Failed to send notification (Redis/Celery may not be running): {e}")
         
 
 @router.post("/create", status_code=201)
@@ -216,28 +216,28 @@ def update_repair_status(
         )
 
     if body.notify_customer:
-        # Get customer email from appointment or user
-        customer_email = None
-        if repair.appointment and repair.appointment.customer_email:
+        # Get customer email from appointment or repair record
+        customer_email = repair.customer_email
+        if not customer_email and repair.appointment and repair.appointment.customer_email:
             customer_email = repair.appointment.customer_email
-        elif repair.appointment and repair.appointment.user:
+        elif not customer_email and repair.appointment and repair.appointment.user:
             customer_email = repair.appointment.user.email
 
-        # Send detailed status update email if email is available
-        if customer_email:
-            try:
-                send_repair_status_update(
-                    email=customer_email,
-                    customer_name=repair.customer_name,
-                    tracking_id=repair.tracking_id,
-                    device_model=repair.device_model,
-                    new_status=body.status
-                )
-            except Exception as e:
-                logger.warning(f"[Email] Failed to send status update email: {e}")
-        else:
-            # Fallback to generic notification via WhatsApp
-            _notify_customer(repair, "whatsapp", None, "updated")
+        # Get notification preference (default to email if not set)
+        notification_preference = getattr(repair, 'notification_preference', 'email')
+
+        # Send status update notification via Celery
+        tracking_link = f"https://expressrepair.com/track/{repair.tracking_id}"
+        msg = f"Hello {repair.customer_name}, your repair ticket for {repair.device_model} status has been updated to '{body.status}'. Track it here: {tracking_link}"
+        subj = f"Repair Status Update - {repair.tracking_id}"
+
+        try:
+            if notification_preference == "whatsapp" and repair.customer_phone:
+                send_whatsapp_task.apply_async(args=[repair.customer_phone, msg], ignore_result=True)
+            if customer_email:
+                send_email_task.apply_async(args=[customer_email, subj, msg], ignore_result=True)
+        except Exception as e:
+            logger.warning(f"[Notification] Failed to send status update notification: {e}")
 
     return {
         "success": True,

@@ -285,6 +285,7 @@ class Repair(Base):
     appointment_id = Column(UUID(as_uuid=True), ForeignKey("appointments.id", ondelete="SET NULL"), nullable=True, index=True)
     customer_name  = Column(String(255), nullable=False)
     customer_phone = Column(String(20), nullable=True, index=True)
+    customer_email = Column(String(255), nullable=True, index=True)
     device_model   = Column(String(255), nullable=False)
     status         = Column(Enum(RepairStatus), default=RepairStatus.received, nullable=False, index=True)
     technician_id  = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -292,6 +293,7 @@ class Repair(Base):
     status_notes   = Column(Text, nullable=True)
     estimated_cost = Column(Numeric(10, 2), default=0.00)
     deposit_paid   = Column(Numeric(10, 2), default=0.00)
+    notification_preference = Column(String(20), default="email", nullable=True)  # email or whatsapp
     created_at     = Column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at     = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
