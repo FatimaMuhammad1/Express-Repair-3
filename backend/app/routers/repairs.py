@@ -354,7 +354,7 @@ def my_repairs(
 @router.get("/all")
 def all_repairs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER")),
 ):
     repairs = db.query(Repair).order_by(Repair.updated_at.desc()).all()
     return {
@@ -407,7 +407,7 @@ def export_repairs_csv(
 @router.get("/stats")
 def get_repair_stats(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER")),
 ):
     """Get repair statistics for admin dashboard"""
     total_repairs = db.query(Repair).count()
