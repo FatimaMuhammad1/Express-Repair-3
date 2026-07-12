@@ -30,7 +30,7 @@ def send_email_task(to_email: str, subject: str, body: str):
     msg = EmailMessage()
     msg.set_content(body)
     msg["Subject"] = subject
-    msg["From"] = settings.EMAIL_FROM
+    msg["From"] = "Express Phone & Laptop Repair <{}>".format(settings.EMAIL_FROM)
     msg["To"] = to_email
 
     try:
@@ -159,7 +159,7 @@ def send_email_sync(to_email: str, subject: str, body: str):
     msg = EmailMessage()
     msg.set_content(body)
     msg["Subject"] = subject
-    msg["From"] = settings.EMAIL_FROM
+    msg["From"] = "Express Phone & Laptop Repair <{}>".format(settings.EMAIL_FROM)
     msg["To"] = to_email
 
     try:
