@@ -227,7 +227,7 @@ def update_repair_status(
         notification_preference = getattr(repair, 'notification_preference', 'email')
 
         # Send status update notification via Celery
-        tracking_link = f"https://expressrepair.com/track/{repair.tracking_id}"
+        tracking_link = f"https://expresstechhub.co.uk/track/{repair.tracking_id}"
         msg = f"Hello {repair.customer_name}, your repair ticket for {repair.device_model} status has been updated to '{body.status}'. Track it here: {tracking_link}"
         subj = f"Repair Status Update - {repair.tracking_id}"
 

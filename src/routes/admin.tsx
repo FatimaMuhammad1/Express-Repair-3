@@ -566,7 +566,7 @@ function AdminDashboard({
 
     businessName: "Express Mobile & Laptop Repair",
 
-    email: "info@expressrepair.com",
+    email: "info@expresstechhub.co.uk",
 
     phone: "+44 123 456 7890",
 
@@ -10959,7 +10959,7 @@ function AdminPage() {
 
                 onChange={(e) => setEmail(e.target.value)}
 
-                placeholder="admin@expressrepair.com"
+                placeholder="admin@expresstechhub.co.uk"
 
                 className="h-12 border-[#2D3142] bg-[#1A1D27] text-white placeholder:text-slate-400 focus-visible:ring-violet-500"
 

@@ -67,7 +67,7 @@ def walk_in_intake(
         db.commit()
     
     # Send notification to customer
-    tracking_link = f"https://expressrepair.com/track/{tracking_id}"
+    tracking_link = f"https://expresstechhub.co.uk/track/{tracking_id}"
     msg = f"Hello {body.customer_name}, your repair ticket for {body.device_model} has been created. Your tracking ID is {tracking_id}. Track it here: {tracking_link}"
     subj = f"Repair Ticket Created - Tracking ID {tracking_id}"
     
