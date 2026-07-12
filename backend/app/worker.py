@@ -54,13 +54,42 @@ def send_sms_task(to_phone: str, body: str):
         
     try:
         telnyx.api_key = settings.TELNYX_API_KEY
+        # Use the correct Telnyx API method
         message = telnyx.Message.create(
             from_=settings.TELNYX_FROM_NUMBER,
             to=to_phone,
             text=body,
+            messaging_profile_id=None,
         )
         logger.info(f"[Worker] SMS sent to {to_phone} via Telnyx, ID: {message.id}")
         return True
+    except AttributeError as e:
+        logger.error(f"[Worker] Telnyx API error - using alternative method: {e}")
+        # Try alternative API call
+        try:
+            import requests
+            response = requests.post(
+                "https://api.telnyx.com/v2/messages",
+                headers={
+                    "Authorization": f"Bearer {settings.TELNYX_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": settings.TELNYX_FROM_NUMBER,
+                    "to": to_phone,
+                    "text": body,
+                    "messaging_profile_id": None,
+                },
+            )
+            if response.status_code == 200:
+                logger.info(f"[Worker] SMS sent to {to_phone} via Telnyx API")
+                return True
+            else:
+                logger.error(f"[Worker] Telnyx API returned {response.status_code}: {response.text}")
+                return False
+        except Exception as e2:
+            logger.error(f"[Worker] Failed to send SMS via alternative method: {e2}")
+            return False
     except Exception as e:
         logger.error(f"[Worker] Failed to send SMS to {to_phone}: {e}")
         return False
@@ -74,6 +103,7 @@ def send_whatsapp_task(to_phone: str, body: str):
         
     try:
         telnyx.api_key = settings.TELNYX_API_KEY
+        # Use the correct Telnyx API method
         message = telnyx.Message.create(
             from_=settings.TELNYX_FROM_NUMBER,
             to=to_phone,
@@ -82,6 +112,33 @@ def send_whatsapp_task(to_phone: str, body: str):
         )
         logger.info(f"[Worker] WhatsApp sent to {to_phone} via Telnyx, ID: {message.id}")
         return True
+    except AttributeError as e:
+        logger.error(f"[Worker] Telnyx API error - using alternative method: {e}")
+        # Try alternative API call
+        try:
+            import requests
+            response = requests.post(
+                "https://api.telnyx.com/v2/messages",
+                headers={
+                    "Authorization": f"Bearer {settings.TELNYX_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": settings.TELNYX_FROM_NUMBER,
+                    "to": to_phone,
+                    "text": body,
+                    "messaging_profile_id": None,
+                },
+            )
+            if response.status_code == 200:
+                logger.info(f"[Worker] WhatsApp sent to {to_phone} via Telnyx API")
+                return True
+            else:
+                logger.error(f"[Worker] Telnyx API returned {response.status_code}: {response.text}")
+                return False
+        except Exception as e2:
+            logger.error(f"[Worker] Failed to send WhatsApp via alternative method: {e2}")
+            return False
     except Exception as e:
         logger.error(f"[Worker] Failed to send WhatsApp to {to_phone}: {e}")
         return False
