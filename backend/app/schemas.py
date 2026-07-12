@@ -174,6 +174,7 @@ class RepairOut(BaseModel):
     tracking_id: str
     customer_name: str
     customer_phone: Optional[str] = None
+    customer_email: Optional[str] = None
     device_model: str
     status: str
     priority: str

@@ -183,8 +183,8 @@ function AuthPanel({
       const data = await res.json();
 
       if (res.ok && data.success) {
-        const userRole = data.user.role?.toLowerCase();
-        if (userRole === "super_admin" || userRole === "staff") {
+        const userRole = data.user.role;
+        if (userRole === "SUPER_ADMIN" || userRole === "staff" || userRole === "BUSINESS_OWNER") {
           localStorage.setItem("admin_token", data.token);
           localStorage.setItem("admin_user", JSON.stringify(data.user));
           router.navigate({ to: "/admin" });
@@ -226,8 +226,8 @@ function AuthPanel({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        const userRole = data.user.role?.toLowerCase();
-        if (userRole === "super_admin" || userRole === "staff") {
+        const userRole = data.user.role;
+        if (userRole === "SUPER_ADMIN" || userRole === "staff" || userRole === "BUSINESS_OWNER") {
           localStorage.setItem("admin_token", data.token);
           localStorage.setItem("admin_user", JSON.stringify(data.user));
           router.navigate({ to: "/admin" });
@@ -915,13 +915,18 @@ function SignedInDashboard({ onSignOut, user }: { onSignOut: () => void, user: a
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Hello, {user?.name || "Customer"}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                {user?.role === "super_admin" ? "Admin" : user?.role === "staff" ? "Staff" : "Customer"}
+                {user?.role === "SUPER_ADMIN" ? "Admin" : user?.role === "staff" ? "Staff" : user?.role === "BUSINESS_OWNER" ? "Business Owner" : "Customer"}
               </span>
               <p className="text-slate-500 dark:text-slate-400">Manage your devices and track repairs.</p>
             </div>
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
+          {(user?.role === "SUPER_ADMIN" || user?.role === "staff" || user?.role === "BUSINESS_OWNER") && (
+            <Button onClick={() => router.navigate({ to: "/admin" })} variant="outline" className="border-[#0095ff]/60 dark:border-sky-900/60 text-[#0095ff] dark:text-sky-400 hover:bg-[#0095ff]/10 dark:hover:bg-sky-900/20 bg-white dark:bg-slate-900 gap-2">
+              <LayoutDashboard className="h-4 w-4" /> Admin Panel
+            </Button>
+          )}
           <Button onClick={onSignOut} variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 bg-white dark:bg-slate-900 gap-2">
             <LogOut className="h-4 w-4" /> Sign Out
           </Button>

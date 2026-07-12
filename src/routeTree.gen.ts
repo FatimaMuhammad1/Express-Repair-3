@@ -13,6 +13,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as OwnerRouteImport } from './routes/owner'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as BuyAndSellRouteImport } from './routes/buy-and-sell'
@@ -41,6 +42,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OwnerRoute = OwnerRouteImport.update({
+  id: '/owner',
+  path: '/owner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
+  '/owner': typeof OwnerRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
@@ -112,6 +119,7 @@ export interface FileRoutesByTo {
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
+  '/owner': typeof OwnerRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
@@ -128,6 +136,7 @@ export interface FileRoutesById {
   '/buy-and-sell': typeof BuyAndSellRoute
   '/contact': typeof ContactRoute
   '/faq': typeof FaqRoute
+  '/owner': typeof OwnerRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/services': typeof ServicesRoute
@@ -145,6 +154,7 @@ export interface FileRouteTypes {
     | '/buy-and-sell'
     | '/contact'
     | '/faq'
+    | '/owner'
     | '/privacy'
     | '/profile'
     | '/services'
@@ -160,6 +170,7 @@ export interface FileRouteTypes {
     | '/buy-and-sell'
     | '/contact'
     | '/faq'
+    | '/owner'
     | '/privacy'
     | '/profile'
     | '/services'
@@ -175,6 +186,7 @@ export interface FileRouteTypes {
     | '/buy-and-sell'
     | '/contact'
     | '/faq'
+    | '/owner'
     | '/privacy'
     | '/profile'
     | '/services'
@@ -191,6 +203,7 @@ export interface RootRouteChildren {
   BuyAndSellRoute: typeof BuyAndSellRoute
   ContactRoute: typeof ContactRoute
   FaqRoute: typeof FaqRoute
+  OwnerRoute: typeof OwnerRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ServicesRoute: typeof ServicesRoute
@@ -225,6 +238,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/owner': {
+      id: '/owner'
+      path: '/owner'
+      fullPath: '/owner'
+      preLoaderRoute: typeof OwnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -313,6 +333,7 @@ const rootRouteChildren: RootRouteChildren = {
   BuyAndSellRoute: BuyAndSellRoute,
   ContactRoute: ContactRoute,
   FaqRoute: FaqRoute,
+  OwnerRoute: OwnerRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ServicesRoute: ServicesRoute,

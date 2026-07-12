@@ -38,14 +38,18 @@ STATUS_PROGRESS = {
 @router.get("/")
 def get_repairs(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER")),
 ):
     """Get all repairs (for dashboard)"""
-    repairs = db.query(Repair).order_by(Repair.created_at.desc()).limit(100).all()
-    return {
-        "success": True,
-        "repairs": [RepairOut.model_validate(r) for r in repairs]
-    }
+    try:
+        repairs = db.query(Repair).order_by(Repair.created_at.desc()).limit(100).all()
+        return {
+            "success": True,
+            "repairs": [RepairOut.model_validate(r) for r in repairs]
+        }
+    except Exception as e:
+        logger.error(f"Error fetching repairs: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 def _notify_customer(repair, notification_preference, customer_email, event_type="created"):
     tracking_link = f"https://yourdomain.com/track/{repair.tracking_id}"

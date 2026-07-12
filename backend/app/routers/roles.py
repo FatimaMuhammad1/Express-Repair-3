@@ -82,7 +82,7 @@ def delete_role(role_id: UUID, db: Session = Depends(get_db), _: User = Depends(
     if not role:
         raise HTTPException(404, "Role not found")
     
-    if role.name in ["SUPER_ADMIN", "staff"]:
+    if role.name in ["SUPER_ADMIN", "staff", "BUSINESS_OWNER"]:
         raise HTTPException(400, "Cannot delete default roles")
     
     db.delete(role)
@@ -197,6 +197,27 @@ def seed_default_roles(db: Session = Depends(get_db), _: User = Depends(require_
                 # Own profile
                 {"resource": "own_profile", "action": "read"},
                 {"resource": "own_profile", "action": "update"},
+            ]
+        },
+        "BUSINESS_OWNER": {
+            "description": "Business owner with read-only access to sales and repairs",
+            "permissions": [
+                # Repairs (read-only)
+                {"resource": "repairs", "action": "read"},
+                # Sales/Products (read-only)
+                {"resource": "products", "action": "read"},
+                # Invoices (read-only)
+                {"resource": "invoices", "action": "read"},
+                # Transactions (read-only)
+                {"resource": "transactions", "action": "read"},
+                # Purchase orders (read-only)
+                {"resource": "purchase_orders", "action": "read"},
+                # Expenses (read-only)
+                {"resource": "expenses", "action": "read"},
+                # Customers (read-only)
+                {"resource": "customers", "action": "read"},
+                # Suppliers (read-only)
+                {"resource": "suppliers", "action": "read"},
             ]
         }
     }

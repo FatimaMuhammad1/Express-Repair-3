@@ -179,14 +179,24 @@ function RootComponent() {
 
         if (res.ok && data.success && data.user) {
           // Update the stored user
-          const userRole = data.user.role?.toLowerCase();
-          if (userRole === "super_admin" || userRole === "staff") {
+          const userRole = data.user.role;
+          if (userRole === "SUPER_ADMIN" || userRole === "staff") {
             localStorage.setItem("admin_user", JSON.stringify(data.user));
             if (!adminToken && userToken) {
               localStorage.setItem("admin_token", userToken);
               localStorage.removeItem("user_token");
             }
             // Only redirect to admin if not on profile page
+            if (window.location.pathname !== "/admin" && window.location.pathname !== "/profile") {
+              router.navigate({ to: "/admin" });
+            }
+          } else if (userRole === "BUSINESS_OWNER") {
+            localStorage.setItem("admin_user", JSON.stringify(data.user));
+            if (!adminToken && userToken) {
+              localStorage.setItem("admin_token", userToken);
+              localStorage.removeItem("user_token");
+            }
+            // BUSINESS_OWNER uses the same admin dashboard with restricted access
             if (window.location.pathname !== "/admin" && window.location.pathname !== "/profile") {
               router.navigate({ to: "/admin" });
             }

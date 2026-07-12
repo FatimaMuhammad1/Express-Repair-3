@@ -242,24 +242,24 @@ function AdminDashboard({
 
   const [activeSection, setActiveSection] = useState("dashboard");
 
-  // Redirect staff to walk-in bookings by default
+  // Redirect staff and BUSINESS_OWNER to walk-in bookings by default
   useEffect(() => {
     const userRole = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("admin_user") || "{}").role : "";
-    if (userRole === "staff") {
+    if (userRole === "staff" || userRole === "BUSINESS_OWNER") {
       setActiveSection("walkin");
     }
   }, []);
 
-  // Prevent staff from accessing admin-only sections
+  // Prevent staff and BUSINESS_OWNER from accessing admin-only sections
   useEffect(() => {
     const userRole = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("admin_user") || "{}").role : "";
-    const staffAllowedSections = ["walkin", "inhouse_sales"];
+    const restrictedAllowedSections = ["walkin", "inhouse_sales"];
     
-    if (userRole === "staff" && !staffAllowedSections.includes(activeSection)) {
+    if ((userRole === "staff" || userRole === "BUSINESS_OWNER") && !restrictedAllowedSections.includes(activeSection)) {
       setActiveSection("walkin");
       // Only show toast in browser environment
       if (typeof window !== "undefined") {
-        safeToast.error("Access denied. Staff can only access Walk-in Bookings and In-House Sales.");
+        safeToast.error("Access denied. You can only access Walk-in Bookings and In-House Sales.");
       }
     }
   }, [activeSection]);
@@ -2731,8 +2731,8 @@ function AdminDashboard({
   const filteredSidebarGroups = sidebarGroups.map(group => ({
     ...group,
     items: group.items.filter(item => {
-      if (userRole === "staff") {
-        // Staff can only access walk-in repair and retail sales
+      if (userRole === "staff" || userRole === "BUSINESS_OWNER") {
+        // Staff and BUSINESS_OWNER can only access walk-in repair and retail sales
         return ["walkin", "inhouse_sales"].includes(item.id);
       }
       return true;
@@ -8589,7 +8589,8 @@ function AdminDashboard({
 
                 </div>
 
-                {/* Retail Sales Form */}
+                {/* Retail Sales Form - Hide for BUSINESS_OWNER */}
+                {userRole !== "BUSINESS_OWNER" && (
                 <div className="mb-6 bg-[#11131E] rounded-lg border border-[#1F2235] p-6">
                   <h3 className="text-lg font-semibold text-white mb-6">Record Retail Sale</h3>
                   
@@ -8759,6 +8760,7 @@ function AdminDashboard({
                     Record Sale
                   </Button>
                 </div>
+                )}
 
                 {/* Filters */}
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
@@ -9296,7 +9298,7 @@ function AdminDashboard({
                     gradient="from-amber-500 to-orange-500"
                   />
                 </div>
-                <WalkInIntake token={token} />
+                {userRole !== "BUSINESS_OWNER" && <WalkInIntake token={token} />}
 
                 {/* Walk-in Repair Table */}
                 <div className="mt-6 overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">

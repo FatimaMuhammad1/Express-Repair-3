@@ -270,7 +270,7 @@ async def get_transactions(
     period: str = "all",
     branch_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER"))
 ):
     """Get all financial transactions with optional time period filtering"""
     
@@ -322,7 +322,7 @@ async def get_transactions(
 async def get_invoices(
     branch_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER"))
 ):
     """Get all invoices"""
     
@@ -539,7 +539,7 @@ async def get_expenses(
     page: Optional[int] = 1,
     per_page: Optional[int] = 25,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER"))
 ):
     """Get all expenses with filtering, sorting, and pagination"""
 
@@ -1200,7 +1200,7 @@ async def delete_online_sale(
 @router.get("/inhouse-sales")
 async def get_inhouse_sales(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff", "BUSINESS_OWNER"))
 ):
     """Get all in-house sales"""
     sales = db.query(InHouseSale).order_by(InHouseSale.created_at.desc()).limit(100).all()

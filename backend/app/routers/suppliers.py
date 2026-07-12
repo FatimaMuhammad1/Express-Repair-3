@@ -33,7 +33,7 @@ class SupplierUpdate(BaseModel):
 @router.get("")
 def get_suppliers(
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN"))
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER"))
 ):
     """Get all suppliers"""
     suppliers = db.query(Supplier).order_by(Supplier.name).all()

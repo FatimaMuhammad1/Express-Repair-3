@@ -6,6 +6,7 @@ import bcrypt
 from app.database import get_db
 from app.models import User
 from app.dependencies import require_roles
+from app.utils.helpers import hash_password
 from pydantic import BaseModel
 from typing import Optional
 
@@ -29,7 +30,7 @@ class UserUpdate(BaseModel):
 
 @router.get("/staff")
 def get_staff(db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN"))):
-    staff = db.query(User).filter(User.role.in_(["staff", "SUPER_ADMIN"])).all()
+    staff = db.query(User).filter(User.role.in_(["staff", "SUPER_ADMIN", "BUSINESS_OWNER"])).all()
     return {
         "success": True,
         "staff": [
@@ -42,6 +43,43 @@ def get_staff(db: Session = Depends(get_db), _: User = Depends(require_roles("SU
                 "is_active": getattr(u, "is_active", True)
             } for u in staff
         ]
+    }
+
+@router.post("")
+def create_user(user_data: UserCreate, db: Session = Depends(get_db), _: User = Depends(require_roles("SUPER_ADMIN"))):
+    # Check if email already exists
+    existing_user = db.query(User).filter(User.email == user_data.email).first()
+    if existing_user:
+        raise HTTPException(400, "Email already exists")
+    
+    # Validate role
+    valid_roles = ["staff", "SUPER_ADMIN", "BUSINESS_OWNER"]
+    if user_data.role not in valid_roles:
+        raise HTTPException(400, f"Invalid role. Must be one of: {', '.join(valid_roles)}")
+    
+    user = User(
+        name=user_data.name,
+        email=user_data.email,
+        password=hash_password(user_data.password),
+        role=user_data.role,
+        phone=user_data.phone,
+        is_verified=True,
+        is_active=True
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    return {
+        "success": True,
+        "user": {
+            "id": str(user.id),
+            "name": user.name,
+            "email": user.email,
+            "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
+            "phone": user.phone,
+            "is_active": user.is_active
+        }
     }
 
 @router.put("/{user_id}/status")

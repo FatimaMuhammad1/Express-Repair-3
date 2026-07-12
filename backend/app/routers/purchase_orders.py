@@ -217,7 +217,7 @@ class PurchaseOrderOut(BaseModel):
 def get_all_purchase_orders(
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN")),
+    _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER")),
 ):
     """Get all purchase orders with optional status filter"""
     query = db.query(PurchaseOrder)

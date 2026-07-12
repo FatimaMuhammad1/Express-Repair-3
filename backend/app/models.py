@@ -20,6 +20,7 @@ class UserRole(enum.Enum):
     customer = "customer"
     staff = "staff"
     SUPER_ADMIN = "SUPER_ADMIN"
+    BUSINESS_OWNER = "BUSINESS_OWNER"
 
 
 class OtpPurpose(enum.Enum):
