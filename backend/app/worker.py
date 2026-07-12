@@ -34,8 +34,13 @@ def send_email_task(to_email: str, subject: str, body: str):
     msg["To"] = to_email
 
     try:
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
-        server.starttls()
+        if settings.SMTP_PORT == 465:
+            # Use SSL for port 465
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+        else:
+            # Use STARTTLS for other ports (e.g., 587)
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            server.starttls()
         server.login(settings.SMTP_USER, settings.SMTP_PASS)
         server.send_message(msg)
         server.quit()
@@ -158,8 +163,13 @@ def send_email_sync(to_email: str, subject: str, body: str):
     msg["To"] = to_email
 
     try:
-        server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
-        server.starttls()
+        if settings.SMTP_PORT == 465:
+            # Use SSL for port 465
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+        else:
+            # Use STARTTLS for other ports (e.g., 587)
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            server.starttls()
         server.login(settings.SMTP_USER, settings.SMTP_PASS)
         server.send_message(msg)
         server.quit()
