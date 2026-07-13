@@ -144,9 +144,9 @@ const helpTopics = [
 ];
 
 const hours = [
-  { label: "Monday-Friday", time: "10 AM - 6 PM" },
+  { label: "Monday-Friday", time: "9 AM - 6 PM" },
 
-  { label: "Saturday", time: "10 AM - 6 PM" },
+  { label: "Saturday", time: "9 AM - 6 PM" },
 
   { label: "Sunday", time: "Closed" },
 

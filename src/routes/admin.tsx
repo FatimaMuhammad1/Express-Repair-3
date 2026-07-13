@@ -584,7 +584,7 @@ function AdminDashboard({
 
       friday: "9:00 AM - 6:00 PM",
 
-      saturday: "10:00 AM - 4:00 PM",
+      saturday: "9:00 AM - 6:00 PM",
 
       sunday: "Closed",
 

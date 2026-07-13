@@ -72,7 +72,7 @@ const sections = [
     items: [
       {
         q: "What are your business hours?",
-        a: "Monday to Saturday, 10:00 AM to 6:00 PM. Closed Sundays.",
+        a: "Monday to Saturday, 9:00 AM to 6:00 PM. Closed Sundays.",
       },
 
       { q: "Where are you located?", a: "6 Harefield Road, Nuneaton, CV11 4HD." },

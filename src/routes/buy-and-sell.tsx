@@ -147,8 +147,8 @@ const steps = [
 ];
 
 const hours = [
-  { day: "Monday – Friday", time: "10 AM – 6 PM" },
-  { day: "Saturday", time: "10 AM – 6 PM" },
+  { day: "Monday – Friday", time: "9 AM – 6 PM" },
+  { day: "Saturday", time: "9 AM – 6 PM" },
   { day: "Sunday", time: "Closed" },
   { day: "Sell payment", time: "Same day" },
 ];
