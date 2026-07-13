@@ -35,7 +35,7 @@ const AUTO_RESPONSES: Record<string, string> = {
   "track my repair":
     "To track your repair, please visit our Profile page and enter your tracking ID. You can also call us for an update.",
   "store hours":
-    "We're open Monday-Saturday 10 AM - 6 PM. Sunday we're closed. Same-day payments available!",
+    "We're open Monday-Saturday 9 AM - 6 PM. Sunday we're closed. Same-day payments available!",
   "contact support":
     "You can reach us at 07415 278767, email us, or visit our shop at 6 Harefield Road, Nuneaton, CV11 4HD.",
   pricing:
