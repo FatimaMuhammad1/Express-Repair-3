@@ -1189,9 +1189,9 @@ function AdminDashboard({
     }
   };
 
-  // Fetch products when inventory section is active
+  // Fetch products when inventory section or retail sales section is active
   useEffect(() => {
-    if (activeSection === "inventory" || activeSection === "inventory_products") {
+    if (activeSection === "inventory" || activeSection === "inventory_products" || activeSection === "inhouse_sales") {
       fetchProducts();
     }
   }, [activeSection]);
