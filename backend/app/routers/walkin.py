@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/walkin", tags=["Walk-in Intake"])
 def walk_in_intake(
     body: WalkInIntakeRequest,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("staff", "SUPER_ADMIN"))
+    _: User = Depends(require_roles("staff", "SUPER_ADMIN", "BUSINESS_OWNER"))
 ):
     """
     Walk-in intake: creates repair record and optional deposit payment.

@@ -407,7 +407,7 @@ async def update_invoice_status(
 async def create_inhouse_sale(
     body: InHouseSaleCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles("SUPER_ADMIN", "staff"))
+    _: User = Depends(require_roles("SUPER_ADMIN", "staff", "BUSINESS_OWNER"))
 ):
     """Create a retail sale with product selection, immediate invoice creation, and payment tracking"""
 
