@@ -2710,7 +2710,6 @@ function AdminDashboard({
       items: [
         { id: "analytics", icon: TrendingUp, label: "Analytics Dashboard" },
         { id: "repair_tracking", icon: Activity, label: "Repair Reports" },
-        { id: "finance", icon: DollarSign, label: "Financial Reports" },
         { id: "customer_history", icon: History, label: "Customer History" },
       ]
     },
