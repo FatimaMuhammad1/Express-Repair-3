@@ -8609,8 +8609,8 @@ function AdminDashboard({
 
                 </div>
 
-                {/* Retail Sales Form - Hide for BUSINESS_OWNER */}
-                {userRole !== "BUSINESS_OWNER" && (
+                {/* Retail Sales Form */}
+                
                 <div className="mb-6 bg-[#11131E] rounded-lg border border-[#1F2235] p-6">
                   <h3 className="text-lg font-semibold text-white mb-6">Record Retail Sale</h3>
                   
@@ -8780,7 +8780,6 @@ function AdminDashboard({
                     Record Sale
                   </Button>
                 </div>
-                )}
 
                 {/* Filters */}
                 <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center justify-between">
@@ -9318,7 +9317,7 @@ function AdminDashboard({
                     gradient="from-amber-500 to-orange-500"
                   />
                 </div>
-                {userRole !== "BUSINESS_OWNER" && <WalkInIntake token={token} />}
+                <WalkInIntake token={token} />
 
                 {/* Walk-in Repair Table */}
                 <div className="mt-6 overflow-hidden rounded-xl border border-[#1F2235] bg-[#11131E] shadow-sm">
