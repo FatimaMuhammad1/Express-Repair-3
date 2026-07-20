@@ -1,7 +1,7 @@
 import smtplib
 from email.message import EmailMessage
 from celery import Celery
-import telnyx
+from twilio.rest import Client
 import logging
 from app.config import settings
 
@@ -101,49 +101,20 @@ def send_sms_task(to_phone: str, body: str):
 
 @celery_app.task
 def send_whatsapp_task(to_phone: str, body: str):
-    """WhatsApp via Telnyx (requires Telnyx WhatsApp Business setup)."""
-    if not settings.TELNYX_API_KEY:
-        logger.info(f"[Worker] Telnyx not configured. Would send WhatsApp to {to_phone}: {body}")
+    """WhatsApp via Twilio."""
+    if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
+        logger.info(f"[Worker] Twilio not configured. Would send WhatsApp to {to_phone}: {body}")
         return False
-        
+
     try:
-        telnyx.api_key = settings.TELNYX_API_KEY
-        # Use the correct Telnyx API method
-        message = telnyx.Message.create(
-            from_=settings.TELNYX_FROM_NUMBER,
-            to=to_phone,
-            text=body,
-            messaging_profile_id=None,  # Set this if you have a WhatsApp messaging profile
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        message = client.messages.create(
+            from_=f"whatsapp:{settings.TWILIO_FROM_NUMBER}",
+            to=f"whatsapp:{to_phone}",
+            body=body
         )
-        logger.info(f"[Worker] WhatsApp sent to {to_phone} via Telnyx, ID: {message.id}")
+        logger.info(f"[Worker] WhatsApp sent to {to_phone} via Twilio, SID: {message.sid}")
         return True
-    except AttributeError as e:
-        logger.error(f"[Worker] Telnyx API error - using alternative method: {e}")
-        # Try alternative API call
-        try:
-            import requests
-            response = requests.post(
-                "https://api.telnyx.com/v2/messages",
-                headers={
-                    "Authorization": f"Bearer {settings.TELNYX_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "from": settings.TELNYX_FROM_NUMBER,
-                    "to": to_phone,
-                    "text": body,
-                    "messaging_profile_id": None,
-                },
-            )
-            if response.status_code == 200:
-                logger.info(f"[Worker] WhatsApp sent to {to_phone} via Telnyx API")
-                return True
-            else:
-                logger.error(f"[Worker] Telnyx API returned {response.status_code}: {response.text}")
-                return False
-        except Exception as e2:
-            logger.error(f"[Worker] Failed to send WhatsApp via alternative method: {e2}")
-            return False
     except Exception as e:
         logger.error(f"[Worker] Failed to send WhatsApp to {to_phone}: {e}")
         return False
@@ -182,19 +153,18 @@ def send_email_sync(to_email: str, subject: str, body: str):
 
 def send_whatsapp_sync(to_phone: str, body: str):
     """Send WhatsApp synchronously without Celery."""
-    if not settings.TELNYX_API_KEY:
-        logger.info(f"[Sync] Telnyx not configured. Would send WhatsApp to {to_phone}: {body}")
+    if not settings.TWILIO_ACCOUNT_SID or not settings.TWILIO_AUTH_TOKEN:
+        logger.info(f"[Sync] Twilio not configured. Would send WhatsApp to {to_phone}: {body}")
         return False
-        
+
     try:
-        telnyx.api_key = settings.TELNYX_API_KEY
-        message = telnyx.Message.create(
-            from_=settings.TELNYX_FROM_NUMBER,
-            to=to_phone,
-            text=body,
-            messaging_profile_id=None,  # Set this if you have a WhatsApp messaging profile
+        client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+        message = client.messages.create(
+            from_=f"whatsapp:{settings.TWILIO_FROM_NUMBER}",
+            to=f"whatsapp:{to_phone}",
+            body=body
         )
-        logger.info(f"[Sync] WhatsApp sent to {to_phone} via Telnyx, ID: {message.id}")
+        logger.info(f"[Sync] WhatsApp sent to {to_phone} via Twilio, SID: {message.sid}")
         return True
     except Exception as e:
         logger.error(f"[Sync] Failed to send WhatsApp to {to_phone}: {e}")

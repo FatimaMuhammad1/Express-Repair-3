@@ -2710,7 +2710,6 @@ function AdminDashboard({
       items: [
         { id: "analytics", icon: TrendingUp, label: "Analytics Dashboard" },
         { id: "repair_tracking", icon: Activity, label: "Repair Reports" },
-        { id: "activity", icon: Activity, label: "Sales Reports" },
         { id: "finance", icon: DollarSign, label: "Financial Reports" },
         { id: "customer_history", icon: History, label: "Customer History" },
       ]
@@ -2990,8 +2989,6 @@ function AdminDashboard({
                 {activeSection === "analytics" && "Analytics Dashboard"}
 
                 {activeSection === "repair_tracking" && "Repair Reports"}
-
-                {activeSection === "activity" && "Sales Reports"}
 
                 {activeSection === "inventory_products" && "Inventory Products"}
 
@@ -7723,6 +7720,30 @@ function AdminDashboard({
                     icon={DollarSign}
 
                     gradient="from-emerald-500 to-green-500"
+
+                  />
+
+                  <StatCard
+
+                    title="Pending Orders"
+
+                    value={purchaseOrders.filter(o => o.status !== "received").length}
+
+                    icon={Clock}
+
+                    gradient="from-amber-500 to-orange-500"
+
+                  />
+
+                  <StatCard
+
+                    title="Average Order Value"
+
+                    value={`£${purchaseOrders.length > 0 ? (purchaseOrders.reduce((sum, o) => sum + (parseFloat(o.total_amount) || 0), 0) / purchaseOrders.length).toFixed(2) : "0.00"}`}
+
+                    icon={TrendingUp}
+
+                    gradient="from-purple-500 to-pink-500"
 
                   />
 

@@ -36,20 +36,25 @@ def get_suppliers(
     _: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER"))
 ):
     """Get all suppliers"""
-    suppliers = db.query(Supplier).order_by(Supplier.name).all()
-    result = []
-    for supplier in suppliers:
-        result.append({
-            "id": str(supplier.id),
-            "name": supplier.name,
-            "supplier_code": supplier.supplier_code,
-            "email": supplier.email,
-            "phone": supplier.phone,
-            "address": supplier.address,
-            "is_active": supplier.is_active,
-            "created_at": supplier.created_at.isoformat()
-        })
-    return {"success": True, "suppliers": result}
+    try:
+        suppliers = db.query(Supplier).order_by(Supplier.name).all()
+        result = []
+        for supplier in suppliers:
+            result.append({
+                "id": str(supplier.id),
+                "name": supplier.name,
+                "supplier_code": supplier.supplier_code,
+                "email": supplier.email,
+                "phone": supplier.phone,
+                "address": supplier.address,
+                "is_active": supplier.is_active,
+                "created_at": supplier.created_at.isoformat() if supplier.created_at else None
+            })
+        return {"success": True, "suppliers": result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error fetching suppliers: {str(e)}")
 
 
 @router.post("", status_code=201)
