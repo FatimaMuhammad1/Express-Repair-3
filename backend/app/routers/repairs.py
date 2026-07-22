@@ -257,9 +257,18 @@ def update_repair_payment(
             raise HTTPException(400, "Invalid payment method. Must be: cash, card, or bank_transfer")
         repair.payment_method = body.payment_method
 
-    # Update deposit amount if provided
-    if body.payment_amount is not None:
-        repair.deposit_paid = Decimal(str(body.payment_amount))
+    # Add additional payment amount if provided
+    if body.payment_amount is not None and body.payment_amount > 0:
+        repair.deposit_paid = (repair.deposit_paid or Decimal("0.00")) + Decimal(str(body.payment_amount))
+        
+        # Update associated invoice if it exists
+        invoice = db.query(Invoice).filter(Invoice.repair_id == repair.id).first()
+        if invoice:
+            invoice.deposit_paid = (invoice.deposit_paid or Decimal("0.00")) + Decimal(str(body.payment_amount))
+            if invoice.deposit_paid >= invoice.amount:
+                invoice.status = "paid"
+            elif invoice.deposit_paid > 0:
+                invoice.status = "partial"
 
     db.commit()
     db.refresh(repair)
