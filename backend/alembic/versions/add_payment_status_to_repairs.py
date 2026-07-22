@@ -1,7 +1,7 @@
 """add payment status to repairs
 
 Revision ID: add_payment_status_to_repairs
-Revises: 
+Revises: add_deposit_paid_to_repairs
 Create Date: 2026-07-22
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import ENUM
 
 # revision identifiers, used by Alembic.
 revision = 'add_payment_status_to_repairs'
-down_revision = None  # Will be set by Alembic
+down_revision = 'add_deposit_paid_to_repairs'
 branch_labels = None
 depends_on = None
 
