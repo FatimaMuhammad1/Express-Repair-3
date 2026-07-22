@@ -145,7 +145,7 @@ def update_repair_status(
     tracking_id: str,
     body: RepairStatusUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("SUPER_ADMIN")),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER")),
 ):
     if body.status not in VALID_STATUSES:
         raise HTTPException(400, f"Invalid status. Choose from: {', '.join(VALID_STATUSES)}")
