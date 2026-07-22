@@ -5,6 +5,11 @@ from twilio.rest import Client
 import logging
 from app.config import settings
 
+try:
+    import telnyx  # type: ignore
+except ImportError:
+    telnyx = None
+
 logger = logging.getLogger(__name__)
 
 celery_app = Celery(

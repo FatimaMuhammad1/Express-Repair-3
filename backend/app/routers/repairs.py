@@ -13,7 +13,7 @@ import json
 import logging
 
 from app.database import get_db
-from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus, RepairStatus, Invoice, InvoiceStatus
+from app.models import Repair, User, Appointment, DeletedItem, DeletedItemStatus, RepairStatus, Invoice, InvoiceStatus, Transaction
 from app.schemas import RepairCreate, RepairOut, RepairStatusUpdate, RepairTrackOut
 from app.dependencies import require_roles, get_current_user
 from app.utils.helpers import generate_tracking_id
@@ -212,11 +212,10 @@ def update_repair_status(
         create_notification(
             db,
             user_id=repair.technician_id,
+            notification_type="status_update",
             title=f"Repair Status Updated",
             message=f"Repair {repair.tracking_id} status changed to {repair.status}",
-            type="status_update",
-            related_id=str(repair.id),
-            related_type="repair",
+            link=f"/admin/repairs/{repair.id}"
         )
 
     # Send status update notification to customer

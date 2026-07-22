@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # Sentry integration (optional)
 try:
-    import sentry_sdk
+    import sentry_sdk  # type: ignore
     if os.getenv("SENTRY_DSN"):
         sentry_sdk.init(
             dsn=os.getenv("SENTRY_DSN"),

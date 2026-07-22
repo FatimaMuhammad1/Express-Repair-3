@@ -460,7 +460,8 @@ function AdminDashboard({
     payment_method: "",
     notes: "",
     status: "pending",
-    source: "manual"
+    source: "manual",
+    otherCategory: ""
   });
 
   const [revenueData, setRevenueData] = useState<any[]>([]);
