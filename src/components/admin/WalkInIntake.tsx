@@ -29,7 +29,7 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
     estimated_cost: "",
     notification_preference: "email",
     deposit_amount: "",
-    payment_method: "",
+    payment_method: "pending",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -306,12 +306,12 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
                 <Select
                   value={formData.payment_method}
                   onValueChange={(value) => handleSelectChange("payment_method", value)}
-                  disabled={!formData.deposit_amount}
                 >
                   <SelectTrigger className="border-[#1F2235] bg-[#1A1D27] text-white">
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="pending">Payment Pending</SelectItem>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="bank_transfer">Bank Transfer</SelectItem>

@@ -52,9 +52,9 @@ def walk_in_intake(
     db.add(repair)
     db.commit()
     db.refresh(repair)
-    
-    # Create deposit payment if provided
-    if body.deposit_amount and body.deposit_amount > 0 and body.payment_method:
+
+    # Create deposit payment if provided and payment method is not pending
+    if body.deposit_amount and body.deposit_amount > 0 and body.payment_method and body.payment_method != "pending":
         transaction = Transaction(
             type="payment",
             amount=body.deposit_amount,
@@ -65,7 +65,7 @@ def walk_in_intake(
         )
         db.add(transaction)
         db.commit()
-    
+
     # Send notification to customer
     tracking_link = f"https://expresstechhub.co.uk/track/{tracking_id}"
     msg = f"Hello {body.customer_name}, your repair ticket for {body.device_model} has been created. Your tracking ID is {tracking_id}. Track it here: {tracking_link}"
