@@ -158,10 +158,6 @@ def update_repair_status(
     repair.status = body.status
     if body.status_notes is not None:
         repair.status_notes = body.status_notes
-    if body.estimated_cost is not None:
-        repair.estimated_cost = body.estimated_cost
-    if body.priority is not None:
-        repair.priority = body.priority
     if body.technician_id is not None:
         repair.technician_id = body.technician_id
 
@@ -175,15 +171,15 @@ def update_repair_status(
         if not existing_invoice:
             # Generate invoice number
             invoice_num = f"INV-{datetime.now().strftime('%Y%m%d')}-{repair.tracking_id}"
-            
+
             # Calculate tax (20% VAT)
             subtotal = float(repair.estimated_cost) if repair.estimated_cost else 0
             tax_amount = subtotal * 0.20
             total = subtotal + tax_amount
-            
+
             # Apply deposit if exists
             deposit_amount = float(repair.deposit_paid) if repair.deposit_paid else 0
-            
+
             # Determine invoice status based on deposit
             if deposit_amount >= total:
                 invoice_status = InvoiceStatus.paid
@@ -191,7 +187,7 @@ def update_repair_status(
                 invoice_status = InvoiceStatus.partial
             else:
                 invoice_status = InvoiceStatus.pending
-            
+
             # Create invoice
             invoice = Invoice(
                 invoice_number=invoice_num,
@@ -212,42 +208,74 @@ def update_repair_status(
     if repair.technician_id:
         create_notification(
             db,
-            repair.technician_id,
-            "repair_status_update",
-            "Repair Status Updated",
-            f"Repair for {repair.customer_name}'s {repair.device_model} changed from {old_status} to {body.status}",
-            f"/admin/repairs/{repair.id}"
+            user_id=repair.technician_id,
+            title=f"Repair Status Updated",
+            message=f"Repair {repair.tracking_id} status changed to {repair.status}",
+            type="status_update",
+            related_id=str(repair.id),
+            related_type="repair",
         )
 
-    if body.notify_customer:
-        # Get customer email from appointment or repair record
-        customer_email = repair.customer_email
-        if not customer_email and repair.appointment and repair.appointment.customer_email:
-            customer_email = repair.appointment.customer_email
-        elif not customer_email and repair.appointment and repair.appointment.user:
-            customer_email = repair.appointment.user.email
+    # Send status update notification to customer
+    try:
+        send_repair_status_update(repair, old_status, repair.status)
+    except Exception as e:
+        logger.warning(f"Failed to send status update notification: {e}")
 
-        # Get notification preference (default to email if not set)
-        notification_preference = getattr(repair, 'notification_preference', 'email')
+    return {"success": True, "message": "Repair status updated successfully"}
 
-        # Send status update notification via Celery
-        tracking_link = f"https://expresstechhub.co.uk/track/{repair.tracking_id}"
-        msg = f"Hello {repair.customer_name}, your repair ticket for {repair.device_model} status has been updated to '{body.status}'. Track it here: {tracking_link}"
-        subj = f"Repair Status Update - {repair.tracking_id}"
 
-        try:
-            if notification_preference == "whatsapp" and repair.customer_phone:
-                send_whatsapp_task.apply_async(args=[repair.customer_phone, msg], ignore_result=True)
-            if customer_email:
-                send_email_task.apply_async(args=[customer_email, subj, msg], ignore_result=True)
-        except Exception as e:
-            logger.warning(f"[Notification] Failed to send status update notification: {e}")
+class RepairPaymentUpdate(BaseModel):
+    payment_status: Optional[str] = None
+    payment_method: Optional[str] = None
+    payment_amount: Optional[float] = None
 
-    return {
-        "success": True,
-        "message": f"Repair status updated to '{body.status}'.",
-        "repair": RepairOut.model_validate(repair),
-    }
+
+@router.put("/{tracking_id}/payment")
+def update_repair_payment(
+    tracking_id: str,
+    body: RepairPaymentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER")),
+):
+    """Update payment information for a repair"""
+    repair = db.query(Repair).filter(Repair.tracking_id == tracking_id.upper()).first()
+    if not repair:
+        raise HTTPException(404, "Repair record not found.")
+
+    # Update payment status if provided
+    if body.payment_status:
+        if body.payment_status not in ["pending", "partially_paid", "paid"]:
+            raise HTTPException(400, "Invalid payment status. Must be: pending, partially_paid, or paid")
+        repair.payment_status = body.payment_status
+
+    # Update payment method if provided
+    if body.payment_method:
+        if body.payment_method not in ["cash", "card", "bank_transfer"]:
+            raise HTTPException(400, "Invalid payment method. Must be: cash, card, or bank_transfer")
+        repair.payment_method = body.payment_method
+
+    # Update deposit amount if provided
+    if body.payment_amount is not None:
+        repair.deposit_paid = Decimal(str(body.payment_amount))
+
+    db.commit()
+    db.refresh(repair)
+
+    # Create transaction record if payment was made
+    if body.payment_amount and body.payment_amount > 0 and body.payment_method:
+        transaction = Transaction(
+            type="payment",
+            amount=Decimal(str(body.payment_amount)),
+            description=f"Payment for repair {tracking_id}",
+            customer_name=repair.customer_name,
+            status="completed",
+            payment_method=body.payment_method,
+        )
+        db.add(transaction)
+        db.commit()
+
+    return {"success": True, "message": "Payment information updated successfully"}
 
 
 @router.delete("/{tracking_id}")

@@ -61,6 +61,12 @@ class RepairPriority(enum.Enum):
     urgent = "urgent"
 
 
+class RepairPaymentStatus(enum.Enum):
+    pending = "pending"
+    partially_paid = "partially_paid"
+    paid = "paid"
+
+
 class ProductCondition(enum.Enum):
     new = "new"
     refurbished = "refurbished"
@@ -294,6 +300,8 @@ class Repair(Base):
     status_notes   = Column(Text, nullable=True)
     estimated_cost = Column(Numeric(10, 2), default=0.00)
     deposit_paid   = Column(Numeric(10, 2), default=0.00)
+    payment_status = Column(Enum(RepairPaymentStatus), default=RepairPaymentStatus.pending, nullable=False, index=True)
+    payment_method = Column(String(50), nullable=True)  # cash, card, bank_transfer, or null if pending
     notification_preference = Column(String(20), default="email", nullable=True)  # email or whatsapp
     created_at     = Column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at     = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

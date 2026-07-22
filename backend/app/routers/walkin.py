@@ -47,6 +47,8 @@ def walk_in_intake(
         status_notes=body.issue_description,
         estimated_cost=body.estimated_cost or Decimal("0.00"),
         deposit_paid=body.deposit_amount or Decimal("0.00"),
+        payment_status=body.payment_status or "pending",
+        payment_method=body.payment_method if body.payment_status != "pending" else None,
         notification_preference=body.notification_preference or "email",
     )
     db.add(repair)

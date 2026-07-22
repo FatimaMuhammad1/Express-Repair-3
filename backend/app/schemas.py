@@ -242,6 +242,7 @@ class WalkInIntakeRequest(BaseModel):
     estimated_cost: Optional[Decimal] = Decimal("0.00")
     notification_preference: Optional[str] = "email"  # email or whatsapp
     deposit_amount: Optional[Decimal] = Decimal("0.00")
+    payment_status: Optional[str] = "pending"  # pending, partially_paid, paid
     payment_method: Optional[str] = None  # cash, card, bank_transfer
 
 

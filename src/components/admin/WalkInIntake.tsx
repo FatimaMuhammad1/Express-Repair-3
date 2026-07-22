@@ -29,7 +29,8 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
     estimated_cost: "",
     notification_preference: "email",
     deposit_amount: "",
-    payment_method: "pending",
+    payment_status: "pending",
+    payment_method: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -284,42 +285,61 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
         <div className="bg-[#11131E] rounded-lg border border-[#1F2235] p-6">
           <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
-            Optional Deposit Payment
+            Payment Information
           </h3>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="deposit_amount" className="text-slate-300">Deposit Amount (£)</Label>
-                <Input
-                  id="deposit_amount"
-                  name="deposit_amount"
-                  type="number"
-                  step="0.01"
-                  value={formData.deposit_amount}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  className="border-[#1F2235] bg-[#1A1D27] text-white"
-                />
-              </div>
-              <div>
-                <Label htmlFor="payment_method" className="text-slate-300">Payment Method</Label>
-                <Select
-                  value={formData.payment_method}
-                  onValueChange={(value) => handleSelectChange("payment_method", value)}
-                >
-                  <SelectTrigger className="border-[#1F2235] bg-[#1A1D27] text-white">
-                    <SelectValue placeholder="Select method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Payment Pending</SelectItem>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="card">Card</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label htmlFor="payment_status" className="text-slate-300">Payment Status</Label>
+              <Select
+                value={formData.payment_status}
+                onValueChange={(value) => handleSelectChange("payment_status", value)}
+              >
+                <SelectTrigger className="border-[#1F2235] bg-[#1A1D27] text-white">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="partially_paid">Partially Paid</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <p className="text-xs text-slate-500">Deposit will be applied to the final invoice when repair is completed.</p>
+            {(formData.payment_status === "partially_paid" || formData.payment_status === "paid") && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="deposit_amount" className="text-slate-300">Amount Paid (£)</Label>
+                  <Input
+                    id="deposit_amount"
+                    name="deposit_amount"
+                    type="number"
+                    step="0.01"
+                    value={formData.deposit_amount}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    className="border-[#1F2235] bg-[#1A1D27] text-white"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="payment_method" className="text-slate-300">Payment Method</Label>
+                  <Select
+                    value={formData.payment_method}
+                    onValueChange={(value) => handleSelectChange("payment_method", value)}
+                  >
+                    <SelectTrigger className="border-[#1F2235] bg-[#1A1D27] text-white">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+            <p className="text-xs text-slate-500">
+              {formData.payment_status === "pending" ? "Payment will be collected when customer collects the device." : "Payment will be applied to the final invoice."}
+            </p>
           </div>
         </div>
 

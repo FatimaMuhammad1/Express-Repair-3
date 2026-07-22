@@ -34,6 +34,9 @@ interface RepairDetail {
   estimated_cost: number;
   created_at: string;
   updated_at: string;
+  payment_status?: string;
+  payment_method?: string;
+  deposit_paid?: number;
 }
 
 export default function RepairTimeline({ repairId, trackingId, onClose }: RepairTimelineProps) {
@@ -42,8 +45,13 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
   const [isLoading, setIsLoading] = useState(true);
   const [newNote, setNewNote] = useState("");
   const [newStatus, setNewStatus] = useState("");
+  const [updatePaymentStatus, setUpdatePaymentStatus] = useState("");
+  const [updatePaymentMethod, setUpdatePaymentMethod] = useState("");
+  const [updatePaymentAmount, setUpdatePaymentAmount] = useState("");
 
   const VALID_STATUSES = ["pending", "received", "diagnosed", "repairing", "testing", "collection", "completed"];
+  const PAYMENT_STATUSES = ["pending", "partially_paid", "paid"];
+  const PAYMENT_METHODS = ["cash", "card", "bank_transfer"];
 
   useEffect(() => {
     fetchRepairDetails();
@@ -147,6 +155,41 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
     } catch (e) {
       console.error("Failed to update status:", e);
       toast.error("Failed to update status");
+    }
+  };
+
+  const updatePaymentInfo = async () => {
+    if (!repair) return;
+
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/repairs/${trackingId}/payment`), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          payment_status: updatePaymentStatus || repair.payment_status,
+          payment_method: updatePaymentMethod || repair.payment_method,
+          payment_amount: updatePaymentAmount ? parseFloat(updatePaymentAmount) : undefined,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success("Payment information updated");
+        setUpdatePaymentStatus("");
+        setUpdatePaymentMethod("");
+        setUpdatePaymentAmount("");
+        fetchRepairDetails();
+        fetchTimeline();
+      } else {
+        const data = await res.json();
+        toast.error(data.detail || "Failed to update payment information");
+      }
+    } catch (e) {
+      console.error("Failed to update payment info:", e);
+      toast.error("Failed to update payment information");
     }
   };
 
@@ -301,6 +344,62 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
                     className="bg-violet-600 hover:bg-violet-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
                   >
                     Update
+                  </button>
+                </div>
+              </div>
+
+              {/* Update Payment Information */}
+              <div className="bg-[#0B0D17] rounded-xl p-4 border border-[#1F2235] mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Update Payment Information</h3>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Payment Status</label>
+                      <Select value={updatePaymentStatus} onValueChange={setUpdatePaymentStatus}>
+                        <SelectTrigger className="bg-[#11131E] border border-[#1F2235] text-white">
+                          <SelectValue placeholder={repair?.payment_status || "Current"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_STATUSES.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {status.charAt(0).toUpperCase() + status.slice(1).replace("_", " ")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-400 mb-1 block">Payment Method</label>
+                      <Select value={updatePaymentMethod} onValueChange={setUpdatePaymentMethod}>
+                        <SelectTrigger className="bg-[#11131E] border border-[#1F2235] text-white">
+                          <SelectValue placeholder={repair?.payment_method || "Current"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_METHODS.map((method) => (
+                            <SelectItem key={method} value={method}>
+                              {method.charAt(0).toUpperCase() + method.slice(1).replace("_", " ")}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 mb-1 block">Additional Payment Amount (£)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={updatePaymentAmount}
+                      onChange={(e) => setUpdatePaymentAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full bg-[#11131E] border border-[#1F2235] rounded-lg px-3 py-2 text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    />
+                  </div>
+                  <button
+                    onClick={updatePaymentInfo}
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Update Payment Information
                   </button>
                 </div>
               </div>
