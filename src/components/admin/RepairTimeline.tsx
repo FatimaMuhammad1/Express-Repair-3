@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Clock, User, FileText, X, ChevronRight, CheckCircle2, AlertCircle, Wrench, Package } from "lucide-react";
 import { buildUrl, getStoredToken } from "@/lib/api";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface RepairTimelineProps {
   repairId: string;
@@ -40,6 +41,9 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newNote, setNewNote] = useState("");
+  const [newStatus, setNewStatus] = useState("");
+
+  const VALID_STATUSES = ["pending", "received", "diagnosed", "repairing", "testing", "collection", "completed"];
 
   useEffect(() => {
     fetchRepairDetails();
@@ -114,6 +118,35 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
     } catch (e) {
       console.error("Failed to add note:", e);
       toast.error("Failed to add note");
+    }
+  };
+
+  const updateStatus = async () => {
+    if (!newStatus || !repair) return;
+
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/repairs/${trackingId}/status`), {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (res.ok) {
+        toast.success(`Status updated to ${newStatus}`);
+        setNewStatus("");
+        fetchRepairDetails();
+        fetchTimeline();
+      } else {
+        const data = await res.json();
+        toast.error(data.detail || "Failed to update status");
+      }
+    } catch (e) {
+      console.error("Failed to update status:", e);
+      toast.error("Failed to update status");
     }
   };
 
@@ -245,6 +278,32 @@ export default function RepairTimeline({ repairId, trackingId, onClose }: Repair
                   <p className="text-white">{repair.status_notes}</p>
                 </div>
               )}
+
+              {/* Update Status */}
+              <div className="bg-[#0B0D17] rounded-xl p-4 border border-[#1F2235] mb-6">
+                <h3 className="text-lg font-semibold text-white mb-4">Update Status</h3>
+                <div className="flex gap-2">
+                  <Select value={newStatus} onValueChange={setNewStatus}>
+                    <SelectTrigger className="flex-1 bg-[#11131E] border border-[#1F2235] text-white">
+                      <SelectValue placeholder="Select new status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {VALID_STATUSES.map((status) => (
+                        <SelectItem key={status} value={status}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <button
+                    onClick={updateStatus}
+                    disabled={!newStatus}
+                    className="bg-violet-600 hover:bg-violet-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                  >
+                    Update
+                  </button>
+                </div>
+              </div>
 
               {/* Timeline */}
               <div className="mb-6">
