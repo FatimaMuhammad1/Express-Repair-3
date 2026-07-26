@@ -71,6 +71,10 @@ class ProductCondition(enum.Enum):
     new = "new"
     refurbished = "refurbished"
     used = "used"
+    grade_a_plus = "grade_a_plus"
+    grade_a = "grade_a"
+    grade_b = "grade_b"
+    grade_c = "grade_c"
 
 
 class ProductCategory(enum.Enum):

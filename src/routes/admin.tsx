@@ -4237,6 +4237,10 @@ function AdminDashboard({
                               <option value="new">New</option>
                               <option value="refurbished">Refurbished</option>
                               <option value="used">Used</option>
+                              <option value="grade_a_plus">Grade A+</option>
+                              <option value="grade_a">Grade A</option>
+                              <option value="grade_b">Grade B</option>
+                              <option value="grade_c">Grade C</option>
                             </select>
                           </div>
                           <div className="grid grid-cols-2 gap-4">
