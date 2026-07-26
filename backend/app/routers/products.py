@@ -420,9 +420,25 @@ async def import_products(
                     
                     # Validate condition
                     condition_value = row.get('condition', 'new').strip().lower()
+                    # Map friendly names to enum values
+                    condition_map = {
+                        'new': 'new',
+                        'refurbished': 'refurbished',
+                        'used': 'used',
+                        'grade a+': 'grade_a_plus',
+                        'grade a plus': 'grade_a_plus',
+                        'grade a': 'grade_a',
+                        'grade b': 'grade_b',
+                        'grade c': 'grade_c',
+                        'grade_a_plus': 'grade_a_plus',
+                        'grade_a': 'grade_a',
+                        'grade_b': 'grade_b',
+                        'grade_c': 'grade_c',
+                    }
+                    condition_value = condition_map.get(condition_value, 'new')
                     valid_conditions = ['new', 'refurbished', 'used', 'grade_a_plus', 'grade_a', 'grade_b', 'grade_c']
                     if condition_value not in valid_conditions:
-                        errors.append(f"Row error: Invalid condition '{condition_value}'. Must be one of: {valid_conditions}")
+                        errors.append(f"Row error: Invalid condition. Must be one of: New, Refurbished, Used, Grade A+, Grade A, Grade B, Grade C")
                         continue
                     
                     product = Product(
@@ -507,9 +523,25 @@ async def import_products(
 
                         # Validate condition
                         condition_value = str(row_data.get('condition', 'new')).strip().lower()
+                        # Map friendly names to enum values
+                        condition_map = {
+                            'new': 'new',
+                            'refurbished': 'refurbished',
+                            'used': 'used',
+                            'grade a+': 'grade_a_plus',
+                            'grade a plus': 'grade_a_plus',
+                            'grade a': 'grade_a',
+                            'grade b': 'grade_b',
+                            'grade c': 'grade_c',
+                            'grade_a_plus': 'grade_a_plus',
+                            'grade_a': 'grade_a',
+                            'grade_b': 'grade_b',
+                            'grade_c': 'grade_c',
+                        }
+                        condition_value = condition_map.get(condition_value, 'new')
                         valid_conditions = ['new', 'refurbished', 'used', 'grade_a_plus', 'grade_a', 'grade_b', 'grade_c']
                         if condition_value not in valid_conditions:
-                            errors.append(f"Row error: Invalid condition '{condition_value}'. Must be one of: {valid_conditions}")
+                            errors.append(f"Row error: Invalid condition. Must be one of: New, Refurbished, Used, Grade A+, Grade A, Grade B, Grade C")
                             continue
 
                         product = Product(
