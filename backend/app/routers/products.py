@@ -405,17 +405,24 @@ async def import_products(
     try:
         # Read file content
         content = await file.read()
-        
+
         # Handle CSV file
         if file.filename.endswith('.csv'):
-            csv_file = io.StringIO(content.decode('utf-8'))
+            try:
+                csv_file = io.StringIO(content.decode('utf-8'))
+            except UnicodeDecodeError:
+                # Try with different encoding
+                csv_file = io.StringIO(content.decode('latin-1'))
             csv_reader = csv.DictReader(csv_file)
             
             for row in csv_reader:
                 try:
+                    # Debug: log the row data
+                    print(f"Processing row: {row}")
+
                     # Validate required fields
                     if not row.get('name'):
-                        errors.append(f"Row error: Missing required field 'name'")
+                        errors.append(f"Row error: Missing required field 'name' - Row: {row}")
                         continue
                     
                     # Validate condition
