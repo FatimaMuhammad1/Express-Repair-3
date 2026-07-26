@@ -420,7 +420,7 @@ async def import_products(
                     
                     # Validate condition
                     condition_value = row.get('condition', 'new').strip().lower()
-                    valid_conditions = ['new', 'refurbished', 'used']
+                    valid_conditions = ['new', 'refurbished', 'used', 'grade_a_plus', 'grade_a', 'grade_b', 'grade_c']
                     if condition_value not in valid_conditions:
                         errors.append(f"Row error: Invalid condition '{condition_value}'. Must be one of: {valid_conditions}")
                         continue
@@ -504,14 +504,21 @@ async def import_products(
                         # Skip if no name provided
                         if not row_data.get('name'):
                             continue
-                            
+
+                        # Validate condition
+                        condition_value = str(row_data.get('condition', 'new')).strip().lower()
+                        valid_conditions = ['new', 'refurbished', 'used', 'grade_a_plus', 'grade_a', 'grade_b', 'grade_c']
+                        if condition_value not in valid_conditions:
+                            errors.append(f"Row error: Invalid condition '{condition_value}'. Must be one of: {valid_conditions}")
+                            continue
+
                         product = Product(
                             name=row_data.get('name', ''),
                             description=row_data.get('description', ''),
                             category=row_data.get('category', 'smartphone').strip(),
                             brand=row_data.get('brand', ''),
                             model=row_data.get('model', ''),
-                            condition=ProductCondition(row_data.get('condition', 'new').strip().lower()),
+                            condition=ProductCondition(condition_value),
                             price=float(row_data.get('price', 0) or 0),
                             stock_quantity=int(row_data.get('stock_quantity', 0) or 0),
                             min_stock_level=int(row_data.get('min_stock_level', 5) or 5),
