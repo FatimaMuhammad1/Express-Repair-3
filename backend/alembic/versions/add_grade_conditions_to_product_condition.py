@@ -1,6 +1,6 @@
 """add grade conditions to product condition
 
-Revision ID: add_grade_conditions_to_product_condition
+Revision ID: add_grade_conds
 Revises: add_payment_status_to_repairs
 Create Date: 2026-07-25
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ENUM
 
 # revision identifiers, used by Alembic.
-revision = 'add_grade_conditions_to_product_condition'
+revision = 'add_grade_conds'
 down_revision = 'add_payment_status_to_repairs'
 branch_labels = None
 depends_on = None
