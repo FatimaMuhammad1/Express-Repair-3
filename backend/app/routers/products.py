@@ -409,11 +409,17 @@ async def import_products(
         # Handle CSV file
         if file.filename.endswith('.csv'):
             try:
-                csv_file = io.StringIO(content.decode('utf-8'))
+                csv_content = content.decode('utf-8')
             except UnicodeDecodeError:
                 # Try with different encoding
-                csv_file = io.StringIO(content.decode('latin-1'))
-            csv_reader = csv.DictReader(csv_file)
+                csv_content = content.decode('latin-1')
+
+            # Detect delimiter (comma or semicolon)
+            sample = csv_content.split('\n')[0]
+            delimiter = ';' if ';' in sample else ','
+
+            csv_file = io.StringIO(csv_content)
+            csv_reader = csv.DictReader(csv_file, delimiter=delimiter)
             
             for row in csv_reader:
                 try:
