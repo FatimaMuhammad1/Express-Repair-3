@@ -18,10 +18,11 @@ depends_on = None
 
 def upgrade():
     # Add new values to the existing productcondition enum
-    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_a_plus' IF NOT EXISTS")
-    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_a' IF NOT EXISTS")
-    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_b' IF NOT EXISTS")
-    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_c' IF NOT EXISTS")
+    # PostgreSQL requires adding enum values in a transaction
+    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_a_plus'")
+    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_a'")
+    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_b'")
+    op.execute("ALTER TYPE productcondition ADD VALUE 'grade_c'")
 
 
 def downgrade():
