@@ -111,7 +111,7 @@ const contactChannels = [
 
     value: "6 Harefield Road",
 
-    href: "https://www.google.com/maps/search/?api=1&query=6+Harefield+Road+Nuneaton+CV11+4HD",
+    href: "https://www.google.com/maps/dir/?api=1&destination=6+Harefield+Road+Nuneaton+CV11+4HD",
 
     note: "Nuneaton, CV11 4HD. Walk-ins welcome.",
     accentColor: "#EC4899",
@@ -473,7 +473,7 @@ function ContactPage() {
                         className="rounded-xl bg-gradient-purple-blue text-white hover:bg-gradient-purple-blue-hover"
                       >
                         <a
-                          href="https://www.google.com/maps/search/?api=1&query=6+Harefield+Road+Nuneaton+CV11+4HD"
+                          href="https://www.google.com/maps/dir/?api=1&destination=6+Harefield+Road+Nuneaton+CV11+4HD"
                           target="_blank"
                           rel="noreferrer"
                         >
@@ -681,7 +681,7 @@ function ContactPage() {
                     className="rounded-xl bg-gradient-purple-blue text-white hover:bg-gradient-purple-blue-hover"
                   >
                     <a
-                      href="https://www.google.com/maps/search/?api=1&query=6+Harefield+Road+Nuneaton+CV11+4HD"
+                      href="https://www.google.com/maps/dir/?api=1&destination=6+Harefield+Road+Nuneaton+CV11+4HD"
                       target="_blank"
                       rel="noreferrer"
                     >
