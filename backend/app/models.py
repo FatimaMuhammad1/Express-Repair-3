@@ -306,6 +306,8 @@ class Repair(Base):
     deposit_paid   = Column(Numeric(10, 2), default=0.00)
     payment_status = Column(Enum(RepairPaymentStatus), default=RepairPaymentStatus.pending, nullable=False, index=True)
     payment_method = Column(String(50), nullable=True)  # cash, card, bank_transfer, or null if pending
+    repair_part_id = Column(UUID(as_uuid=True), ForeignKey("repair_parts_inventory.id", ondelete="SET NULL"), nullable=True, index=True)  # Track which repair part was used
+    repair_notes   = Column(Text, nullable=True)  # Notes about repair (e.g., "software update only", "screen replaced")
     notification_preference = Column(String(20), default="email", nullable=True)  # email or whatsapp
     created_at     = Column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at     = Column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -353,6 +355,7 @@ class Product(Base):
     reorder_quantity = Column(Integer, default=10)  # Default quantity to reorder
     supplier_id    = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True)
     image_url      = Column(String(500), nullable=True)
+    purchase_date  = Column(Date, nullable=True)  # Date when inventory was purchased for aging analysis
     is_active      = Column(Boolean, default=True, index=True)
     is_for_sale    = Column(Boolean, default=True)
     created_at     = Column(DateTime(timezone=True), default=utcnow)

@@ -5,7 +5,7 @@ from typing import Optional
 import csv
 import io
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 from app.database import get_db
 from app.models import Product, Category, TradeRequest, User, DeletedItem, DeletedItemStatus
@@ -54,6 +54,7 @@ class ProductCreate(BaseModel):
     price: float
     stock_quantity: int = 0
     image_url: Optional[str] = None
+    purchase_date: Optional[date] = None
     is_for_sale: bool = True
 
 class ProductUpdate(BaseModel):
@@ -68,6 +69,7 @@ class ProductUpdate(BaseModel):
     sku: Optional[str] = None
     min_stock_level: Optional[int] = None
     image_url: Optional[str] = None
+    purchase_date: Optional[date] = None
     is_active: Optional[bool] = None
     is_for_sale: Optional[bool] = None
 
@@ -84,6 +86,7 @@ class ProductOut(BaseModel):
     sku: Optional[str]
     min_stock_level: Optional[int]
     image_url: Optional[str]
+    purchase_date: Optional[str]
     is_active: bool
     is_for_sale: bool
     created_at: str
@@ -103,6 +106,7 @@ class ProductOut(BaseModel):
             sku=obj.sku,
             min_stock_level=obj.reorder_threshold,
             image_url=obj.image_url,
+            purchase_date=obj.purchase_date.isoformat() if obj.purchase_date else None,
             is_active=obj.is_active,
             is_for_sale=obj.is_for_sale,
             created_at=obj.created_at.isoformat() if obj.created_at else None
@@ -464,6 +468,7 @@ async def import_products(
                         price=float(row.get('price', 0) or 0),
                         stock_quantity=int(row.get('stock_quantity', 0) or 0),
                         image_url=row.get('image_url', ''),
+                        purchase_date=None,
                         is_for_sale=True
                     )
                     db.add(product)
@@ -569,6 +574,7 @@ async def import_products(
                             min_stock_level=int(row_data.get('min_stock_level', 5) or 5),
                             sku=row_data.get('sku', ''),
                             image_url=row_data.get('image_url', ''),
+                            purchase_date=None,
                             is_for_sale=True
                         )
                         db.add(product)

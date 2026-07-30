@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Phone, Mail, Smartphone, DollarSign, FileText, CheckCircle } from "lucide-react";
+import { User, Phone, Mail, Smartphone, DollarSign, FileText, CheckCircle, Wrench } from "lucide-react";
 import { API_BASE } from "@/lib/apiBase";
 
 interface WalkInIntakeProps {
@@ -18,6 +18,7 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [repairParts, setRepairParts] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     customer_name: "",
@@ -31,7 +32,30 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
     deposit_amount: "",
     payment_status: "pending",
     payment_method: "",
+    repair_part_id: "",
+    repair_notes: "",
   });
+
+  // Fetch repair parts inventory
+  useEffect(() => {
+    const fetchRepairParts = async () => {
+      try {
+        const token = localStorage.getItem("admin_token");
+        const res = await fetch(`${API_BASE}/repairs/inventory`, {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setRepairParts(data.filter((part: any) => part.is_active && part.stock_quantity > 0));
+        }
+      } catch (err) {
+        console.error("Failed to fetch repair parts:", err);
+      }
+    };
+    fetchRepairParts();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -60,6 +84,8 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
         notification_preference: formData.notification_preference,
         deposit_amount: formData.deposit_amount ? parseFloat(formData.deposit_amount) : null,
         payment_method: (formData.deposit_amount && formData.payment_method) ? formData.payment_method : undefined,
+        repair_part_id: formData.repair_part_id || null,
+        repair_notes: formData.repair_notes || null,
       };
 
       const res = await fetch(`${API_BASE}/walkin/intake`, {
@@ -97,6 +123,8 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
           deposit_amount: "",
           payment_status: "pending",
           payment_method: "",
+          repair_part_id: "",
+          repair_notes: "",
         });
       } else {
         console.error("Walk-in intake error:", data);
@@ -278,6 +306,47 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Repair Parts Section */}
+        <div className="bg-[#11131E] rounded-lg border border-[#1F2235] p-6">
+          <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+            <Wrench className="w-4 h-4" />
+            Repair Parts
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <Label htmlFor="repair_part_id" className="text-slate-300">Repair Part Used (Optional)</Label>
+              <Select
+                value={formData.repair_part_id}
+                onValueChange={(value) => handleSelectChange("repair_part_id", value)}
+              >
+                <SelectTrigger className="border-[#1F2235] bg-[#1A1D27] text-white">
+                  <SelectValue placeholder="Select repair part or leave blank for no parts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No repair part (software update, labor only, etc.)</SelectItem>
+                  {repairParts.map((part) => (
+                    <SelectItem key={part.id} value={part.id}>
+                      {part.name} ({part.part_type}) - Stock: {part.stock_quantity}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="repair_notes" className="text-slate-300">Repair Notes (Optional)</Label>
+              <Textarea
+                id="repair_notes"
+                name="repair_notes"
+                value={formData.repair_notes}
+                onChange={handleChange}
+                rows={2}
+                placeholder="e.g., Software update only, Screen replaced, Battery replaced, etc."
+                className="border-[#1F2235] bg-[#1A1D27] text-white"
+              />
             </div>
           </div>
         </div>

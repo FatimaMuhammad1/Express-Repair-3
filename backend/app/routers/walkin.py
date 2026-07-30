@@ -6,7 +6,7 @@ from uuid import UUID
 import logging
 
 from app.database import get_db
-from app.models import Repair, Invoice, Transaction, User
+from app.models import Repair, Invoice, Transaction, User, RepairPartInventory
 from app.schemas import WalkInIntakeRequest, WalkInIntakeResponse
 from app.dependencies import require_roles
 from app.utils.helpers import generate_tracking_id
@@ -36,6 +36,13 @@ def walk_in_intake(
     else:
         raise HTTPException(500, "Could not generate a unique tracking ID.")
     
+    # Validate repair_part_id if provided
+    repair_part = None
+    if body.repair_part_id:
+        repair_part = db.query(RepairPartInventory).filter(RepairPartInventory.id == body.repair_part_id).first()
+        if not repair_part:
+            raise HTTPException(status_code=404, detail="Repair part not found")
+
     # Create repair record
     repair = Repair(
         tracking_id=tracking_id,
@@ -49,6 +56,8 @@ def walk_in_intake(
         deposit_paid=body.deposit_amount or Decimal("0.00"),
         payment_status=body.payment_status or "pending",
         payment_method=body.payment_method if body.payment_status != "pending" else None,
+        repair_part_id=body.repair_part_id,
+        repair_notes=body.repair_notes,
         notification_preference=body.notification_preference or "email",
     )
     db.add(repair)

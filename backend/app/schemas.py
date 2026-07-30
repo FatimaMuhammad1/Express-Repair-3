@@ -244,6 +244,8 @@ class WalkInIntakeRequest(BaseModel):
     deposit_amount: Optional[Decimal] = Decimal("0.00")
     payment_status: Optional[str] = "pending"  # pending, partially_paid, paid
     payment_method: Optional[str] = None  # cash, card, bank_transfer
+    repair_part_id: Optional[UUID] = None  # ID of repair part used (if any)
+    repair_notes: Optional[str] = None  # Notes about repair (e.g., "software update only", "screen replaced")
 
 
 class WalkInIntakeResponse(BaseModel):

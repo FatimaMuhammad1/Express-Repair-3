@@ -385,7 +385,8 @@ function AdminDashboard({
     stock_quantity: "",
     min_stock_level: "5",
     sku: "",
-    image_url: ""
+    image_url: "",
+    purchase_date: ""
   });
 
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
@@ -2016,7 +2017,8 @@ function AdminDashboard({
           stock_quantity: parseInt(newProduct.stock_quantity),
           min_stock_level: parseInt(newProduct.min_stock_level),
           sku: newProduct.sku,
-          image_url: newProduct.image_url || null
+          image_url: newProduct.image_url || null,
+          purchase_date: newProduct.purchase_date || null
         })
       });
       const data = await res.json();
@@ -2034,7 +2036,8 @@ function AdminDashboard({
           stock_quantity: "",
           min_stock_level: "5",
           sku: "",
-          image_url: ""
+          image_url: "",
+          purchase_date: ""
         });
         safeToast.success("Product created successfully");
       } else {
@@ -4293,6 +4296,15 @@ function AdminDashboard({
                               onChange={(e) => setNewProduct({ ...newProduct, image_url: e.target.value })}
                               className="border-[#1F2235] bg-[#1A1D27] text-white"
                               placeholder="Optional image URL..."
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-slate-300">Purchase Date (Optional)</Label>
+                            <Input
+                              type="date"
+                              value={newProduct.purchase_date}
+                              onChange={(e) => setNewProduct({ ...newProduct, purchase_date: e.target.value })}
+                              className="border-[#1F2235] bg-[#1A1D27] text-white"
                             />
                           </div>
                           <div className="flex gap-3 pt-4">
