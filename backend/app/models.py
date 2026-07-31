@@ -355,7 +355,7 @@ class Product(Base):
     reorder_quantity = Column(Integer, default=10)  # Default quantity to reorder
     supplier_id    = Column(UUID(as_uuid=True), ForeignKey("suppliers.id", ondelete="SET NULL"), nullable=True, index=True)
     image_url      = Column(String(500), nullable=True)
-    purchase_date  = Column(Date, nullable=True)  # Date when inventory was purchased for aging analysis
+    received_date  = Column(Date, nullable=True)  # Date when inventory was received for aging analysis
     is_active      = Column(Boolean, default=True, index=True)
     is_for_sale    = Column(Boolean, default=True)
     created_at     = Column(DateTime(timezone=True), default=utcnow)
@@ -389,6 +389,7 @@ class RepairPartInventory(Base):
     stock_quantity = Column(Integer, default=0, nullable=False)
     min_stock_level = Column(Integer, default=5, nullable=False)  # Reorder threshold
     location = Column(String(100), nullable=True)  # Storage location
+    received_date = Column(Date, nullable=True)  # Date when inventory was received
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), default=utcnow, index=True)

@@ -1,7 +1,7 @@
 """add repair parts tracking to repairs
 
 Revision ID: add_repair_parts_tracking
-Revises: add_purchase_date
+Revises: add_received_date_products
 Create Date: 2026-07-30
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import UUID
 
 # revision identifiers, used by Alembic.
 revision = 'add_repair_parts_tracking'
-down_revision = 'add_purchase_date'
+down_revision = 'add_received_date_products'
 branch_labels = None
 depends_on = None
 

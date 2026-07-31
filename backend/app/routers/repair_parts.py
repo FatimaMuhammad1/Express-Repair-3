@@ -6,7 +6,7 @@ from typing import Optional
 import csv
 import io
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 
 from app.database import get_db
 from app.models import Repair, Product, User, RepairPartInventory, DeletedItem, DeletedItemStatus
@@ -59,6 +59,7 @@ class RepairPartInventoryCreate(BaseModel):
     stock_quantity: int = 0
     min_stock_level: int = 5
     location: Optional[str] = None
+    received_date: Optional[date] = None
     notes: Optional[str] = None
 
 
@@ -74,6 +75,7 @@ class RepairPartInventoryUpdate(BaseModel):
     stock_quantity: Optional[int] = None
     min_stock_level: Optional[int] = None
     location: Optional[str] = None
+    received_date: Optional[date] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -91,6 +93,7 @@ class RepairPartInventoryOut(BaseModel):
     stock_quantity: int
     min_stock_level: int
     location: Optional[str]
+    received_date: Optional[str]
     notes: Optional[str]
     is_active: bool
     created_at: str
@@ -389,6 +392,7 @@ def create_repair_part_inventory(
         stock_quantity=body.stock_quantity,
         min_stock_level=body.min_stock_level,
         location=body.location,
+        received_date=body.received_date,
         notes=body.notes,
     )
     
@@ -412,6 +416,7 @@ def create_repair_part_inventory(
             "stock_quantity": part.stock_quantity,
             "min_stock_level": part.min_stock_level,
             "location": part.location,
+            "received_date": part.received_date.isoformat() if part.received_date else None,
             "notes": part.notes,
             "is_active": part.is_active,
             "created_at": part.created_at.isoformat(),
@@ -461,6 +466,7 @@ def update_repair_part_inventory(
             "stock_quantity": part.stock_quantity,
             "min_stock_level": part.min_stock_level,
             "location": part.location,
+            "received_date": part.received_date.isoformat() if part.received_date else None,
             "notes": part.notes,
             "is_active": part.is_active,
             "created_at": part.created_at.isoformat(),

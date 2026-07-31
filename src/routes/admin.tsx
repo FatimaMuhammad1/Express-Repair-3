@@ -371,6 +371,7 @@ function AdminDashboard({
     stock_quantity: "",
     min_stock_level: "5",
     location: "",
+    received_date: "",
     notes: ""
   });
 
@@ -386,7 +387,7 @@ function AdminDashboard({
     min_stock_level: "5",
     sku: "",
     image_url: "",
-    purchase_date: ""
+    received_date: ""
   });
 
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
@@ -2018,7 +2019,7 @@ function AdminDashboard({
           min_stock_level: parseInt(newProduct.min_stock_level),
           sku: newProduct.sku,
           image_url: newProduct.image_url || null,
-          purchase_date: newProduct.purchase_date || null
+          received_date: newProduct.received_date || null
         })
       });
       const data = await res.json();
@@ -2037,7 +2038,7 @@ function AdminDashboard({
           min_stock_level: "5",
           sku: "",
           image_url: "",
-          purchase_date: ""
+          received_date: ""
         });
         safeToast.success("Product created successfully");
       } else {
@@ -2158,6 +2159,7 @@ function AdminDashboard({
           stock_quantity: parseInt(newRepairPart.stock_quantity),
           min_stock_level: parseInt(newRepairPart.min_stock_level),
           location: newRepairPart.location,
+          received_date: newRepairPart.received_date || null,
           notes: newRepairPart.notes
         })
       });
@@ -2177,6 +2179,7 @@ function AdminDashboard({
           stock_quantity: "",
           min_stock_level: "5",
           location: "",
+          received_date: "",
           notes: ""
         });
         safeToast.success("Repair part added successfully");
@@ -4299,11 +4302,11 @@ function AdminDashboard({
                             />
                           </div>
                           <div>
-                            <Label className="text-slate-300">Purchase Date (Optional)</Label>
+                            <Label className="text-slate-300">Received Date (Optional)</Label>
                             <Input
                               type="date"
-                              value={newProduct.purchase_date}
-                              onChange={(e) => setNewProduct({ ...newProduct, purchase_date: e.target.value })}
+                              value={newProduct.received_date}
+                              onChange={(e) => setNewProduct({ ...newProduct, received_date: e.target.value })}
                               className="border-[#1F2235] bg-[#1A1D27] text-white"
                             />
                           </div>
@@ -4681,6 +4684,15 @@ function AdminDashboard({
                                     className="border-[#1F2235] bg-[#1A1D27] text-white"
                                   />
                                 </div>
+                              </div>
+                              <div>
+                                <Label className="text-slate-300">Received Date (Optional)</Label>
+                                <Input
+                                  type="date"
+                                  value={newRepairPart.received_date}
+                                  onChange={(e) => setNewRepairPart({ ...newRepairPart, received_date: e.target.value })}
+                                  className="border-[#1F2235] bg-[#1A1D27] text-white"
+                                />
                               </div>
                               <div>
                                 <Label className="text-slate-300">Notes</Label>
