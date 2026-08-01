@@ -3954,6 +3954,12 @@ function AdminDashboard({
 
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
+                            Received Date
+
+                          </th>
+
+                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+
                             SKU
 
                           </th>
@@ -3979,12 +3985,6 @@ function AdminDashboard({
                           <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
 
                             Stock
-
-                          </th>
-
-                          <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-
-                            Received Date
 
                           </th>
 
@@ -4023,6 +4023,10 @@ function AdminDashboard({
                               className="border-b border-[#1F2235] bg-[#11131E] hover:bg-[#1A1D27] transition-colors"
 
                             >
+
+                              <td className="px-4 py-3 text-slate-400 text-sm">
+                                {product.received_date ? new Date(product.received_date).toLocaleDateString() : "N/A"}
+                              </td>
 
                               <td className="px-4 py-3 text-slate-400 text-sm">
 
@@ -4074,10 +4078,6 @@ function AdminDashboard({
 
                                 </div>
 
-                              </td>
-
-                              <td className="px-4 py-3 text-slate-400 text-sm">
-                                {product.received_date ? new Date(product.received_date).toLocaleDateString() : "N/A"}
                               </td>
 
                               <td className="px-4 py-3">
@@ -4492,6 +4492,9 @@ function AdminDashboard({
                           <thead>
                             <tr className="border-b border-[#1F2235] bg-[#11131E]">
                               <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
+                                Received Date
+                              </th>
+                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
                                 SKU
                               </th>
                               <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
@@ -4505,9 +4508,6 @@ function AdminDashboard({
                               </th>
                               <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
                                 Location
-                              </th>
-                              <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
-                                Received Date
                               </th>
                               <th className="px-6 py-4 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 bg-transparent">
                                 Actions
@@ -4526,6 +4526,7 @@ function AdminDashboard({
                               })
                               .map((part) => (
                                 <tr key={part.id} className="border-b border-[#1F2235] hover:bg-[#1A1D27] transition-colors">
+                                  <td className="px-6 py-4 text-slate-300">{part.received_date ? new Date(part.received_date).toLocaleDateString() : "N/A"}</td>
                                   <td className="px-6 py-4 text-slate-300">{part.sku || "-"}</td>
                                   <td className="px-6 py-4">
                                     <div>
@@ -4540,7 +4541,6 @@ function AdminDashboard({
                                   </td>
                                   <td className="px-6 py-4 text-slate-300">£{part.unit_cost ? parseFloat(part.unit_cost).toFixed(2) : "0.00"}</td>
                                   <td className="px-6 py-4 text-slate-300">{part.location || "-"}</td>
-                                  <td className="px-6 py-4 text-slate-300">{part.received_date ? new Date(part.received_date).toLocaleDateString() : "N/A"}</td>
                                   <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
                                       <Button
