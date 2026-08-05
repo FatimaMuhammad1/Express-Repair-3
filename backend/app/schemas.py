@@ -164,6 +164,7 @@ class RepairStatusUpdate(BaseModel):
     status: str
     status_notes: Optional[str] = None
     estimated_cost: Optional[Decimal] = None
+    final_repair_cost: Optional[Decimal] = None  # Final confirmed cost when completing repair
     notify_customer: Optional[bool] = False
     priority: Optional[str] = None
     technician_id: Optional[UUID] = None

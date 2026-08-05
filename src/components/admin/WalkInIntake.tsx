@@ -376,7 +376,7 @@ export default function WalkInIntake({ token, onSuccess }: WalkInIntakeProps) {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="deposit_amount" className="text-slate-300">Amount Paid (£)</Label>
+                <Label htmlFor="deposit_amount" className="text-slate-300">Initial Payment (Optional) (£)</Label>
                 <Input
                   id="deposit_amount"
                   name="deposit_amount"

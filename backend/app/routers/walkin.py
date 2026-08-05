@@ -64,18 +64,29 @@ def walk_in_intake(
     db.commit()
     db.refresh(repair)
 
-    # Create deposit payment if provided and payment method is not pending
+    # Create initial payment transaction if provided and payment method is not pending
     if body.deposit_amount and body.deposit_amount > 0 and body.payment_method and body.payment_method != "pending":
         transaction = Transaction(
             type="payment",
+            payment_type="Initial Payment",
             amount=body.deposit_amount,
-            description=f"Deposit payment for repair {tracking_id}",
+            description=f"Initial payment for repair {tracking_id}",
             customer_name=body.customer_name,
             status="completed",
             payment_method=body.payment_method,
+            repair_id=repair.id,
+            staff_member=_.name if _ else "Unknown",
         )
         db.add(transaction)
         db.commit()
+
+        # Send WhatsApp notification to business owner for audit trail
+        try:
+            from app.config import settings
+            owner_message = f"PAYMENT RECEIVED\n\nCustomer: {body.customer_name}\nRepair ID: {tracking_id}\nAmount: £{body.deposit_amount:.2f}\nPayment Method: {body.payment_method}\nStaff: {_.name if _ else 'Unknown'}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\nExpress Tech Hub & Repair"
+            send_whatsapp_task.apply_async(args=[settings.OWNER_WHATSAPP_NUMBER, owner_message], ignore_result=True)
+        except Exception as e:
+            logger.warning(f"Failed to send WhatsApp notification to owner: {e}")
 
     # Send notification to customer
     tracking_link = f"https://expresstechhub.co.uk/track/{tracking_id}"

@@ -27,30 +27,28 @@ class InvoiceResponse(BaseModel):
 
 @router.post("/generate")
 async def generate_invoice(
-    repair_id: UUID,
-    tax_rate_id: Optional[UUID] = None,
-    notes: Optional[str] = None,
+    body: InvoiceCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles("SUPER_ADMIN")),
 ):
     """Generate a professional HTML invoice for a repair (can be printed/saved as PDF from browser)"""
-    
-    repair = db.query(Repair).filter(Repair.id == repair_id).first()
+
+    repair = db.query(Repair).filter(Repair.id == body.repair_id).first()
     if not repair:
         raise HTTPException(404, "Repair not found")
     
     # Get tax rate - use provided tax_rate_id, or default to 20% VAT
     tax_percentage = 20.0  # Default UK VAT rate
-    if tax_rate_id:
-        tax_rate = db.query(TaxRate).filter(TaxRate.id == tax_rate_id).first()
+    if body.tax_rate_id:
+        tax_rate = db.query(TaxRate).filter(TaxRate.id == body.tax_rate_id).first()
         if tax_rate:
             tax_percentage = float(tax_rate.rate * 100)
-    
+
     # Calculate totals
     subtotal = float(repair.estimated_cost) if repair.estimated_cost else 0
     tax_amount = subtotal * (tax_percentage / 100)
     total = subtotal + tax_amount
-    
+
     # Generate professional HTML invoice
     invoice_html = f"""
     <!DOCTYPE html>
@@ -61,7 +59,7 @@ async def generate_invoice(
             body {{ font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }}
             .header {{ display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0095ff; padding-bottom: 20px; margin-bottom: 20px; }}
             .company {{ color: #0095ff; }}
-            .invoice-details {{ text-align: right; }}
+            .invoice-details {{	text-align: right; }}
             .section {{ margin-bottom: 20px; }}
             .section-title {{ font-weight: bold; color: #333; margin-bottom: 10px; }}
             table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
@@ -131,7 +129,7 @@ async def generate_invoice(
             </div>
         </div>
 
-        {f'<div class="section"><div class="section-title">Notes:</div><p>{notes}</p></div>' if notes else ''}
+        {f'<div class="section"><div class="section-title">Notes:</div><p>{body.notes}</p></div>' if body.notes else ''}
 
         <div class="footer">
             <p>Thank you for your business!</p>
@@ -141,13 +139,13 @@ async def generate_invoice(
     </body>
     </html>
     """
-    
+
     return {
         "success": True,
         "message": "Invoice generated successfully",
         "invoice": {
             "invoice_number": f"INV-{repair.tracking_id}",
-            "repair_id": str(repair_id),
+            "repair_id": str(body.repair_id),
             "tracking_id": repair.tracking_id,
             "customer_name": repair.customer_name,
             "customer_phone": repair.customer_phone,
@@ -157,7 +155,7 @@ async def generate_invoice(
             "tax_percentage": tax_percentage,
             "tax_amount": tax_amount,
             "total": total,
-            "notes": notes,
+            "notes": body.notes,
             "generated_at": datetime.utcnow().isoformat(),
             "generated_by": current_user.name,
             "html": invoice_html,

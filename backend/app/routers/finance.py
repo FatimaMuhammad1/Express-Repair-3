@@ -4,6 +4,7 @@ from sqlalchemy import func, and_, or_
 from datetime import datetime, date, timedelta
 from typing import Optional
 import csv
+import logging
 from io import StringIO
 from uuid import UUID
 from pydantic import BaseModel, field_validator
@@ -13,6 +14,7 @@ from app.models import Transaction, Invoice, Expense, User, Branch, OnlineSale, 
 from app.dependencies import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/finance", tags=["Finance"])
+logger = logging.getLogger(__name__)
 
 
 def resolve_invoice_status(invoice: Invoice) -> str:
@@ -175,8 +177,9 @@ async def get_finance_stats(
     
     transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
         and_(
-            Transaction.type == "revenue",
-            Transaction.status == "completed"
+            Transaction.type == "payment",
+            Transaction.status == "completed",
+            Transaction.payment_type != "Refund"  # Don't count refunds as revenue
         )
     ).scalar() or 0
     
@@ -204,8 +207,9 @@ async def get_finance_stats(
     
     monthly_transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
         and_(
-            Transaction.type == "revenue",
+            Transaction.type == "payment",
             Transaction.status == "completed",
+            Transaction.payment_type != "Refund",  # Don't count refunds as revenue
             Transaction.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
         )
     ).scalar() or 0
@@ -403,6 +407,85 @@ async def update_invoice_status(
     }
 
 
+class RefundRequest(BaseModel):
+    amount: Decimal
+    payment_method: str
+    reason: Optional[str] = None
+
+
+@router.post("/invoices/{invoice_id}/refund")
+async def issue_refund(
+    invoice_id: UUID,
+    body: RefundRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER")),
+):
+    """Issue a refund for an overpaid invoice"""
+    invoice = db.query(Invoice).filter(Invoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Calculate current overpayment
+    total_payments = float(invoice.deposit_paid or 0)
+    invoice_total = float(invoice.amount or 0)
+    overpayment = total_payments - invoice_total
+
+    if overpayment <= 0:
+        raise HTTPException(400, "This invoice is not overpaid. Cannot issue refund.")
+
+    if body.amount > overpayment:
+        raise HTTPException(400, f"Refund amount cannot exceed overpayment of £{overpayment:.2f}")
+
+    # Create refund transaction
+    refund_transaction = Transaction(
+        type="payment",
+        payment_type="Refund",
+        amount=body.amount,
+        description=f"Refund for invoice {invoice.invoice_number}" + (f": {body.reason}" if body.reason else ""),
+        customer_name=invoice.customer_name,
+        invoice_number=invoice.invoice_number,
+        status="completed",
+        payment_method=body.payment_method,
+        repair_id=invoice.repair_id,
+        staff_member=current_user.name,
+    )
+    db.add(refund_transaction)
+
+    # Update invoice deposit_paid
+    invoice.deposit_paid = invoice.deposit_paid - body.amount
+
+    # Update invoice status if no longer overpaid
+    new_overpayment = float(invoice.deposit_paid) - invoice_total
+    if new_overpayment == 0:
+        invoice.status = InvoiceStatus.paid
+    elif new_overpayment > 0:
+        invoice.status = InvoiceStatus.overpaid
+    elif new_overpayment < 0:
+        invoice.status = InvoiceStatus.partial
+
+    db.commit()
+    db.refresh(invoice)
+
+    # Send WhatsApp notification to business owner for audit trail
+    try:
+        from app.worker import send_whatsapp_sync
+        owner_message = f"REFUND ISSUED\n\nCustomer: {invoice.customer_name}\nInvoice: {invoice.invoice_number}\nAmount: £{body.amount:.2f}\nPayment Method: {body.payment_method}\nStaff: {current_user.name}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\nExpress Tech Hub & Repair"
+        send_whatsapp_sync(settings.OWNER_WHATSAPP_NUMBER, owner_message)
+    except Exception as e:
+        logger.error(f"Failed to send WhatsApp notification to owner: {e}")
+
+    return {
+        "success": True,
+        "message": f"Refund of £{body.amount:.2f} issued successfully",
+        "refund": {
+            "id": str(refund_transaction.id),
+            "amount": float(refund_transaction.amount),
+            "invoice_number": invoice.invoice_number,
+            "remaining_overpayment": new_overpayment if new_overpayment > 0 else 0,
+        }
+    }
+
+
 @router.post("/inhouse-sales", status_code=201)
 async def create_inhouse_sale(
     body: InHouseSaleCreate,
@@ -492,12 +575,14 @@ async def create_inhouse_sale(
     if body.payment_status in ["paid", "partial"] and body.payment_amount and payment_method_enum:
         transaction = Transaction(
             type=TransactionType.payment,
+            payment_type="Retail Sale",
             amount=body.payment_amount,
             description=f"Payment for retail sale {reference}",
             customer_name=body.customer_name,
             invoice_number=invoice_num,
             status=TransactionStatus.completed,
             payment_method=payment_method_enum,
+            staff_member=_.name if _ else "Unknown",
         )
         db.add(transaction)
         db.commit()
@@ -505,6 +590,23 @@ async def create_inhouse_sale(
     # Deduct from inventory
     product.stock_quantity -= body.quantity
     db.commit()
+
+    # Send WhatsApp notification to customer if phone number provided
+    if body.customer_phone:
+        try:
+            from app.worker import send_whatsapp_sync
+            message = f"Thank you {body.customer_name}! Your purchase has been recorded.\n\nReference: {reference}\nProduct: {product.name}\nQuantity: {qty}\nTotal: £{total_amount:.2f}\n\nExpress Tech Hub & Repair"
+            send_whatsapp_sync(body.customer_phone, message)
+        except Exception as e:
+            logger.error(f"Failed to send WhatsApp notification: {e}")
+
+    # Send WhatsApp notification to business owner for audit trail
+    try:
+        from app.worker import send_whatsapp_sync
+        owner_message = f"PAYMENT RECEIVED\n\nCustomer: {body.customer_name}\nSale ID: {reference}\nAmount: £{total_amount:.2f}\nPayment Method: {body.payment_method}\nStaff: {_.name if _ else 'Unknown'}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\nExpress Tech Hub & Repair"
+        send_whatsapp_sync(settings.OWNER_WHATSAPP_NUMBER, owner_message)
+    except Exception as e:
+        logger.error(f"Failed to send WhatsApp notification to owner: {e}")
 
     return {
         "success": True,

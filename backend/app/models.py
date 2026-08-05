@@ -145,6 +145,7 @@ class InvoiceStatus(enum.Enum):
     pending = "pending"
     partial = "partial"
     paid = "paid"
+    overpaid = "overpaid"
     overdue = "overdue"
 
 
@@ -303,6 +304,7 @@ class Repair(Base):
     priority       = Column(String(20), default="normal", nullable=True, index=True)
     status_notes   = Column(Text, nullable=True)
     estimated_cost = Column(Numeric(10, 2), default=0.00)
+    final_repair_cost = Column(Numeric(10, 2), nullable=True)  # Final confirmed cost when repair is completed
     deposit_paid   = Column(Numeric(10, 2), default=0.00)
     payment_status = Column(Enum(RepairPaymentStatus), default=RepairPaymentStatus.pending, nullable=False, index=True)
     payment_method = Column(String(50), nullable=True)  # cash, card, bank_transfer, or null if pending
@@ -610,6 +612,7 @@ class Transaction(Base):
 
     id              = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     type            = Column(Enum(TransactionType), nullable=False, index=True)
+    payment_type    = Column(String(50), nullable=True)  # Initial Payment / Final Payment / Retail Sale / Online Sale / Refund
     amount          = Column(Numeric(10, 2), nullable=False)
     description     = Column(String(500), nullable=True)
     customer_name   = Column(String(255), nullable=True, index=True)
@@ -617,11 +620,14 @@ class Transaction(Base):
     status          = Column(Enum(TransactionStatus), default=TransactionStatus.completed, nullable=False, index=True)
     payment_method  = Column(Enum(PaymentMethod), nullable=True)
     branch_id       = Column(UUID(as_uuid=True), ForeignKey("branches.id", ondelete="SET NULL"), nullable=True, index=True)
+    repair_id       = Column(UUID(as_uuid=True), ForeignKey("repairs.id", ondelete="SET NULL"), nullable=True, index=True)  # Link to repair for payment transactions
+    staff_member    = Column(String(255), nullable=True)  # Staff member who recorded the payment
     created_at      = Column(DateTime(timezone=True), default=utcnow, index=True)
-    
+
     __table_args__ = (
         Index('idx_transactions_type_status', 'type', 'status'),
         Index('idx_transactions_branch_created', 'branch_id', 'created_at'),
+        Index('idx_transactions_repair_id', 'repair_id'),
         CheckConstraint('amount >= 0', name='check_transaction_amount_positive'),
     )
 
@@ -650,7 +656,6 @@ class Invoice(Base):
         Index('idx_invoices_status_due', 'status', 'due_date'),
         Index('idx_invoices_customer_phone', 'customer_phone'),
         CheckConstraint('amount >= 0', name='check_invoice_amount_positive'),
-        CheckConstraint('deposit_paid <= amount', name='check_deposit_not_exceed_total'),
     )
 
 

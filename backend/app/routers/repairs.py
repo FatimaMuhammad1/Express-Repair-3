@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from uuid import UUID
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -163,33 +163,53 @@ def update_repair_status(
         repair.status_notes = body.status_notes
     if body.technician_id is not None:
         repair.technician_id = body.technician_id
+    if body.estimated_cost is not None:
+        repair.estimated_cost = body.estimated_cost
+    if body.final_repair_cost is not None:
+        repair.final_repair_cost = body.final_repair_cost
 
     db.commit()
     db.refresh(repair)
 
     # Create invoice when repair is marked as completed
     if body.status == "completed" and old_status != "completed":
+        # Require final_repair_cost before completion
+        if not repair.final_repair_cost:
+            raise HTTPException(400, "Please enter the Final Repair Cost before completing this repair.")
+
         # Check if invoice already exists for this repair
         existing_invoice = db.query(Invoice).filter(Invoice.repair_id == repair.id).first()
         if not existing_invoice:
+            # Use final_repair_cost (required, not estimated_cost)
+            final_cost = repair.final_repair_cost
+
             # Generate invoice number
             invoice_num = f"INV-{datetime.now().strftime('%Y%m%d')}-{repair.tracking_id}"
 
             # Calculate tax (20% VAT)
-            subtotal = float(repair.estimated_cost) if repair.estimated_cost else 0
+            subtotal = float(final_cost) if final_cost else 0
             tax_amount = subtotal * 0.20
             total = subtotal + tax_amount
 
-            # Apply deposit if exists
-            deposit_amount = float(repair.deposit_paid) if repair.deposit_paid else 0
+            # Calculate total payments received for this repair
+            total_payments = db.query(func.sum(Transaction.amount)).filter(
+                and_(
+                    Transaction.repair_id == repair.id,
+                    Transaction.type == "payment",
+                    Transaction.payment_type != "Refund",
+                    Transaction.status == "completed"
+                )
+            ).scalar() or 0
 
-            # Determine invoice status based on deposit
-            if deposit_amount >= total:
-                invoice_status = InvoiceStatus.paid
-            elif deposit_amount > 0:
-                invoice_status = InvoiceStatus.partial
-            else:
+            # Determine invoice status based on payments received
+            if total_payments == 0:
                 invoice_status = InvoiceStatus.pending
+            elif total_payments < total:
+                invoice_status = InvoiceStatus.partial
+            elif total_payments == total:
+                invoice_status = InvoiceStatus.paid
+            else:  # total_payments > total
+                invoice_status = InvoiceStatus.overpaid
 
             # Create invoice
             invoice = Invoice(
@@ -200,7 +220,7 @@ def update_repair_status(
                 customer_phone=repair.customer_phone,
                 amount=total,
                 tax_amount=tax_amount,
-                deposit_paid=deposit_amount,
+                deposit_paid=total_payments,
                 status=invoice_status,
                 due_date=datetime.now(timezone.utc).date() + timedelta(days=7),  # Due in 7 days
             )
@@ -277,16 +297,111 @@ def update_repair_payment(
     if body.payment_amount and body.payment_amount > 0 and body.payment_method:
         transaction = Transaction(
             type="payment",
+            payment_type="Final Payment",
             amount=Decimal(str(body.payment_amount)),
-            description=f"Payment for repair {tracking_id}",
+            description=f"Final payment for repair {tracking_id}",
             customer_name=repair.customer_name,
             status="completed",
             payment_method=body.payment_method,
+            repair_id=repair.id,
+            staff_member=current_user.name,
         )
         db.add(transaction)
         db.commit()
 
+        # Send WhatsApp notification to business owner for audit trail
+        try:
+            from app.config import settings
+            owner_message = f"PAYMENT RECEIVED\n\nCustomer: {repair.customer_name}\nRepair ID: {tracking_id}\nAmount: £{body.payment_amount:.2f}\nPayment Method: {body.payment_method}\nStaff: {current_user.name}\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n\nExpress Tech Hub & Repair"
+            send_whatsapp_task.apply_async(args=[settings.OWNER_WHATSAPP_NUMBER, owner_message], ignore_result=True)
+        except Exception as e:
+            logger.warning(f"Failed to send WhatsApp notification to owner: {e}")
+
     return {"success": True, "message": "Payment information updated successfully"}
+
+
+@router.get("/{tracking_id}/payment-summary")
+def get_repair_payment_summary(
+    tracking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("SUPER_ADMIN", "BUSINESS_OWNER", "staff")),
+):
+    """Get payment summary for a repair"""
+    repair = db.query(Repair).filter(Repair.tracking_id == tracking_id.upper()).first()
+    if not repair:
+        raise HTTPException(404, "Repair record not found.")
+
+    # Calculate payments
+    initial_payments = db.query(func.sum(Transaction.amount)).filter(
+        and_(
+            Transaction.repair_id == repair.id,
+            Transaction.payment_type == "Initial Payment",
+            Transaction.status == "completed"
+        )
+    ).scalar() or 0
+
+    final_payments = db.query(func.sum(Transaction.amount)).filter(
+        and_(
+            Transaction.repair_id == repair.id,
+            Transaction.payment_type == "Final Payment",
+            Transaction.status == "completed"
+        )
+    ).scalar() or 0
+
+    refunds = db.query(func.sum(Transaction.amount)).filter(
+        and_(
+            Transaction.repair_id == repair.id,
+            Transaction.payment_type == "Refund",
+            Transaction.status == "completed"
+        )
+    ).scalar() or 0
+
+    total_payments = initial_payments + final_payments - refunds
+
+    # Calculate outstanding balance
+    final_cost = float(repair.final_repair_cost) if repair.final_repair_cost else 0
+    outstanding_balance = final_cost - total_payments
+
+    # Determine payment status
+    if final_cost == 0:
+        payment_status = "Not Finalized"
+    elif outstanding_balance == 0:
+        payment_status = "Paid"
+    elif outstanding_balance > 0:
+        payment_status = "Partially Paid"
+    else:  # outstanding_balance < 0
+        payment_status = "Overpaid"
+
+    return {
+        "success": True,
+        "repair_id": str(repair.id),
+        "tracking_id": repair.tracking_id,
+        "customer_name": repair.customer_name,
+        "payment_summary": {
+            "estimated_repair_cost": float(repair.estimated_cost) if repair.estimated_cost else 0,
+            "final_repair_cost": final_cost,
+            "initial_payment": float(initial_payments),
+            "additional_payments": float(final_payments),
+            "refunds_issued": float(refunds),
+            "total_payments": float(total_payments),
+            "outstanding_balance": outstanding_balance,
+            "payment_status": payment_status,
+        },
+        "transactions": [
+            {
+                "id": str(t.id),
+                "payment_type": t.payment_type,
+                "amount": float(t.amount),
+                "payment_method": t.payment_method.value if t.payment_method else None,
+                "staff_member": t.staff_member,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+            }
+            for t in db.query(Transaction).filter(
+                Transaction.repair_id == repair.id,
+                Transaction.type == "payment"
+            ).order_by(Transaction.created_at.desc()).all()
+        ]
+    }
 
 
 @router.delete("/{tracking_id}")

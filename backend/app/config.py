@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     TWILIO_ACCOUNT_SID: str = ""
     TWILIO_AUTH_TOKEN: str = ""
     TWILIO_FROM_NUMBER: str = ""
+    OWNER_WHATSAPP_NUMBER: str = ""  # Business owner's WhatsApp number for payment notifications
 
     STRIPE_SECRET_KEY: str = ""
     FRONTEND_URL: str = "http://localhost:5173"

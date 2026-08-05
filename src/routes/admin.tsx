@@ -451,6 +451,31 @@ function AdminDashboard({
     tax_rate_id: "",
     notes: ""
   });
+  const [showPaymentSummaryModal, setShowPaymentSummaryModal] = useState(false);
+  const [selectedRepairForPaymentSummary, setSelectedRepairForPaymentSummary] = useState<any>(null);
+  const [paymentSummaryData, setPaymentSummaryData] = useState<any>(null);
+
+  const fetchPaymentSummary = async (trackingId: string) => {
+    try {
+      const token = getStoredToken();
+      const res = await fetch(buildUrl(`/repairs/${trackingId}/payment-summary`), {
+        headers: {
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        }
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPaymentSummaryData(data);
+        return data;
+      } else {
+        safeToast.error(data.detail || "Failed to fetch payment summary");
+      }
+    } catch (e) {
+      console.error(e);
+      safeToast.error("Failed to fetch payment summary");
+    }
+  };
+
   const [newExpense, setNewExpense] = useState({
     category: "",
     description: "",
@@ -758,6 +783,47 @@ function AdminDashboard({
   }, []);
 
   const updateStatus = async (trackingId: string, newStatus: string) => {
+    // If completing repair, require final_repair_cost
+    if (newStatus === "completed") {
+      const repair = repairs.find(r => r.tracking_id === trackingId);
+      if (!repair || !repair.final_repair_cost) {
+        const finalCost = prompt("Please enter the Final Repair Cost before completing this repair:");
+        if (!finalCost || isNaN(parseFloat(finalCost))) {
+          safeToast.error("Final Repair Cost is required to complete the repair");
+          return;
+        }
+        // Update the repair with final_repair_cost
+        try {
+          await fetch(
+            buildUrl(API_CONFIG.ENDPOINTS.REPAIRS.UPDATE_STATUS(trackingId)),
+            {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                status: newStatus,
+                final_repair_cost: parseFloat(finalCost),
+                notify_customer: true
+              }),
+            },
+          );
+          // Update local state
+          setRepairs(prev => prev.map(r =>
+            r.tracking_id === trackingId ? { ...r, status: newStatus, final_repair_cost: parseFloat(finalCost) } : r
+          ));
+          fetchStats();
+          safeToast.success("Repair completed successfully");
+          return;
+        } catch (e) {
+          console.error(e);
+          safeToast.error("Failed to complete repair");
+          return;
+        }
+      }
+    }
+
     // Optimistic update - update local state immediately
     setRepairs(prev => prev.map(r =>
       r.tracking_id === trackingId ? { ...r, status: newStatus } : r
@@ -3420,6 +3486,24 @@ function AdminDashboard({
 
                                 <div className="flex items-center gap-1">
 
+                                  <button
+
+                                    onClick={async () => {
+                                      setSelectedRepairForPaymentSummary(r);
+                                      await fetchPaymentSummary(r.tracking_id);
+                                      setShowPaymentSummaryModal(true);
+                                    }}
+
+                                    className="text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/20 p-2 rounded-lg transition-colors"
+
+                                    title="View payment summary"
+
+                                  >
+
+                                    <DollarSign className="h-4 w-4" />
+
+                                  </button>
+
                                   {(r.status === "completed" || r.status === "collection") && (
 
                                     <button
@@ -3661,7 +3745,107 @@ function AdminDashboard({
               )}
             </AnimatePresence>
 
-
+            {/* Payment Summary Modal */}
+            <AnimatePresence>
+              {showPaymentSummaryModal && selectedRepairForPaymentSummary && paymentSummaryData && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                  onClick={() => setShowPaymentSummaryModal(false)}
+                >
+                  <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.95, opacity: 0 }}
+                    className="w-full max-w-2xl rounded-2xl border border-[#1F2235] bg-[#11131E] p-6 shadow-2xl"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 className="mb-4 text-lg font-semibold text-white">Payment Summary</h3>
+                    <div className="space-y-4">
+                      <div className="bg-[#1A1D27] rounded-lg p-4 mb-4">
+                        <p className="text-sm text-slate-400 mb-2">Repair Details</p>
+                        <p className="text-white font-medium">{selectedRepairForPaymentSummary.customer_name}</p>
+                        <p className="text-sm text-slate-400">{selectedRepairForPaymentSummary.device_model}</p>
+                        <p className="text-sm text-slate-400">Tracking ID: {selectedRepairForPaymentSummary.tracking_id}</p>
+                      </div>
+                      <div className="bg-[#1A1D27] rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-slate-300 mb-3">Payment Summary</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <p className="text-slate-500">Estimated Cost</p>
+                            <p className="text-white font-medium">£{paymentSummaryData.payment_summary.estimated_repair_cost.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Final Repair Cost</p>
+                            <p className="text-white font-medium">£{paymentSummaryData.payment_summary.final_repair_cost.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Initial Payment</p>
+                            <p className="text-emerald-400 font-medium">£{paymentSummaryData.payment_summary.initial_payment.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Additional Payments</p>
+                            <p className="text-emerald-400 font-medium">£{paymentSummaryData.payment_summary.additional_payments.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Refunds Issued</p>
+                            <p className="text-red-400 font-medium">£{paymentSummaryData.payment_summary.refunds_issued.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Total Payments</p>
+                            <p className="text-white font-medium">£{paymentSummaryData.payment_summary.total_payments.toFixed(2)}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-slate-500">Outstanding Balance</p>
+                            <p className={`text-lg font-bold ${paymentSummaryData.payment_summary.outstanding_balance > 0 ? 'text-amber-400' : paymentSummaryData.payment_summary.outstanding_balance < 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                              £{paymentSummaryData.payment_summary.outstanding_balance.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-slate-500">Payment Status</p>
+                            <p className={`font-semibold ${paymentSummaryData.payment_summary.payment_status === 'Paid' ? 'text-emerald-400' : paymentSummaryData.payment_summary.payment_status === 'Overpaid' ? 'text-red-400' : 'text-amber-400'}`}>
+                              {paymentSummaryData.payment_summary.payment_status}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      {paymentSummaryData.transactions.length > 0 && (
+                        <div className="bg-[#1A1D27] rounded-lg p-4">
+                          <h4 className="text-sm font-semibold text-slate-300 mb-3">Transaction History</h4>
+                          <div className="space-y-2 max-h-40 overflow-y-auto">
+                            {paymentSummaryData.transactions.map((t: any) => (
+                              <div key={t.id} className="flex justify-between items-center text-sm border-b border-[#2D3142] pb-2">
+                                <div>
+                                  <p className="text-white">{t.payment_type}</p>
+                                  <p className="text-slate-500 text-xs">{t.staff_member} • {new Date(t.created_at).toLocaleString()}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className={`font-medium ${t.payment_type === 'Refund' ? 'text-red-400' : 'text-emerald-400'}`}>
+                                    {t.payment_type === 'Refund' ? '-' : '+'}£{t.amount.toFixed(2)}
+                                  </p>
+                                  <p className="text-slate-500 text-xs">{t.payment_method}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex gap-3 pt-4">
+                        <Button
+                          onClick={() => setShowPaymentSummaryModal(false)}
+                          variant="outline"
+                          className="flex-1 border-[#1F2235] text-white hover:bg-slate-800"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {activeSection === "customers" && (
 
@@ -8508,9 +8692,9 @@ function AdminDashboard({
 
                             <td className="px-4 py-3">
 
-                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${invoice.status === "paid" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : invoice.status === "overdue" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${invoice.status === "paid" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : invoice.status === "overdue" ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : invoice.status === "overpaid" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
 
-                                {invoice.status || "outstanding"}
+                                {invoice.status === "overpaid" ? "Overpaid" : invoice.status || "outstanding"}
 
                               </span>
 
@@ -8519,6 +8703,53 @@ function AdminDashboard({
                             <td className="px-4 py-3">
 
                               <div className="flex gap-2">
+
+                                {invoice.status === "overpaid" && (
+                                  <button
+                                    onClick={async () => {
+                                      const refundAmount = prompt(`Enter refund amount (Max: £{(invoice.deposit_paid - invoice.amount).toFixed(2)}):`);
+                                      if (!refundAmount || isNaN(parseFloat(refundAmount))) {
+                                        safeToast.error("Invalid refund amount");
+                                        return;
+                                      }
+                                      const paymentMethod = prompt("Enter payment method (cash/card/bank_transfer):");
+                                      if (!paymentMethod) {
+                                        safeToast.error("Payment method is required");
+                                        return;
+                                      }
+                                      const reason = prompt("Enter reason for refund (optional):") || "";
+                                      try {
+                                        const token = getStoredToken();
+                                        const res = await fetch(buildUrl(`/api/finance/invoices/${invoice.id}/refund`), {
+                                          method: "POST",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                            ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+                                          },
+                                          body: JSON.stringify({
+                                            amount: parseFloat(refundAmount),
+                                            payment_method: paymentMethod,
+                                            reason: reason
+                                          }),
+                                        });
+                                        const data = await res.json();
+                                        if (res.ok) {
+                                          safeToast.success(data.message);
+                                          fetchInvoices();
+                                        } else {
+                                          safeToast.error(data.detail || "Failed to issue refund");
+                                        }
+                                      } catch (e) {
+                                        console.error(e);
+                                        safeToast.error("Failed to issue refund");
+                                      }
+                                    }}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 p-2 rounded-lg transition-colors"
+                                    title="Issue refund"
+                                  >
+                                    <DollarSign className="h-4 w-4" />
+                                  </button>
+                                )}
 
                                 <button
 
