@@ -21,7 +21,7 @@ def upgrade():
     op.add_column('transactions', sa.Column('repair_id', sa.UUID(as_uuid=True), nullable=True))
     op.create_index('idx_transactions_repair_id', 'transactions', ['repair_id'])
     op.add_column('transactions', sa.Column('staff_member', sa.String(255), nullable=True))
-    op.create_foreign_key('fk_transactions_repair_id', 'transactions', 'repairs', ['repair_id'], ondelete='SET NULL')
+    op.create_foreign_key('fk_transactions_repair_id', 'transactions', 'repairs', ['repair_id'], ['id'], ondelete='SET NULL')
 
 
 def downgrade():
