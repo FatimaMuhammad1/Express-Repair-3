@@ -1,7 +1,7 @@
 """add final_repair_cost to repairs
 
 Revision ID: add_final_repair_cost
-Revises: add_received_date_to_repair_parts
+Revises: merge_heads
 Create Date: 2026-08-05 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_final_repair_cost'
-down_revision = 'add_received_date_to_repair_parts'
+down_revision = 'merge_heads'
 branch_labels = None
 depends_on = None
 
