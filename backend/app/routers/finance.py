@@ -12,7 +12,7 @@ from pydantic import BaseModel, field_validator
 
 from app.database import get_db
 from app.config import settings
-from app.models import Transaction, Invoice, Expense, User, Branch, OnlineSale, InHouseSale, InvoiceStatus, TransactionStatus, TransactionType, ExpenseStatus, Product, PaymentMethod
+from app.models import Transaction, Invoice, Expense, User, Branch, OnlineSale, InHouseSale, InvoiceStatus, TransactionStatus, TransactionType, ExpenseStatus, Product, PaymentMethod, Repair
 from app.dependencies import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/finance", tags=["Finance"])
@@ -190,7 +190,16 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    total_revenue = online_sales_revenue + inhouse_sales_revenue + transaction_revenue
+    # Include repair payments from old repairs that don't have transaction records
+    repair_payments_revenue = db.query(func.sum(Repair.deposit_paid)).filter(
+        and_(
+            Repair.deposit_paid.isnot(None),
+            Repair.deposit_paid > 0,
+            Repair.created_at >= datetime.combine(start_date, datetime.min.time())
+        )
+    ).scalar() or 0
+
+    total_revenue = online_sales_revenue + inhouse_sales_revenue + transaction_revenue + repair_payments_revenue
 
     # Monthly Revenue (from actual payments received in last 30 days)
     monthly_online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
