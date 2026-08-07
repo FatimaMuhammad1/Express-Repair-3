@@ -3707,7 +3707,7 @@ function AdminDashboard({
                           onClick={async () => {
                             try {
                               const token = getStoredToken();
-                              const res = await fetch(buildUrl("/invoices/generate"), {
+                              const res = await fetch(buildUrl("/api/invoices/generate"), {
                                 method: "POST",
                                 headers: {
                                   "Content-Type": "application/json",
