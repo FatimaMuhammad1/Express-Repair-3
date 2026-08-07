@@ -173,15 +173,15 @@ def update_repair_status(
 
     # Create invoice when repair is marked as completed
     if body.status == "completed" and old_status != "completed":
-        # Require final_repair_cost before completion
-        if not repair.final_repair_cost:
+        # For new repairs, require final_repair_cost. For old ones, use estimated_cost as fallback
+        if not repair.final_repair_cost and not repair.estimated_cost:
             raise HTTPException(400, "Please enter the Final Repair Cost before completing this repair.")
 
         # Check if invoice already exists for this repair
         existing_invoice = db.query(Invoice).filter(Invoice.repair_id == repair.id).first()
         if not existing_invoice:
-            # Use final_repair_cost (required, not estimated_cost)
-            final_cost = repair.final_repair_cost
+            # Use final_repair_cost if available, otherwise fall back to estimated_cost for old repairs
+            final_cost = repair.final_repair_cost or repair.estimated_cost
 
             # Generate invoice number
             invoice_num = f"INV-{datetime.now().strftime('%Y%m%d')}-{repair.tracking_id}"

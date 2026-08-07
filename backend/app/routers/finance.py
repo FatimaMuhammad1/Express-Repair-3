@@ -190,12 +190,13 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Include repair payments from old repairs that don't have transaction records
+    # Include repair payments from old repairs that don't have invoice records
+    # Repairs with invoices are counted in invoice_revenue
     repair_payments_revenue = db.query(func.sum(Repair.deposit_paid)).filter(
         and_(
             Repair.deposit_paid.isnot(None),
             Repair.deposit_paid > 0,
-            Repair.created_at >= datetime.combine(start_date, datetime.min.time())
+            ~Repair.id.in_(db.query(Invoice.repair_id).filter(Invoice.repair_id.isnot(None)))
         )
     ).scalar() or 0
 
