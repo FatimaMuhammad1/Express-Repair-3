@@ -65,10 +65,10 @@ export function FinanceSection({ token }: FinanceSectionProps) {
     setLoading(true);
     try {
       const [statsRes, transRes, invRes, expRes] = await Promise.all([
-        fetch(buildUrl(`/finance/stats?period=${timePeriod}`), { headers: getAuthHeaders(token) }),
-        fetch(buildUrl(`/finance/transactions?period=${timePeriod}`), { headers: getAuthHeaders(token) }),
-        fetch(buildUrl("/finance/invoices"), { headers: getAuthHeaders(token) }),
-        fetch(buildUrl("/finance/expenses"), { headers: getAuthHeaders(token) }),
+        fetch(buildUrl(`/api/finance/stats?period=${timePeriod}`), { headers: getAuthHeaders(token) }),
+        fetch(buildUrl(`/api/finance/transactions?period=${timePeriod}`), { headers: getAuthHeaders(token) }),
+        fetch(buildUrl("/api/finance/invoices"), { headers: getAuthHeaders(token) }),
+        fetch(buildUrl("/api/finance/expenses"), { headers: getAuthHeaders(token) }),
       ]);
 
       if (statsRes.ok) {

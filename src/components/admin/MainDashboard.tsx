@@ -83,7 +83,7 @@ export default function MainDashboard() {
 
       // Fetch finance stats
       try {
-        const financeStatsRes = await fetch(buildUrl("/finance/stats"), {
+        const financeStatsRes = await fetch(buildUrl("/api/finance/stats"), {
           headers: token ? { "Authorization": `Bearer ${token}` } : {}
         });
         financeStatsData = await financeStatsRes.json();
