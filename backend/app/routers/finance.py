@@ -181,7 +181,10 @@ async def get_finance_stats(
         and_(
             Transaction.type == "payment",
             Transaction.status == "completed",
-            Transaction.payment_type != "Refund"  # Don't count refunds as revenue
+            or_(
+                Transaction.payment_type != "Refund",
+                Transaction.payment_type.is_(None)  # Include old transactions with NULL payment_type
+            )
         )
     ).scalar() or 0
     
@@ -211,7 +214,10 @@ async def get_finance_stats(
         and_(
             Transaction.type == "payment",
             Transaction.status == "completed",
-            Transaction.payment_type != "Refund",  # Don't count refunds as revenue
+            or_(
+                Transaction.payment_type != "Refund",
+                Transaction.payment_type.is_(None)  # Include old transactions with NULL payment_type
+            ),
             Transaction.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
         )
     ).scalar() or 0
