@@ -72,8 +72,12 @@ async def generate_invoice(
         notes=body.notes
     )
     db.add(invoice)
-    db.commit()
-    db.refresh(invoice)
+    try:
+        db.commit()
+        db.refresh(invoice)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(500, f"Failed to create invoice: {str(e)}")
 
     # Generate professional HTML invoice
     invoice_html = f"""
@@ -170,6 +174,7 @@ async def generate_invoice(
         "success": True,
         "message": "Invoice generated successfully",
         "invoice": {
+            "id": str(invoice.id),
             "invoice_number": f"INV-{repair.tracking_id}",
             "repair_id": str(body.repair_id),
             "tracking_id": repair.tracking_id,
