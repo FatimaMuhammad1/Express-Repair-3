@@ -190,13 +190,12 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Include repair payments from old repairs that don't have invoice records
-    # Repairs with invoices are counted in invoice_revenue
+    # Include repair payments from old repairs that don't have transaction records
     repair_payments_revenue = db.query(func.sum(Repair.deposit_paid)).filter(
         and_(
             Repair.deposit_paid.isnot(None),
             Repair.deposit_paid > 0,
-            ~Repair.id.in_(db.query(Invoice.repair_id).filter(Invoice.repair_id.isnot(None)))
+            ~Repair.id.in_(db.query(Transaction.repair_id).filter(Transaction.type == "payment", Transaction.repair_id.isnot(None)))
         )
     ).scalar() or 0
 
@@ -226,7 +225,16 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    monthly_revenue = monthly_online_sales_revenue + monthly_inhouse_sales_revenue + monthly_transaction_revenue
+    monthly_repair_payments_revenue = db.query(func.sum(Repair.deposit_paid)).filter(
+        and_(
+            Repair.deposit_paid.isnot(None),
+            Repair.deposit_paid > 0,
+            ~Repair.id.in_(db.query(Transaction.repair_id).filter(Transaction.type == "payment", Transaction.repair_id.isnot(None))),
+            Repair.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
+        )
+    ).scalar() or 0
+
+    monthly_revenue = monthly_online_sales_revenue + monthly_inhouse_sales_revenue + monthly_transaction_revenue + monthly_repair_payments_revenue
     
     # Outstanding Payments
     outstanding_payments = db.query(func.sum(Invoice.amount - Invoice.deposit_paid)).filter(

@@ -582,10 +582,20 @@ def get_repair_stats(
         count = db.query(Repair).filter(Repair.status == status_enum).count()
         status_counts[status_name] = count
 
-    # Calculate total revenue from repairs ready for collection
-    completed_repairs = db.query(Repair).filter(Repair.status == RepairStatus.collection)
+    # Calculate total revenue from repairs ready for collection and completed
+    completed_repairs = db.query(Repair).filter(Repair.status.in_([RepairStatus.collection, RepairStatus.completed]))
     completed_repairs_count = completed_repairs.count()
-    total_revenue = sum(r.estimated_cost or 0 for r in completed_repairs.all())
+    
+    total_revenue = 0
+    for r in completed_repairs.all():
+        val = 0
+        if r.final_repair_cost is not None:
+            val = r.final_repair_cost
+        elif r.estimated_cost is not None and r.estimated_cost > 0:
+            val = r.estimated_cost
+        elif r.deposit_paid is not None:
+            val = r.deposit_paid
+        total_revenue += float(val)
 
     # Get repairs from last 30 days
     thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
