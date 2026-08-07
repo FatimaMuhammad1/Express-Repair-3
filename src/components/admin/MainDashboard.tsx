@@ -178,6 +178,7 @@ export default function MainDashboard() {
       if (financeStatsData.success && financeStatsData.stats) {
         setStats(prev => ({
           ...prev,
+          totalRevenue: (financeStatsData.stats as any).totalRevenue || 0,
           totalProfit: (financeStatsData.stats as any).netProfit || 0,
           totalExpenses: (financeStatsData.stats as any).totalExpenses || 0,
           outstandingReceivables: (financeStatsData.stats as any).outstandingPayments || 0,
