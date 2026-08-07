@@ -162,21 +162,22 @@ async def get_finance_stats(
     invoice_filters = []
     if branch_id and branch_id != "all":
         invoice_filters.append(Invoice.branch_id == branch_id)
-    
-    # Total Revenue (from invoices, online sales, in-house sales, and revenue transactions)
-    invoice_revenue = db.query(func.sum(Invoice.amount)).filter(
+
+    # Total Revenue (from actual payments received only)
+    # Revenue = money actually received, not estimates or invoice totals
+    online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
         and_(
-            Invoice.status.in_([InvoiceStatus.paid, InvoiceStatus.partial]),
-            *invoice_filters
+            OnlineSale.status == "completed",
+            OnlineSale.created_at >= datetime.combine(start_date, datetime.min.time())
         )
     ).scalar() or 0
-    
-    online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
-        OnlineSale.status == "completed"
+
+    inhouse_sales_revenue = db.query(func.sum(InHouseSale.amount)).filter(
+        InHouseSale.created_at >= datetime.combine(start_date, datetime.min.time())
     ).scalar() or 0
-    
-    inhouse_sales_revenue = db.query(func.sum(InHouseSale.amount)).scalar() or 0
-    
+
+    # Count all actual payment transactions (excluding refunds)
+    # This includes repair payments, retail sales, etc.
     transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
         and_(
             Transaction.type == "payment",
@@ -184,32 +185,25 @@ async def get_finance_stats(
             or_(
                 Transaction.payment_type != "Refund",
                 Transaction.payment_type.is_(None)  # Include old transactions with NULL payment_type
-            )
+            ),
+            Transaction.created_at >= datetime.combine(start_date, datetime.min.time())
         )
     ).scalar() or 0
-    
-    total_revenue = invoice_revenue + online_sales_revenue + inhouse_sales_revenue + transaction_revenue
-    
-    # Monthly Revenue (from all revenue sources in last 30 days)
-    monthly_invoice_revenue = db.query(func.sum(Invoice.amount)).filter(
-        and_(
-            Invoice.status.in_([InvoiceStatus.paid, InvoiceStatus.partial]),
-            Invoice.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time()),
-            *invoice_filters
-        )
-    ).scalar() or 0
-    
+
+    total_revenue = online_sales_revenue + inhouse_sales_revenue + transaction_revenue
+
+    # Monthly Revenue (from actual payments received in last 30 days)
     monthly_online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
         and_(
             OnlineSale.status == "completed",
             OnlineSale.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
         )
     ).scalar() or 0
-    
+
     monthly_inhouse_sales_revenue = db.query(func.sum(InHouseSale.amount)).filter(
         InHouseSale.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
     ).scalar() or 0
-    
+
     monthly_transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
         and_(
             Transaction.type == "payment",
@@ -221,8 +215,8 @@ async def get_finance_stats(
             Transaction.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
         )
     ).scalar() or 0
-    
-    monthly_revenue = monthly_invoice_revenue + monthly_online_sales_revenue + monthly_inhouse_sales_revenue + monthly_transaction_revenue
+
+    monthly_revenue = monthly_online_sales_revenue + monthly_inhouse_sales_revenue + monthly_transaction_revenue
     
     # Outstanding Payments
     outstanding_payments = db.query(func.sum(Invoice.amount - Invoice.deposit_paid)).filter(
