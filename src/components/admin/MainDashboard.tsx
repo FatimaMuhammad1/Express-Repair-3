@@ -302,13 +302,11 @@ export default function MainDashboard() {
 
         setStats(prev => ({
           ...prev,
-          totalRevenue: total,
           todaySales: todayRevenue
         }));
       } else if (revenueData.success) {
         setStats(prev => ({
           ...prev,
-          totalRevenue: connectedRevenueTotal,
           todaySales: todayRevenue
         }));
       }
