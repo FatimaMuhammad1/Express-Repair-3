@@ -176,7 +176,7 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair costs for completed repairs that don't have payment transactions
+    # Add repair costs for repairs that don't have payment transactions
     # This covers old walk-in repairs where full amount was written in deposit_paid
     repairs_with_payments = db.query(Transaction.repair_id).filter(
         and_(
@@ -189,7 +189,6 @@ async def get_finance_stats(
 
     repairs_without_payments = db.query(Repair).filter(
         and_(
-            Repair.status.in_([RepairStatus.collection, RepairStatus.completed]),
             ~Repair.id.in_(repair_ids_with_payments) if repair_ids_with_payments else True,
             Repair.created_at >= datetime.combine(start_date, datetime.min.time())
         )
@@ -222,7 +221,7 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair costs for completed repairs without payment transactions in last 30 days
+    # Add repair costs for repairs without payment transactions in last 30 days
     # This covers old walk-in repairs where full amount was written in deposit_paid
     monthly_repairs_with_payments = db.query(Transaction.repair_id).filter(
         and_(
@@ -235,7 +234,6 @@ async def get_finance_stats(
 
     monthly_repairs_without_payments = db.query(Repair).filter(
         and_(
-            Repair.status.in_([RepairStatus.collection, RepairStatus.completed]),
             ~Repair.id.in_(monthly_repair_ids_with_payments) if monthly_repair_ids_with_payments else True,
             Repair.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
         )
