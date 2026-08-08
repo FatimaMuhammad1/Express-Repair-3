@@ -176,8 +176,8 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair costs for repairs that don't have payment transactions
-    # This covers walk-in repairs and other repairs without recorded payments
+    # Add repair costs for completed repairs that don't have payment transactions
+    # This covers old walk-in repairs where full amount was written in deposit_paid
     repairs_with_payments = db.query(Transaction.repair_id).filter(
         and_(
             Transaction.type == "payment",
@@ -198,12 +198,13 @@ async def get_finance_stats(
     repair_costs_without_payments = 0
     for r in repairs_without_payments:
         val = 0
-        if r.final_repair_cost is not None:
+        # Use deposit_paid first (old repairs where full amount was written here)
+        if r.deposit_paid is not None and r.deposit_paid > 0:
+            val = r.deposit_paid
+        elif r.final_repair_cost is not None:
             val = r.final_repair_cost
         elif r.estimated_cost is not None and r.estimated_cost > 0:
             val = r.estimated_cost
-        elif r.deposit_paid is not None:
-            val = r.deposit_paid
         repair_costs_without_payments += float(val)
 
     total_revenue = transaction_revenue + repair_costs_without_payments
@@ -221,12 +222,12 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair costs for repairs without payment transactions in last 30 days
+    # Add repair costs for completed repairs without payment transactions in last 30 days
+    # This covers old walk-in repairs where full amount was written in deposit_paid
     monthly_repairs_with_payments = db.query(Transaction.repair_id).filter(
         and_(
             Transaction.type == "payment",
-            Transaction.repair_id.isnot(None),
-            Transaction.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
+            Transaction.repair_id.isnot(None)
         )
     ).distinct().all()
 
@@ -243,12 +244,13 @@ async def get_finance_stats(
     monthly_repair_costs_without_payments = 0
     for r in monthly_repairs_without_payments:
         val = 0
-        if r.final_repair_cost is not None:
+        # Use deposit_paid first (old repairs where full amount was written here)
+        if r.deposit_paid is not None and r.deposit_paid > 0:
+            val = r.deposit_paid
+        elif r.final_repair_cost is not None:
             val = r.final_repair_cost
         elif r.estimated_cost is not None and r.estimated_cost > 0:
             val = r.estimated_cost
-        elif r.deposit_paid is not None:
-            val = r.deposit_paid
         monthly_repair_costs_without_payments += float(val)
 
     monthly_revenue = monthly_transaction_revenue + monthly_repair_costs_without_payments
