@@ -12,7 +12,7 @@ from pydantic import BaseModel, field_validator
 
 from app.database import get_db
 from app.config import settings
-from app.models import Transaction, Invoice, Expense, User, Branch, OnlineSale, InHouseSale, InvoiceStatus, TransactionStatus, TransactionType, ExpenseStatus, Product, PaymentMethod, Repair, RepairStatus
+from app.models import Transaction, Invoice, Expense, User, Branch, OnlineSale, InHouseSale, InvoiceStatus, TransactionStatus, TransactionType, ExpenseStatus, Product, PaymentMethod, Repair
 from app.dependencies import get_current_user, require_roles
 
 router = APIRouter(prefix="/api/finance", tags=["Finance"])
@@ -163,7 +163,21 @@ async def get_finance_stats(
     if branch_id and branch_id != "all":
         invoice_filters.append(Invoice.branch_id == branch_id)
 
-    # Total Revenue from payment transactions
+    # Total Revenue (from actual payments received only)
+    # Revenue = money actually received, not estimates or invoice totals
+    online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
+        and_(
+            OnlineSale.status == "completed",
+            OnlineSale.created_at >= datetime.combine(start_date, datetime.min.time())
+        )
+    ).scalar() or 0
+
+    inhouse_sales_revenue = db.query(func.sum(InHouseSale.amount)).filter(
+        InHouseSale.created_at >= datetime.combine(start_date, datetime.min.time())
+    ).scalar() or 0
+
+    # Count all actual payment transactions (excluding refunds)
+    # This includes repair payments, retail sales, etc.
     transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
         and_(
             Transaction.type == "payment",
@@ -176,31 +190,29 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair deposit_paid for repairs that don't have payment transactions
-    # This covers old walk-in repairs where full amount was written in deposit_paid
-    repairs_with_payments = db.query(Transaction.repair_id).filter(
-        and_(
-            Transaction.type == "payment",
-            Transaction.repair_id.isnot(None)
-        )
-    ).distinct().all()
-
-    repair_ids_with_payments = [r[0] for r in repairs_with_payments]
-
-    repairs_without_payments = db.query(Repair).filter(
+    # Include repair payments from old repairs that don't have transaction records
+    repair_payments_revenue = db.query(func.sum(Repair.deposit_paid)).filter(
         and_(
             Repair.deposit_paid.isnot(None),
             Repair.deposit_paid > 0,
-            ~Repair.id.in_(repair_ids_with_payments) if repair_ids_with_payments else True,
-            Repair.created_at >= datetime.combine(start_date, datetime.min.time())
+            ~Repair.id.in_(db.query(Transaction.repair_id).filter(Transaction.type == "payment", Transaction.repair_id.isnot(None)))
         )
-    ).all()
+    ).scalar() or 0
 
-    repair_deposit_revenue = sum(float(r.deposit_paid) for r in repairs_without_payments)
+    total_revenue = online_sales_revenue + inhouse_sales_revenue + transaction_revenue + repair_payments_revenue
 
-    total_revenue = transaction_revenue + repair_deposit_revenue
+    # Monthly Revenue (from actual payments received in last 30 days)
+    monthly_online_sales_revenue = db.query(func.sum(OnlineSale.amount)).filter(
+        and_(
+            OnlineSale.status == "completed",
+            OnlineSale.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
+        )
+    ).scalar() or 0
 
-    # Monthly Revenue from payment transactions in last 30 days
+    monthly_inhouse_sales_revenue = db.query(func.sum(InHouseSale.amount)).filter(
+        InHouseSale.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
+    ).scalar() or 0
+
     monthly_transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
         and_(
             Transaction.type == "payment",
@@ -213,28 +225,16 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair deposit_paid for repairs without payment transactions in last 30 days
-    monthly_repairs_with_payments = db.query(Transaction.repair_id).filter(
-        and_(
-            Transaction.type == "payment",
-            Transaction.repair_id.isnot(None)
-        )
-    ).distinct().all()
-
-    monthly_repair_ids_with_payments = [r[0] for r in monthly_repairs_with_payments]
-
-    monthly_repairs_without_payments = db.query(Repair).filter(
+    monthly_repair_payments_revenue = db.query(func.sum(Repair.deposit_paid)).filter(
         and_(
             Repair.deposit_paid.isnot(None),
             Repair.deposit_paid > 0,
-            ~Repair.id.in_(monthly_repair_ids_with_payments) if monthly_repair_ids_with_payments else True,
+            ~Repair.id.in_(db.query(Transaction.repair_id).filter(Transaction.type == "payment", Transaction.repair_id.isnot(None))),
             Repair.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
         )
-    ).all()
+    ).scalar() or 0
 
-    monthly_repair_deposit_revenue = sum(float(r.deposit_paid) for r in monthly_repairs_without_payments)
-
-    monthly_revenue = monthly_transaction_revenue + monthly_repair_deposit_revenue
+    monthly_revenue = monthly_online_sales_revenue + monthly_inhouse_sales_revenue + monthly_transaction_revenue + monthly_repair_payments_revenue
     
     # Outstanding Payments
     outstanding_payments = db.query(func.sum(Invoice.amount - Invoice.deposit_paid)).filter(
@@ -256,7 +256,7 @@ async def get_finance_stats(
         )
     ).scalar() or 0
     
-    # Net Profit (revenue minus expenses)
+    # Net Profit
     net_profit = total_revenue - total_expenses
     
     # Paid Invoices

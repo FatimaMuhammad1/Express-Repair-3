@@ -3,11 +3,10 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from decimal import Decimal
 from typing import Optional
-from datetime import datetime, timedelta
-from datetime import timezone
+from datetime import datetime
 
 from app.database import get_db
-from app.models import Repair, User, TaxRate, Invoice, InvoiceStatus
+from app.models import Repair, User, TaxRate
 from app.dependencies import require_roles
 from pydantic import BaseModel
 
@@ -45,39 +44,10 @@ async def generate_invoice(
         if tax_rate:
             tax_percentage = float(tax_rate.rate * 100)
 
-    # Calculate totals - use final_repair_cost if available, otherwise estimated_cost
-    cost = repair.final_repair_cost or repair.estimated_cost
-    subtotal = float(cost) if cost else 0
+    # Calculate totals
+    subtotal = float(repair.estimated_cost) if repair.estimated_cost else 0
     tax_amount = subtotal * (tax_percentage / 100)
     total = subtotal + tax_amount
-
-    # Check if invoice already exists for this repair
-    existing_invoice = db.query(Invoice).filter(Invoice.repair_id == repair.id).first()
-    if existing_invoice:
-        raise HTTPException(400, "Invoice already exists for this repair")
-
-    # Create invoice record in database
-    invoice_num = f"INV-{datetime.now().strftime('%Y%m%d')}-{repair.tracking_id}"
-    invoice = Invoice(
-        invoice_number=invoice_num,
-        repair_id=repair.id,
-        customer_name=repair.customer_name,
-        customer_email=repair.customer_email,
-        customer_phone=repair.customer_phone,
-        amount=total,
-        tax_amount=tax_amount,
-        deposit_paid=repair.deposit_paid or 0,
-        status=InvoiceStatus.pending if (repair.deposit_paid or 0) == 0 else InvoiceStatus.partial,
-        due_date=datetime.now(timezone.utc).date() + timedelta(days=7),
-        notes=body.notes
-    )
-    db.add(invoice)
-    try:
-        db.commit()
-        db.refresh(invoice)
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(500, f"Failed to create invoice: {str(e)}")
 
     # Generate professional HTML invoice
     invoice_html = f"""
@@ -174,7 +144,6 @@ async def generate_invoice(
         "success": True,
         "message": "Invoice generated successfully",
         "invoice": {
-            "id": str(invoice.id),
             "invoice_number": f"INV-{repair.tracking_id}",
             "repair_id": str(body.repair_id),
             "tracking_id": repair.tracking_id,

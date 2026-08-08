@@ -83,7 +83,7 @@ export default function MainDashboard() {
 
       // Fetch finance stats
       try {
-        const financeStatsRes = await fetch(buildUrl("/api/finance/stats?period=all"), {
+        const financeStatsRes = await fetch(buildUrl("/finance/stats"), {
           headers: token ? { "Authorization": `Bearer ${token}` } : {}
         });
         financeStatsData = await financeStatsRes.json();
@@ -178,7 +178,6 @@ export default function MainDashboard() {
       if (financeStatsData.success && financeStatsData.stats) {
         setStats(prev => ({
           ...prev,
-          totalRevenue: (financeStatsData.stats as any).totalRevenue || 0,
           totalProfit: (financeStatsData.stats as any).netProfit || 0,
           totalExpenses: (financeStatsData.stats as any).totalExpenses || 0,
           outstandingReceivables: (financeStatsData.stats as any).outstandingPayments || 0,
@@ -302,11 +301,13 @@ export default function MainDashboard() {
 
         setStats(prev => ({
           ...prev,
+          totalRevenue: total,
           todaySales: todayRevenue
         }));
       } else if (revenueData.success) {
         setStats(prev => ({
           ...prev,
+          totalRevenue: connectedRevenueTotal,
           todaySales: todayRevenue
         }));
       }
