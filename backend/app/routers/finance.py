@@ -176,7 +176,7 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair costs for repairs that don't have payment transactions
+    # Add repair deposit_paid for repairs that don't have payment transactions
     # This covers old walk-in repairs where full amount was written in deposit_paid
     repairs_with_payments = db.query(Transaction.repair_id).filter(
         and_(
@@ -189,24 +189,16 @@ async def get_finance_stats(
 
     repairs_without_payments = db.query(Repair).filter(
         and_(
+            Repair.deposit_paid.isnot(None),
+            Repair.deposit_paid > 0,
             ~Repair.id.in_(repair_ids_with_payments) if repair_ids_with_payments else True,
             Repair.created_at >= datetime.combine(start_date, datetime.min.time())
         )
     ).all()
 
-    repair_costs_without_payments = 0
-    for r in repairs_without_payments:
-        val = 0
-        # Use deposit_paid first (old repairs where full amount was written here)
-        if r.deposit_paid is not None and r.deposit_paid > 0:
-            val = r.deposit_paid
-        elif r.final_repair_cost is not None:
-            val = r.final_repair_cost
-        elif r.estimated_cost is not None and r.estimated_cost > 0:
-            val = r.estimated_cost
-        repair_costs_without_payments += float(val)
+    repair_deposit_revenue = sum(float(r.deposit_paid) for r in repairs_without_payments)
 
-    total_revenue = transaction_revenue + repair_costs_without_payments
+    total_revenue = transaction_revenue + repair_deposit_revenue
 
     # Monthly Revenue from payment transactions in last 30 days
     monthly_transaction_revenue = db.query(func.sum(Transaction.amount)).filter(
@@ -221,8 +213,7 @@ async def get_finance_stats(
         )
     ).scalar() or 0
 
-    # Add repair costs for repairs without payment transactions in last 30 days
-    # This covers old walk-in repairs where full amount was written in deposit_paid
+    # Add repair deposit_paid for repairs without payment transactions in last 30 days
     monthly_repairs_with_payments = db.query(Transaction.repair_id).filter(
         and_(
             Transaction.type == "payment",
@@ -234,24 +225,16 @@ async def get_finance_stats(
 
     monthly_repairs_without_payments = db.query(Repair).filter(
         and_(
+            Repair.deposit_paid.isnot(None),
+            Repair.deposit_paid > 0,
             ~Repair.id.in_(monthly_repair_ids_with_payments) if monthly_repair_ids_with_payments else True,
             Repair.created_at >= datetime.combine((now - timedelta(days=30)).date(), datetime.min.time())
         )
     ).all()
 
-    monthly_repair_costs_without_payments = 0
-    for r in monthly_repairs_without_payments:
-        val = 0
-        # Use deposit_paid first (old repairs where full amount was written here)
-        if r.deposit_paid is not None and r.deposit_paid > 0:
-            val = r.deposit_paid
-        elif r.final_repair_cost is not None:
-            val = r.final_repair_cost
-        elif r.estimated_cost is not None and r.estimated_cost > 0:
-            val = r.estimated_cost
-        monthly_repair_costs_without_payments += float(val)
+    monthly_repair_deposit_revenue = sum(float(r.deposit_paid) for r in monthly_repairs_without_payments)
 
-    monthly_revenue = monthly_transaction_revenue + monthly_repair_costs_without_payments
+    monthly_revenue = monthly_transaction_revenue + monthly_repair_deposit_revenue
     
     # Outstanding Payments
     outstanding_payments = db.query(func.sum(Invoice.amount - Invoice.deposit_paid)).filter(
