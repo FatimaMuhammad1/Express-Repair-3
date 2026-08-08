@@ -314,31 +314,67 @@ async def get_transactions(
         start_date = date.min
     
     query = db.query(Transaction)
-    
+
     if branch_id and branch_id != "all":
         query = query.filter(Transaction.branch_id == branch_id)
-    
+
     if period != "all":
         query = query.filter(Transaction.created_at >= datetime.combine(start_date, datetime.min.time()))
-    
+
     transactions = query.order_by(Transaction.created_at.desc()).limit(100).all()
-    
+
+    # Also include repair payments from deposit_paid for repairs without transaction records
+    repair_payments_query = db.query(Repair).filter(
+        and_(
+            Repair.deposit_paid.isnot(None),
+            Repair.deposit_paid > 0,
+            ~Repair.id.in_(db.query(Transaction.repair_id).filter(Transaction.type == "payment", Transaction.repair_id.isnot(None)))
+        )
+    )
+
+    if branch_id and branch_id != "all":
+        repair_payments_query = repair_payments_query.filter(Repair.branch_id == branch_id)
+
+    if period != "all":
+        repair_payments_query = repair_payments_query.filter(Repair.created_at >= datetime.combine(start_date, datetime.min.time()))
+
+    repair_payments = repair_payments_query.order_by(Repair.created_at.desc()).limit(100).all()
+
+    # Combine both sources
+    all_transactions = []
+    for t in transactions:
+        all_transactions.append({
+            "id": str(t.id),
+            "type": t.type,
+            "amount": float(t.amount),
+            "description": t.description,
+            "customer_name": t.customer_name,
+            "invoice_number": t.invoice_number,
+            "status": t.status,
+            "payment_method": t.payment_method,
+            "created_at": t.created_at.isoformat(),
+        })
+
+    for r in repair_payments:
+        all_transactions.append({
+            "id": f"repair-{r.id}",
+            "type": "payment",
+            "amount": float(r.deposit_paid),
+            "description": f"Deposit payment for repair {r.tracking_id}",
+            "customer_name": r.customer_name,
+            "invoice_number": None,
+            "status": "received",
+            "payment_method": None,
+            "created_at": r.created_at.isoformat(),
+        })
+
+    # Sort by date descending
+    all_transactions.sort(key=lambda x: x["created_at"], reverse=True)
+    all_transactions = all_transactions[:100]
+
     return {
         "success": True,
-        "transactions": [
-            {
-                "id": str(t.id),
-                "type": t.type,
-                "amount": float(t.amount),
-                "description": t.description,
-                "customer_name": t.customer_name,
-                "invoice_number": t.invoice_number,
-                "status": t.status,
-                "payment_method": t.payment_method,
-                "created_at": t.created_at.isoformat(),
-            }
-            for t in transactions
-        ]
+        "transactions": all_transactions
     }
 
 
